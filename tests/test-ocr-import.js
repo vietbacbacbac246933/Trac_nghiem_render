@@ -323,7 +323,50 @@ const createdExams = [];
     check('không có ảnh người dùng nào bị ghi vào data/ocr-cache', pngInCache.length === 0, JSON.stringify(pngInCache));
 
     // ------------------------------------------------------------------
-    console.log('\n=== 18. Dọn dẹp: xóa các bài test đã tạo ===');
+    console.log('\n=== 18. Đáp án đúng đánh dấu bằng GẠCH CHÂN trong ảnh ===');
+    const ulEx = await extract(cookie, [{
+        name: 'de-thi-gach-chan.png', type: 'image/png', buffer: fixture('de-thi-gach-chan.png')
+    }]);
+    check('extract ảnh gạch chân -> success', ulEx.json && ulEx.json.success === true, JSON.stringify(ulEx.json).slice(0, 200));
+    check('báo nhận diện được 3 dòng gạch chân', ulEx.json && ulEx.json.underlined === 3,
+        'underlined=' + (ulEx.json && ulEx.json.underlined));
+
+    const ulAn = await analyze(cookie, ulEx.json.sessionId);
+    check('analyze ảnh gạch chân -> success', ulAn.json && ulAn.json.success === true, JSON.stringify(ulAn.json).slice(0, 200));
+    check('nhận diện 4 câu hỏi', ulAn.json && ulAn.json.count === 4, 'count=' + (ulAn.json && ulAn.json.count));
+
+    const uq = (ulAn.json && ulAn.json.questions) || [];
+    check('gạch chân CHỮ CÁI -> đáp án D (index 3)', uq[0] && uq[0].correct === 3, 'correct=' + (uq[0] && JSON.stringify(uq[0].correct)));
+    check('gạch chân CHỮ CÁI -> đáp án B (index 1)', uq[1] && uq[1].correct === 1, 'correct=' + (uq[1] && JSON.stringify(uq[1].correct)));
+    check('gạch chân CẢ DÒNG -> đáp án D (index 3)', uq[2] && uq[2].correct === 3, 'correct=' + (uq[2] && JSON.stringify(uq[2].correct)));
+    check('câu gạch chân KHÔNG bị đánh dấu cần kiểm tra', uq[0] && uq[0].needsReview === false);
+    check('KHÔNG gạch chân -> correct = null', uq[3] && uq[3].correct === null, 'correct=' + (uq[3] && JSON.stringify(uq[3].correct)));
+    check('KHÔNG gạch chân -> đánh dấu cần kiểm tra', uq[3] && uq[3].needsReview === true);
+    check('nội dung đáp án gạch chân không còn dấu * lẫn vào',
+        uq[0] && !/\*/.test(String(uq[0].options[3] || '')), JSON.stringify(uq[0] && uq[0].options[3]));
+
+    const ulSave = await confirm(cookie, {
+        sessionId: ulEx.json.sessionId,
+        destination: 'new',
+        examName: 'TEST-OCR-UNDERLINE',
+        questions: uq.map(q => toSavePayload(q))
+    });
+    check('lưu 3 câu có đáp án (bỏ 1 câu thiếu đáp án)',
+        ulSave.json && ulSave.json.success === true && ulSave.json.saved === 3, JSON.stringify(ulSave.json).slice(0, 200));
+    if (ulSave.json && ulSave.json.examId) createdExams.push(ulSave.json.examId);
+
+    if (ulSave.json && ulSave.json.examId) {
+        const ulRe = await getExam(cookie, ulSave.json.examId);
+        const savedU = (ulRe.json && ulRe.json.exam && ulRe.json.exam.questions) || [];
+        check('đọc lại được 3 câu đã lưu', savedU.length === 3, 'len=' + savedU.length);
+        check('đáp án suy ra từ gạch chân được LƯU đúng (D)', savedU[0] && savedU[0].correct === 3,
+            JSON.stringify(savedU[0] && savedU[0].correct));
+        check('đáp án suy ra từ gạch chân được LƯU đúng (B)', savedU[1] && savedU[1].correct === 1,
+            JSON.stringify(savedU[1] && savedU[1].correct));
+    }
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 19. Dọn dẹp: xóa các bài test đã tạo ===');
     let cleaned = 0;
     for (const id of createdExams) {
         const r = await fetch(BASE + '/api/exams/' + id, { method: 'DELETE', headers: { Cookie: cookie } });

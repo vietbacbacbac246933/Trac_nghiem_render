@@ -4008,6 +4008,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
             if (result.ocr) {
                 html += `<div style="margin-top:6px; font-size:0.85em; color:#777;">Đọc bằng ${escapeHtml(String(result.ocr.provider))} · thấy ${result.ocr.questionMarkers || 0} mốc câu hỏi, ${result.ocr.optionMarkers || 0} đáp án. Nếu thiếu câu, hãy mở "Xem văn bản OCR" ở bước chọn ảnh để kiểm tra.</div>`;
+                if (result.ocr.underlined > 0) {
+                    html += `<div style="margin-top:6px; font-size:0.85em; color:#2e7d32;">🖍 Đã nhận ra <b>${result.ocr.underlined}</b> đáp án được <b>gạch chân</b> trong ảnh và tự chọn sẵn. Hãy kiểm tra lại bên dưới.</div>`;
+                }
             }
 
             // Luôn tạo sẵn dòng cảnh báo (có id) để updateImportSummaryCounts cập nhật/ẩn được

@@ -15,7 +15,7 @@
 
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-const { Document, Packer, Paragraph } = require(path.join(ROOT, 'node_modules', 'docx'));
+const { Document, Packer, Paragraph, TextRun } = require(path.join(ROOT, 'node_modules', 'docx'));
 
 const BASE = process.env.TEST_BASE || 'http://127.0.0.1:3999';
 const PASSWORD = process.env.TEST_PASSWORD || 'test123';
@@ -51,6 +51,51 @@ async function buildSampleDocx() {
                 new Paragraph('B. 4'),
                 new Paragraph('C. 5'),
                 new Paragraph('D. 6')
+            ]
+        }]
+    });
+    return Packer.toBuffer(doc);
+}
+
+// .docx mà ĐÁP ÁN ĐÚNG ĐƯỢC GẠCH CHÂN (kiểu đề thi rất phổ biến khi in từ Word).
+// Có 3 kiểu: gạch chân chỉ chữ cái ("D."), gạch chân cả dòng, và dòng câu hỏi
+// bị gạch chân (KHÔNG được coi là đáp án).
+async function buildUnderlinedDocx() {
+    const under = (t) => new TextRun({ text: t, underline: {} });
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph('Câu 1: Nội dung nào sau đây phản ánh không đúng đặc điểm của xu thế đa cực trong quan hệ quốc tế?'),
+                new Paragraph('A. Mỹ suy giảm sức mạnh tương đối so với các cường quốc khác.'),
+                new Paragraph('B. Sự gia tăng sức mạnh của các nước lớn.'),
+                new Paragraph('C. Vai trò ngày càng tăng của các trung tâm quốc tế.'),
+                // Gạch chân CHỈ chữ cái "D."
+                new Paragraph({ children: [under('D.'), new TextRun(' Sự cạnh tranh sức mạnh tổng hợp.')] }),
+
+                new Paragraph('Câu 2: Nội dung nào sau đây không phản ánh đúng bối cảnh lịch sử hình thành tổ chức Liên hợp quốc?'),
+                new Paragraph('A. Nhân dân thế giới có khát vọng được chung sống hòa bình.'),
+                // Gạch chân CHỈ chữ cái "B."
+                new Paragraph({ children: [under('B.'), new TextRun(' Chủ nghĩa phát xít xuất hiện và cầm quyền ở nhiều nước.')] }),
+                new Paragraph('C. Ý thức của các nước Đồng minh về việc tổ chức thế giới.'),
+                new Paragraph('D. Nhu cầu thành lập tổ chức quốc tế mới thay thế tổ chức cũ.'),
+
+                new Paragraph('Câu 3: Số nào sau đây là số nguyên tố?'),
+                new Paragraph('A. 4'),
+                new Paragraph('B. 6'),
+                new Paragraph('C. 8'),
+                // Gạch chân CẢ DÒNG đáp án
+                new Paragraph({ children: [under('D. 11')] }),
+
+                new Paragraph('Câu 4: Hành tinh nào nằm gần Mặt Trời nhất?'),
+                new Paragraph('A. Sao Kim'),
+                new Paragraph('B. Sao Thủy'),
+                new Paragraph('C. Trái Đất'),
+                new Paragraph('D. Sao Hỏa'),
+
+                // Dòng CÂU HỎI bị gạch chân -> KHÔNG được suy ra thành đáp án
+                new Paragraph({ children: [under('Câu 5: Dòng này gạch chân nhưng là dòng câu hỏi, không phải đáp án.')] }),
+                new Paragraph('A. Phương án một.'),
+                new Paragraph('B. Phương án hai.')
             ]
         }]
     });
@@ -271,7 +316,61 @@ const createdExams = [];
     check('confirm khi chưa đăng nhập -> 403', anonConfirm.status === 403, 'status=' + anonConfirm.status);
 
     // ------------------------------------------------------------------
-    console.log('\n=== 12. Dọn dẹp: xoá các bài test đã tạo ===');
+    console.log('\n=== 12. Word: đáp án đúng được GẠCH CHÂN (không dùng dấu *) ===');
+    const ulDocx = await buildUnderlinedDocx();
+    const pu = await preview(cookie, [{
+        name: 'de-thi-gach-chan.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: ulDocx
+    }]);
+    check('preview ảnh/docx gạch chân -> success', pu.json && pu.json.success === true, JSON.stringify(pu.json).slice(0, 200));
+    check('nhận diện 5 câu hỏi', pu.json && pu.json.count === 5, 'count=' + (pu.json && pu.json.count));
+
+    const uq = (pu.json && pu.json.questions) || [];
+    check('gạch chân CHỮ CÁI -> đáp án D (index 3)', uq[0] && uq[0].correct === 3, 'correct=' + (uq[0] && JSON.stringify(uq[0].correct)));
+    check('gạch chân CHỮ CÁI -> đáp án B (index 1)', uq[1] && uq[1].correct === 1, 'correct=' + (uq[1] && JSON.stringify(uq[1].correct)));
+    check('gạch chân CẢ DÒNG -> đáp án D (index 3)', uq[2] && uq[2].correct === 3, 'correct=' + (uq[2] && JSON.stringify(uq[2].correct)));
+    check('câu có gạch chân KHÔNG bị đánh dấu cần kiểm tra', uq[0] && uq[0].needsReview === false, JSON.stringify(uq[0] && uq[0].needsReview));
+    check('KHÔNG gạch chân -> correct = null (không tự bịa)', uq[3] && uq[3].correct === null, 'correct=' + (uq[3] && JSON.stringify(uq[3].correct)));
+    check('KHÔNG gạch chân -> đánh dấu cần kiểm tra', uq[3] && uq[3].needsReview === true);
+    check('gạch chân ở DÒNG CÂU HỎI không bị coi là đáp án', uq[4] && uq[4].correct === null, 'correct=' + (uq[4] && JSON.stringify(uq[4].correct)));
+
+    const uOpt0 = String((uq[0] && uq[0].options[3]) || '');
+    const uText0 = uOpt0.replace(/<[^>]+>/g, '').trim();
+    check('đáp án gạch chân đã bỏ thẻ <u>', !/<u\b/i.test(uOpt0), JSON.stringify(uOpt0));
+    check('đáp án gạch chân đã bỏ chữ cái "D." ở đầu', !/^D\./.test(uText0), JSON.stringify(uText0));
+    check('đáp án gạch chân giữ đúng nội dung',
+        /cạnh tranh sức mạnh tổng hợp/i.test(uText0), JSON.stringify(uText0));
+    const uText3 = String((uq[2] && uq[2].options[3]) || '').replace(/<[^>]+>/g, '').trim();
+    check('câu gạch chân CẢ DÒNG cũng sạch chữ cái đầu', uText3 === '11', JSON.stringify(uText3));
+
+    // Lưu thật rồi đọc lại
+    const cu = await confirm(cookie, {
+        sessionId: pu.json.sessionId,
+        destination: 'new',
+        examName: 'TEST-IMPORT-UNDERLINE',
+        questions: uq.map(q => ({
+            include: true, type: q.type, question: q.question, options: q.options,
+            correct: q.correct, correctList: q.correctList, correctTF: q.correctTF
+        }))
+    });
+    check('lưu 3 câu có đáp án (bỏ 2 câu thiếu đáp án)',
+        cu.json && cu.json.success === true && cu.json.saved === 3, JSON.stringify(cu.json).slice(0, 200));
+    if (cu.json && cu.json.examId) createdExams.push(cu.json.examId);
+
+    if (cu.json && cu.json.examId) {
+        const ulRe = await fetch(BASE + '/api/exams/' + cu.json.examId, { headers: { Cookie: cookie } });
+        const ulJson = await ulRe.json();
+        const savedU = (ulJson && ulJson.exam && ulJson.exam.questions) || [];
+        check('đọc lại được 3 câu đã lưu', savedU.length === 3, 'len=' + savedU.length);
+        check('đáp án gạch chân được LƯU đúng (D)', savedU[0] && savedU[0].correct === 3, JSON.stringify(savedU[0] && savedU[0].correct));
+        check('đáp án gạch chân được LƯU đúng (B)', savedU[1] && savedU[1].correct === 1, JSON.stringify(savedU[1] && savedU[1].correct));
+        check('đáp án gạch chân được LƯU đúng (câu 3 = D)',
+            savedU[2] && savedU[2].correct === 3, JSON.stringify(savedU[2] && savedU[2].correct));
+    }
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 13. Dọn dẹp: xoá các bài test đã tạo ===');
     let cleaned = 0;
     for (const id of createdExams) {
         const r = await fetch(BASE + '/api/exams/' + id, { method: 'DELETE', headers: { Cookie: cookie } });

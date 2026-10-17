@@ -34,6 +34,7 @@ var importSessions = require('./lib/import-sessions');
 // OCR (trich xuat chu tu anh) + chuan hoa van ban OCR
 var ocr = require('./lib/ocr');
 var ocrParse = require('./lib/ocr-parse');
+var underline = require('./lib/underline');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -3266,15 +3267,34 @@ app.post('/api/ocr/extract',
         // OCR tuần tự từng ảnh để giới hạn RAM
         var results = [];
         var parts = [];
+        var underlinedTotal = 0;
         try {
             for (var k = 0; k < images.length; k++) {
                 var img = images[k];
                 var out = await ocr.recognize(img.buffer, img.mime);
+                // Dap an dung co the duoc danh dau bang GACH CHAN trong anh
+                // (khong phai dau "*"). Doc diem anh de biet dong nao bi gach chan,
+                // roi them dau "*" vao cuoi dong do -> phan phan tich phia sau
+                // khong phai sua gi.
+                var markedCount = 0;
+                try {
+                    var flags = underline.detectUnderlinedLines(img.buffer, img.mime, out.lines || []);
+                    var marked = underline.applyUnderlineMarkers(out.text || '', out.lines || [], flags);
+                    if (marked.marked > 0) {
+                        out.text = marked.text;
+                        markedCount = marked.marked;
+                        underlinedTotal += markedCount;
+                    }
+                } catch (e) {
+                    // Khong doc duoc diem anh (dinh dang la) -> bo qua, khong lam hong luong OCR
+                    console.error('Lỗi dò gạch chân:', e && e.message);
+                }
                 results.push({
                     name: img.name,
                     provider: out.provider,
                     confidence: out.confidence,
-                    chars: (out.text || '').length
+                    chars: (out.text || '').length,
+                    underlined: markedCount
                 });
                 parts.push(out.text || '');
             }
@@ -3290,7 +3310,7 @@ app.post('/api/ocr/extract',
         var text = parts.join('\n\n');
         if (text.length > OCR_MAX_CHARS) text = text.slice(0, OCR_MAX_CHARS);
 
-        var sessionId = importSessions.create({ ocr: { images: results, text: text } });
+        var sessionId = importSessions.create({ ocr: { images: results, text: text, underlined: underlinedTotal } });
 
         res.json({
             success: true,
@@ -3298,6 +3318,8 @@ app.post('/api/ocr/extract',
             provider: ocr.resolveProvider(),
             images: results,
             chars: text.length,
+            // So dong duoc suy ra dap an nho GACH CHAN (de bao cho giao vien)
+            underlined: underlinedTotal,
             // Van ban tho de giao vien doi chieu voi anh
             text: text,
             warnings: errors
@@ -3378,7 +3400,9 @@ app.post('/api/ocr/analyze', function (req, res) {
         ocr: {
             provider: ocr.resolveProvider(),
             questionMarkers: info.questionMarkers,
-            optionMarkers: info.optionMarkers
+            optionMarkers: info.optionMarkers,
+            // Số dòng được suy ra "đáp án đúng" nhờ GẠCH CHÂN trong ảnh
+            underlined: session.ocr.underlined || 0
         },
         questions: questions
     });
@@ -3593,7 +3617,11 @@ function mammothToHtml(buffer) {
             { buffer: data.buffer },
             {
                 styleMap: [
-                    "p[style-name='Code'] => pre"
+                    "p[style-name='Code'] => pre",
+                    // Giu lai thong tin GACH CHAN cua Word (mammoth mac dinh bo qua).
+                    // Nhieu de thi danh dau dap an dung bang cach gach chan chu cai
+                    // dap an -> can thong tin nay de nhan dien dung dap an.
+                    "u => u"
                 ],
                 convertImage: mammoth.images.imgElement(function(image) {
                     return image.read('base64').then(function(imageBase64) {
@@ -3630,7 +3658,19 @@ function stripHtmlTags(html) {
 }
 
 function removeCorrectMarkers(html) {
-    return html.replace(/\*|\[x\]|\[X\]/g, '').replace(/\(đúng\)|\(dung\)/gi, '').trim();
+    return html.replace(/\*|\[x\]|\[X\]/g, '')
+        .replace(/\(đúng\)|\(dung\)/gi, '')
+        // Bo the gach chan: gach chan trong 1 dong dap an duoc coi la dau hieu
+        // "dap an dung" (giong dau "*"), nen khong giu lai trong noi dung cau hoi.
+        .replace(/<\/?u\b[^>]*>/gi, '')
+        .trim();
+}
+
+// Dong dap an co bi GACH CHAN khong? (mammoth xuat the <u> khi bat styleMap "u => u")
+var UNDERLINE_MARKER_RX = /<u\b[^>]*>[\s\S]*?<\/u>/i;
+
+function hasUnderlineMarker(html) {
+    return UNDERLINE_MARKER_RX.test(String(html || ''));
 }
 
 // Regex nhận dạng marker "đúng" cho truefalse: (đúng) (dung) (Đ) (D) (d) (đ) (T) (t) (Y) (y)
@@ -3645,7 +3685,15 @@ function removeTFMarkers(html) {
 }
 
 function stripOptionPrefix(html) {
-    return html.replace(/^[A-Za-z][\.\)]\s*/, '');
+    // Bo the gach chan cua Word TRUOC khi bo "A." / "B)".
+    // Ly do: de thi thuong gach chan chu cai dap an dung, nen HTML co dang
+    // "<u>D.</u> noi dung..." hoac "<u>D. noi dung...</u>" — neu khong bo the
+    // truoc thi regex "A." o dau chuoi se khong khop va chu cai se bi giu lai
+    // trong noi dung dap an.
+    // Gach chan trong 1 dong dap an duoc coi la dau hieu "dap an dung" (giong
+    // dau "*"), nen khong can giu lai dinh dang nay.
+    var s = String(html).replace(/<\/?u\b[^>]*>/gi, '');
+    return s.replace(/^[A-Za-z][\.\)]\s*/, '');
 }
 
 function stripQuestionPrefix(html) {
@@ -3853,12 +3901,12 @@ function parseQuestionsFromHtml(html, opts) {
             var optHtml = stripOptionPrefix(paraHtml).trim();
 
             if (currentType === 'single') {
-                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText)) {
+                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText) || hasUnderlineMarker(paraHtml)) {
                     correctAnswer = optIndex;
                 }
                 optHtml = removeCorrectMarkers(optHtml);
             } else if (currentType === 'multi') {
-                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText)) {
+                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText) || hasUnderlineMarker(paraHtml)) {
                     correctList.push(optIndex);
                 }
                 optHtml = removeCorrectMarkers(optHtml);

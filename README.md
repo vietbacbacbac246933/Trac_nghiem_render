@@ -28,6 +28,7 @@ nguyên (Node.js + Express + Socket.IO, giao diện HTML thuần).
 | `OCR_PROVIDER` | Không | `auto` (mặc định) \| `tesseract` \| `ocrspace` |
 | `OCR_LANGS` | Không | Ngôn ngữ OCR, mặc định `vie+eng` |
 | `OCR_SPACE_API_KEY` | Không | Khoá OCR.space (chỉ khi muốn dùng `ocrspace`) |
+| `OCR_DEBUG` | Không | Đặt `1` để in tiến trình OCR + kết quả dò gạch chân theo từng dòng ra log (khi cần gỡ lỗi) |
 
 Xem `.env.example`.
 
@@ -36,6 +37,10 @@ WASM) nên **không cần API key, không cần cài thêm gói hệ thống** �
 Render ở chế độ Node thuần. Nếu muốn chất lượng tốt hơn với ảnh chụp bằng điện
 thoại, đặt `OCR_SPACE_API_KEY` (OCR.space có gói miễn phí) và hệ thống sẽ tự
 chuyển sang dùng OCR.space. **Không khoá nào được ghi trong mã nguồn.**
+
+Chức năng dò **đáp án gạch chân** trong ảnh dùng thêm 2 thư viện **thuần
+JavaScript** (không cần biên dịch, cài qua `npm install` như bình thường):
+`pngjs` (đọc ảnh PNG) và `jpeg-js` (đọc ảnh JPG).
 
 ## 3. Chạy thử ở máy (chế độ file, không cần Postgres)
 
@@ -101,6 +106,11 @@ Trong **Quản lý Bài kiểm tra** → nút **“Nhập Word/Ảnh”**:
 
 Nguyên tắc:
 
+- **Đáp án đúng** được nhận ra khi trong file có dấu hiệu rõ ràng: dấu `*` sau
+  đáp án, `[x]`, `(đúng)`, hoặc **đáp án được GẠCH CHÂN** (kiểu rất phổ biến ở đề
+  in từ Word: gạch chân chỉ chữ cái `D.`, hoặc gạch chân cả dòng). Gạch chân chỉ
+  được xét **trong dòng đáp án** — gạch chân ở dòng câu hỏi không bị hiểu thành
+  đáp án; sau khi nhận diện, gạch chân được bỏ khỏi nội dung đáp án lưu lại.
 - **Không tự bịa dữ liệu.** Câu thiếu đáp án / thiếu nội dung / không xác định
   được ranh giới sẽ bị gắn nhãn *“cần kiểm tra”* kèm lý do, chứ không tự gán
   đáp án A. Khi bấm lưu, câu chưa hợp lệ sẽ bị **bỏ qua** và báo rõ lý do.
@@ -128,9 +138,14 @@ Trong **Quản lý Bài kiểm tra** → nút **“📷 Nhập từ ảnh (OCR)�
 Nguyên tắc riêng cho OCR:
 
 - **Không đoán đáp án.** Đáp án đúng chỉ được lấy khi ảnh có dấu hiệu rõ ràng
-  (`*` sau đáp án, `[x]`, `(đúng)`), ví dụ `B. Hà Nội *`. Nếu ảnh **không** ghi
-  đáp án đúng, câu đó có `correct = null` và bị đánh dấu **cần kiểm tra**; nếu
-  giáo viên cố lưu thì câu đó bị **bỏ qua** chứ không tự gán bừa.
+  (`*` sau đáp án, `[x]`, `(đúng)`), ví dụ `B. Hà Nội *`, **hoặc chữ cái đáp án bị
+  GẠCH CHÂN trong ảnh** (ví dụ dưới `D.` có gạch chân). Với gạch chân, server đọc
+  trực tiếp điểm ảnh: tìm một **đoạn mực dài, mảnh, nằm ngay dưới đường chân chữ
+  (baseline)** trong dòng đáp án — nét chữ và đuôi chữ (g, y, ạ…) chỉ tạo đoạn
+  ngắn nên không bị nhầm. Chỉ xét dòng bắt đầu bằng `A.`/`B.`/`C.`/`D.`. Nếu **không**
+  ghi đáp án đúng, câu đó có `correct = null` và bị đánh dấu **cần kiểm tra**; nếu
+  giáo viên cố lưu thì câu đó bị **bỏ qua** chứ không tự gán bừa. Số đáp án nhận ra
+  nhờ gạch chân được báo ngay trên bản xem trước để giáo viên đối chiếu với ảnh.
 - **Ảnh mờ / không có chữ**: hệ thống báo rõ *“OCR không nhận ra câu hỏi nào”* và
   hiện văn bản đọc được để giáo viên biết cần chụp lại ảnh rõ hơn.
 - **Tách bước rõ ràng**: *chọn ảnh → OCR → phân tích câu hỏi → xem trước → xác
@@ -171,6 +186,10 @@ API mới (đều yêu cầu đăng nhập giáo viên):
 - `socketId` do trình duyệt gửi lên nên về lý thuyết có thể giả mạo (rủi ro
   thấp, cần biết ID của phiên khác).
 - Chưa giới hạn tần suất ở mọi API (chỉ có ở đăng nhập giáo viên).
+- **Dò gạch chân chỉ chạy với tesseract** (nhà cung cấp mặc định), vì cần toạ độ
+  từng dòng chữ do tesseract trả về. Nếu đặt `OCR_SPACE_API_KEY` (provider
+  `ocrspace`) thì OCR.space chỉ trả về chữ, **không** dò được gạch chân — khi đó
+  đáp án đúng vẫn phải dựa vào `*`/`[x]`/`(đúng)` và giáo viên tự chọn.
 
 ## 7. Cấu trúc thư mục
 
@@ -182,6 +201,7 @@ lib/file-validate.js # Kiểm tra định dạng/dung lượng file nhập đề
 lib/import-sessions.js # Phiên xem trước khi nhập đề (RAM, tự hết hạn)
 lib/ocr.js           # Trích xuất chữ từ ảnh (tesseract.js / OCR.space)
 lib/ocr-parse.js     # Chuẩn hoá văn bản OCR trước khi phân tích câu hỏi
+lib/underline.js     # Dò đáp án GẠCH CHÂN trong ảnh (đọc điểm ảnh, không cần OCR thêm)
 public/              # Giao diện học sinh, giáo viên, trang đăng nhập
 data/                # Dữ liệu gieo ban đầu (câu hỏi, đề thi, file mẫu)
 data/ocr-cache/      # Cache dữ liệu ngôn ngữ OCR (tự sinh, không commit)

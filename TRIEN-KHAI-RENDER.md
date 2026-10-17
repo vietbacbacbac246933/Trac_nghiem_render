@@ -43,22 +43,23 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 |---|---|
 | `lib/file-validate.js` | Nhận dạng `.docx` (chữ ký ZIP) và ảnh (PNG/JPEG/GIF/BMP/WEBP) theo nội dung thật; giới hạn `.docx` 15 MB, ảnh 8 MB, tổng 25 MB, ≤ 30 ảnh. |
 | `lib/import-sessions.js` | Lưu tạm kết quả phân tích để giáo viên xem/sửa trước khi lưu; ảnh giữ trong RAM dưới dạng token `[[IMG:n]]`; hết hạn 30 phút. |
-| `tests/test-import-docx.js` | Test DOCX hợp lệ, thiếu đáp án, sai định dạng, file giả, docx hỏng, ảnh, quá dung lượng, chặn ẩn danh, chống lưu lặp. |
+| `tests/test-import-docx.js` | Test DOCX hợp lệ, thiếu đáp án, **đáp án gạch chân trong Word**, sai định dạng, file giả, docx hỏng, ảnh, quá dung lượng, chặn ẩn danh, chống lưu lặp. |
 
 ### File mới (tính năng nhập đề từ ẢNH bằng OCR)
 | File | Vai trò |
 |---|---|
 | `lib/ocr.js` | Trích xuất chữ từ ảnh. Mặc định **tesseract.js** (WASM, chạy trong tiến trình Node, miễn phí, không cần API key, không cần cài gói hệ thống nên chạy được trên Render Node thuần); tuỳ chọn **OCR.space** qua biến môi trường `OCR_SPACE_API_KEY`. Chỉ nhận `Buffer` trong RAM; xếp hàng tuần tự để giới hạn RAM. |
 | `lib/ocr-parse.js` | Chuẩn hoá văn bản OCR (`Cau 1`→`Câu 1`, `A.4`→`A. 4`, gộp dòng, bỏ tiền tố rác/số trang) và đánh giá “có giống đề thi không” để báo lỗi khi ảnh mờ. |
-| `tests/test-ocr-import.js` | Test OCR (69 trường hợp): ảnh rõ, nhiều câu, ảnh mờ/không đọc được, câu thiếu đáp án, sai định dạng, quá dung lượng, sửa trước khi lưu, hủy không tạo dữ liệu, lưu rồi mở lại, chống lặp phiên, chặn ẩn danh, không ghi ảnh người dùng lên đĩa. |
-| `tests/fixtures/*.png` + `make-fixtures.ps1` | Ảnh đề mẫu (4 câu, 8 câu, ảnh mờ) và script GDI+ tạo lại. |
+| `lib/underline.js` | Dò **đáp án đúng bị GẠCH CHÂN** trong ảnh. Dùng toạ độ dòng chữ của tesseract + đọc trực tiếp điểm ảnh (`pngjs` cho PNG, `jpeg-js` cho JPEG): nhị phân bằng Otsu (tự nhận nền sáng/tối), tìm đoạn mực **dài và mảnh nằm ngay dưới đường chân chữ (baseline)** trong dòng đáp án → chèn `*` vào cuối dòng để phần phân tích phía sau hiểu là đáp án đúng. Không giải mã được ảnh thì trả về “không có gạch chân” (an toàn). |
+| `tests/test-ocr-import.js` | Test OCR (84 trường hợp): ảnh rõ, nhiều câu, ảnh mờ/không đọc được, câu thiếu đáp án, **đáp án gạch chân (chỉ chữ cái / cả dòng)**, sai định dạng, quá dung lượng, sửa trước khi lưu, hủy không tạo dữ liệu, lưu rồi mở lại, chống lặp phiên, chặn ẩn danh, không ghi ảnh người dùng lên đĩa. |
+| `tests/fixtures/*.png` + `make-fixtures.ps1` | Ảnh đề mẫu (4 câu, 8 câu, **đáp án gạch chân**, ảnh mờ) và script GDI+ tạo lại. |
 
 ### File sửa
 | File | Nội dung chính |
 |---|---|
-| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; quản lý PIN + `/api/student-pins*`; `/api/select-student` đòi PIN; bootstrap bất đồng bộ + shutdown. **Thêm:** `/api/import/preview`, `/api/import/confirm`, `GET /api/exams/:examId`; multer riêng có giới hạn + lọc định dạng; `parseQuestionsFromHtml` chế độ `trackReview` (đánh dấu câu cần kiểm tra, không tự gán đáp án). **Thêm (OCR):** `/api/ocr/extract`, `/api/ocr/analyze`, `/api/ocr/status`; trường `points` (trọng số) trong chuẩn hoá câu hỏi + công thức chấm điểm quy về thang 10 theo trọng số (không có `points` thì y như cũ); nạp trước OCR lúc khởi động và giải phóng worker khi tắt. |
-| `package.json` | Thêm `jszip`, `xml-js`, `pg`, `tesseract.js`; `engines.node >= 18`; thêm script `test:import`, `test:ocr`. |
-| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401; nút + hộp thoại “Mã PIN học sinh” (xem/tạo lại/tải Excel). **Thêm:** nút “Nhập Word/Ảnh” + modal xem trước cho sửa (nội dung, đáp án, loại câu, chọn đáp án đúng) và chọn nơi lưu. **Thêm (OCR):** nút “📷 Nhập từ ảnh (OCR)”, modal chọn/xoá ảnh (thumbnail + nút ✕), xem văn bản OCR để đối chiếu, và ô **Điểm** từng câu trong bản xem trước. |
+| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; quản lý PIN + `/api/student-pins*`; `/api/select-student` đòi PIN; bootstrap bất đồng bộ + shutdown. **Thêm:** `/api/import/preview`, `/api/import/confirm`, `GET /api/exams/:examId`; multer riêng có giới hạn + lọc định dạng; `parseQuestionsFromHtml` chế độ `trackReview` (đánh dấu câu cần kiểm tra, không tự gán đáp án). **Thêm (OCR):** `/api/ocr/extract`, `/api/ocr/analyze`, `/api/ocr/status`; trường `points` (trọng số) trong chuẩn hoá câu hỏi + công thức chấm điểm quy về thang 10 theo trọng số (không có `points` thì y như cũ); nạp trước OCR lúc khởi động và giải phóng worker khi tắt. **Thêm (gạch chân):** nạp `lib/underline.js` — dò gạch chân trong `/api/ocr/extract`, trả `underlined` (số đáp án suy ra từ gạch chân); `styleMap: "u => u"` khi đọc Word để giữ thẻ `<u>`, `hasUnderlineMarker()` coi `<u>` trong **dòng đáp án** là đáp án đúng, `stripOptionPrefix()`/`removeCorrectMarkers()` bỏ `<u>` khỏi nội dung đáp án. |
+| `package.json` | Thêm `jszip`, `xml-js`, `pg`, `tesseract.js`, `pngjs`, `jpeg-js`; `engines.node >= 18`; thêm script `test:import`, `test:ocr`. |
+| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401; nút + hộp thoại “Mã PIN học sinh” (xem/tạo lại/tải Excel). **Thêm:** nút “Nhập Word/Ảnh” + modal xem trước cho sửa (nội dung, đáp án, loại câu, chọn đáp án đúng) và chọn nơi lưu. **Thêm (OCR):** nút “📷 Nhập từ ảnh (OCR)”, modal chọn/xoá ảnh (thumbnail + nút ✕), xem văn bản OCR để đối chiếu, và ô **Điểm** từng câu trong bản xem trước. **Thêm (gạch chân):** dòng thông báo “🖍 Đã nhận ra N đáp án được gạch chân…” trên bản xem trước OCR. |
 | `.env.example` | Thêm `OCR_PROVIDER`, `OCR_LANGS`, `OCR_SPACE_API_KEY`, `OCR_DEBUG`. |
 | `public/index.html` | Hộp thoại nhập PIN khi chọn tên; gửi `{stt, socketId, pin}`. |
 | `.gitignore` | Bỏ qua dữ liệu chạy + thông tin học sinh (mục 6). |
@@ -164,11 +165,16 @@ vào dịch vụ PostgreSQL sẵn có trên máy.
 `data/questions.json` và 8 file `data/exams/*.json` khớp MD5 tuyệt đối với bản
 gốc (không bị sửa nhầm trong quá trình test).
 
-### E. Nhập đề từ Word/Ảnh — 38/38 đạt
+### E. Nhập đề từ Word/Ảnh — 56/56 đạt
 `node tests/test-import-docx.js` (server cổng 3999, `TEACHER_PASSWORD=test123`):
 
 - **DOCX hợp lệ**: `mau-cau-hoi`/đề tự sinh → nhận đúng 2 câu, đúng đáp án `*`,
   câu 1 không bị đánh dấu.
+- **Đáp án GẠCH CHÂN trong Word** (mục 12, 18 trường hợp): đề có đáp án gạch chân
+  chỉ chữ cái (`D.`) → đáp án D; gạch chân cả dòng (`D. 11`) → đáp án D; câu
+  **không** gạch chân → `correct = null` + “cần kiểm tra”; gạch chân ở **dòng câu
+  hỏi** → **không** bị hiểu là đáp án. Nội dung đáp án lưu ra đã **bỏ thẻ `<u>`**
+  và **bỏ chữ cái `D.` ở đầu**; lưu rồi đọc lại đúng đáp án.
 - **Thiếu đáp án**: câu không có dấu đáp án → `needsReview = true`,
   `correct = null` (**không** tự gán đáp án A), có lý do cụ thể.
 - **Xác nhận lưu**: câu thiếu đáp án bị **bỏ qua** kèm lý do; bài mới chỉ chứa
@@ -197,7 +203,7 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
   trước. Không có lỗi nào trong Console.
 - Đã xoá bài kiểm tra test; 8 đề gieo ban đầu còn nguyên.
 
-### G. Nhập đề từ ẢNH bằng OCR — 69/69 đạt
+### G. Nhập đề từ ẢNH bằng OCR — 84/84 đạt
 `node tests/test-ocr-import.js` (server cổng 3999, `TEACHER_PASSWORD=test123`).
 Ảnh mẫu sinh bằng GDI+ (`tests/fixtures/`), OCR bằng tesseract.js `vie+eng`.
 
@@ -209,6 +215,14 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
 - **Câu không có đáp án trong ảnh** (câu 4): `correct = null`,
   `needsReview = true`, có lý do; tổng “cần kiểm tra” = 1.
 - **Ảnh nhiều câu** (`de-thi-8cau.png`): tách **đúng 8 câu**, 8/8 câu đủ đáp án.
+- **Đáp án GẠCH CHÂN trong ảnh** (`de-thi-gach-chan.png`, mục 18 — 15 trường hợp):
+  extract báo `underlined = 3`; câu 1 gạch chân **chỉ chữ cái `D.`** → đáp án D (3);
+  câu 2 gạch chân **chỉ `B.`** → đáp án B (1); câu 3 gạch chân **cả dòng `D. 11`**
+  → đáp án D (3); câu 4 **không** gạch chân → `correct = null` + “cần kiểm tra”.
+  Dấu `*` chèn tạm **không** lọt vào nội dung đáp án lưu ra; lưu 3 câu rồi đọc lại
+  đúng đáp án. Đo thực tế: dòng gạch chân có **đoạn mực dài 28–168 px**, còn nét
+  chữ/đuôi chữ chỉ **0–10 px** ⇒ ngưỡng `max(16, 0.55×chiều cao dòng)` tách bạch
+  hoàn toàn, **không** báo nhầm dòng nào.
 - **Ảnh mờ / không có chữ** (`anh-mo.png`): analyze trả `success:false` +
   `ocrIssues:true` + `questionMarkers:0` + hướng dẫn chụp lại,
   **không** tạo câu hỏi nào; vẫn trả văn bản OCR để đối chiếu.
@@ -240,13 +254,16 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
 - Trả lại trọng số 1 → sai 1 câu còn 19/20 → **9.5 điểm**, **giống hệt** cách
   chấm cũ ⇒ **tương thích ngược**.
 
-### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số)
+### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số + gạch chân)
 - `test-render-local.js` **21/21**, `test-render-exam.js` **14/14**
   (nộp đúng hết = 10 điểm, `/api/exam` **không** lộ đáp án),
   `test-render-import.js` **5/5**, `test-render-pins.js` **13/13**,
-  `test-import-docx.js` **38/38**.
-- `node --check` qua `server.js`, `lib/ocr.js`, `lib/ocr-parse.js`; kiểm tra cú
-  pháp toàn bộ `<script>` inline của `teacher.html` và `index.html` → 0 lỗi.
+  `test-import-docx.js` **56/56**, `test-ocr-import.js` **84/84** ⇒ **199/199**.
+- Kiểm tra 7 file `.docx` mẫu sẵn trong `data/` (đọc trực tiếp `word/document.xml`)
+  → **không file nào** dùng gạch chân ⇒ bật `styleMap "u => u"` **không** làm đổi
+  kết quả của các đề mẫu cũ.
+- `node --check` qua `server.js`, `lib/ocr.js`, `lib/ocr-parse.js`, `lib/underline.js`;
+  kiểm tra cú pháp toàn bộ `<script>` inline của `teacher.html` và `index.html` → 0 lỗi.
 
 ### J. Kiểm thử giao diện OCR thật (Chromium)
 Mở `/teacher`, tạo ảnh đề bằng `canvas` ngay trong trình duyệt rồi nạp vào ô
@@ -264,6 +281,23 @@ chọn ảnh (đúng luồng người dùng, không gọi tắt API):
   3 câu; đọc lại bằng API thấy `points = 2` và đáp án đúng là đáp án đã chọn
   trong giao diện. **0 lỗi trong Console.** Đã xoá bài test, còn đúng 8 đề gieo
   ban đầu, bài đang chọn không đổi.
+
+### K. Kiểm thử giao diện GẠCH CHÂN thật (Chromium) — đã sửa 1 lỗi tìm được
+Cũng bằng cách vẽ đề trong trình duyệt (`canvas`) rồi nạp vào ô chọn ảnh, nhưng
+lần này **đáp án đúng được gạch chân** (câu 1 gạch chân chữ cái `B.`, câu 2 gạch
+chân `C.`, câu 3 gạch chân cả dòng `D. Mười một`), **không** dùng dấu `*`:
+
+- Lần chạy đầu chỉ nhận ra **2/3** đáp án. Bật `OCR_DEBUG=1` để in số đo từng
+  dòng, phát hiện nguyên nhân: gạch chân do công cụ khác vẽ ra nằm **thấp hơn**
+  gạch chân của Word, mà cửa sổ dò ban đầu chỉ xuống dưới baseline ~6–8 px.
+- **Sửa:** mở rộng cửa sổ dò xuống **sát dòng chữ kế tiếp** (không lấn sang dòng
+  dưới); vẫn dựa vào **độ dài đoạn mực** làm yếu tố lọc chính nên không sinh báo
+  nhầm. Thêm log gỡ lỗi có kiểm soát bằng `OCR_DEBUG=1`.
+- Chạy lại: nhận đủ **3/3**, dòng tóm tắt hiện “🖍 Đã nhận ra **3** đáp án được
+  gạch chân trong ảnh và tự chọn sẵn”, cả 3 câu đều nhãn `OK`, **0** câu cần kiểm tra.
+- Bấm **Xác nhận lưu** → tạo bài “TEST-UI-GACH-CHAN”; đọc lại bằng API thấy đáp án
+  đúng lần lượt **B, C, D** (đúng như ảnh). **0 lỗi trong Console.** Đã xoá bài
+  test, còn đúng 8 đề, bài đang chọn không đổi, `data/questions.json` khôi phục 20 câu.
 
 ---
 
