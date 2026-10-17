@@ -1048,9 +1048,9 @@
                             <button class="btn" onclick="createNewExam()" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; border: none;">
                                 Tạo bài trống
                             </button>
-                            <label class="btn" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.82;">
-                                Upload Word
-                                <input type="file" accept=".docx" style="display: none;" onchange="createExamFromFile(this, 'word')">
+                            <label class="btn" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.9;">
+                                Nhập Word/Ảnh
+                                <input type="file" multiple accept=".docx,.png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;" onchange="startImportPreview(this)">
                             </label>
                             <label class="btn" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.65;">
                                 Upload JSON
@@ -1087,6 +1087,43 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== MODAL XEM TRƯỚC NHẬP ĐỀ (Word/Ảnh) ========== -->
+        <div id="importPreviewModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:3000; justify-content:center; align-items:flex-start; overflow-y:auto; padding:20px; box-sizing:border-box;">
+            <div style="background:#fff; border-radius:12px; max-width:1000px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25); margin:auto;">
+                <div style="background:#667eea; color:#fff; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; border-radius:12px 12px 0 0;">
+                    <h2 style="margin:0; font-size:1.1em; font-weight:600;">Xem trước &amp; sửa đề trước khi lưu</h2>
+                    <button onclick="cancelImportPreview()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.2em; cursor:pointer; padding:4px 10px; border-radius:6px; line-height:1;">&times;</button>
+                </div>
+
+                <div style="padding:18px 22px; max-height:calc(100vh - 210px); overflow-y:auto;">
+                    <div id="importPreviewSummary" style="margin-bottom:14px;"></div>
+
+                    <div style="border:1px solid #e0e0e0; border-radius:10px; padding:14px 16px; margin-bottom:16px; background:#fafaff;">
+                        <div style="font-weight:600; color:#444; margin-bottom:8px; font-size:0.92em;">Lưu vào đâu?</div>
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                            <input type="radio" name="importDestination" value="new" checked onchange="updateImportDestinationUI()">
+                            <span>Tạo bài kiểm tra mới</span>
+                        </label>
+                        <input type="text" id="importNewExamName" maxlength="40" placeholder="Tên bài kiểm tra mới (tối đa 40 ký tự)" style="width:calc(100% - 24px); margin:0 0 10px 24px; padding:9px 12px; border:1px solid #ddd; border-radius:7px; box-sizing:border-box; font-size:0.95em;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="radio" name="importDestination" value="current" onchange="updateImportDestinationUI()">
+                            <span>Thêm vào bài đang soạn</span>
+                        </label>
+                    </div>
+
+                    <div id="importPreviewList"></div>
+                </div>
+
+                <div style="padding:14px 22px; border-top:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div id="importPreviewStatus" style="font-size:0.9em; color:#666;"></div>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="cancelImportPreview()" style="background:#eee; color:#333; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:0.95em;">Hủy</button>
+                        <button id="importConfirmBtn" onclick="confirmImportPreview()" style="background:#2e7d32; color:#fff; border:none; padding:10px 22px; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.95em;">Xác nhận lưu</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3838,6 +3875,381 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
             
             input.value = ''; // Reset input
+        }
+
+        // ===== NHẬP ĐỀ TỪ WORD / ẢNH: xem trước - sửa - xác nhận mới lưu =====
+        let _importPreview = null; // { sessionId, imagePool, questions }
+        const IMG_TOKEN_RX = /\[\[IMG:(\d+)\]\]/g;
+
+        // Hiển thị token ảnh thành ảnh thật (chỉ để xem; khi lưu server tự thay lại)
+        function imgTokenToThumb(html, pool) {
+            return String(html || '').replace(IMG_TOKEN_RX, (m, n) => {
+                const src = pool && pool[n];
+                return src ? `<img src="${src}" style="max-width:100%;max-height:160px;border:1px solid #ddd;border-radius:6px;vertical-align:middle;margin:4px 0;">` : '';
+            });
+        }
+
+        function openImportPreviewModal() { document.getElementById('importPreviewModal').style.display = 'flex'; }
+        function closeImportPreviewModal() { document.getElementById('importPreviewModal').style.display = 'none'; }
+        function setImportStatus(html) { document.getElementById('importPreviewStatus').innerHTML = html || ''; }
+
+        function updateImportDestinationUI() {
+            const dest = document.querySelector('input[name="importDestination"]:checked');
+            const isNew = !dest || dest.value === 'new';
+            const nameInput = document.getElementById('importNewExamName');
+            nameInput.disabled = !isNew;
+            nameInput.style.opacity = isNew ? '1' : '0.5';
+        }
+
+        async function startImportPreview(input) {
+            const files = Array.from(input.files || []);
+            input.value = '';
+            if (!files.length) return;
+
+            const MAX_MB = 15;
+            const tooBig = files.find(f => f.size > MAX_MB * 1024 * 1024);
+            if (tooBig) { alert(`File "${tooBig.name}" quá lớn (tối đa ${MAX_MB} MB).`); return; }
+
+            openImportPreviewModal();
+            document.getElementById('importPreviewSummary').innerHTML = '';
+            document.getElementById('importPreviewList').innerHTML = '';
+            document.getElementById('importNewExamName').value = '';
+            setImportStatus('Đang phân tích file...');
+
+            const fd = new FormData();
+            files.forEach(f => fd.append('files', f));
+
+            try {
+                const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
+                const result = await res.json();
+                if (!result.success) {
+                    setImportStatus('');
+                    alert('✘ ' + result.error);
+                    closeImportPreviewModal();
+                    return;
+                }
+                _importPreview = {
+                    sessionId: result.sessionId,
+                    imagePool: result.imagePool || {},
+                    questions: (result.questions || []).map(q => Object.assign({ include: true }, q))
+                };
+                renderImportPreview(result);
+                setImportStatus('');
+            } catch (err) {
+                setImportStatus('');
+                alert('Lỗi: ' + err.message);
+                closeImportPreviewModal();
+            }
+        }
+
+        function renderImportPreview(result) {
+            const nameInput = document.getElementById('importNewExamName');
+            if (!nameInput.value) {
+                let base = (result.source && result.source.docx)
+                    ? result.source.docx.replace(/\.docx$/i, '')
+                    : 'Bài nhập từ file';
+                nameInput.value = base.substring(0, 40);
+            }
+
+            const src = [];
+            if (result.source && result.source.docx) src.push('Word: ' + escapeHtml(result.source.docx));
+            if (result.source && result.source.images && result.source.images.length) src.push(result.source.images.length + ' ảnh');
+
+            let html = `<div style="font-size:0.92em; color:#555;">Nhận diện <b>${result.count}</b> câu hỏi`;
+            if (src.length) html += ' (' + src.join(', ') + ')';
+            html += '.</div>';
+
+            if (result.needsReview > 0) {
+                html += `<div style="margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;">⚠ ${result.needsReview} câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).</div>`;
+            }
+            if (result.warnings && result.warnings.length) {
+                html += `<div style="margin-top:6px; background:#ffebee; border:1px solid #ef9a9a; border-radius:8px; padding:8px 12px; color:#b71c1c; font-size:0.9em;">${result.warnings.map(escapeHtml).join('<br>')}</div>`;
+            }
+            document.getElementById('importPreviewSummary').innerHTML = html;
+
+            updateImportDestinationUI();
+            renderImportPreviewList();
+        }
+
+        function importBadgeHtml(q) {
+            return q.needsReview
+                ? '<span style="background:#e65100;color:#fff;border-radius:4px;padding:1px 7px;font-size:0.76em;">cần kiểm tra</span>'
+                : '<span style="background:#2e7d32;color:#fff;border-radius:4px;padding:1px 7px;font-size:0.76em;">OK</span>';
+        }
+        function importReasonsHtml(q) {
+            if (!q.reviewReasons || !q.reviewReasons.length) return '';
+            return `<div style="margin-top:8px; color:#bf360c; font-size:0.85em;">${q.reviewReasons.map(r => '⚠ ' + escapeHtml(r)).join('<br>')}</div>`;
+        }
+
+        // Tính lại trạng thái "cần kiểm tra" của 1 câu (dùng chung cho render và cập nhật nhanh)
+        function computeImportReview(q) {
+            const reasons = [];
+            const qHtml = String(q.question || '');
+            const plain = qHtml.replace(IMG_TOKEN_RX, '').replace(/<[^>]*>/g, '').trim();
+            const hasImg = /\[\[IMG:\d+\]\]/.test(qHtml) || /<img\b/i.test(qHtml);
+
+            if (!plain && !hasImg) reasons.push('Thiếu nội dung câu hỏi.');
+            else if (!plain && hasImg) reasons.push('Câu hỏi chỉ có hình ảnh — cần bổ sung nội dung chữ.');
+
+            const opts = q.options || [];
+            if (opts.length < 2) reasons.push('Chỉ có ' + opts.length + ' đáp án (cần ít nhất 2).');
+
+            if (q.type === 'single') {
+                if (!(typeof q.correct === 'number' && q.correct >= 0 && q.correct < opts.length)) {
+                    reasons.push('Chưa chọn đáp án đúng.');
+                }
+            } else if (q.type === 'multi') {
+                if (!(Array.isArray(q.correctList) && q.correctList.length > 0)) reasons.push('Chưa chọn đáp án đúng.');
+            } else if (q.type === 'truefalse') {
+                const tf = Array.isArray(q.correctTF) ? q.correctTF : [];
+                let undecided = 0;
+                for (let k = 0; k < opts.length; k++) { if (tf[k] !== true && tf[k] !== false) undecided++; }
+                if (undecided > 0) reasons.push('Còn ' + undecided + ' phát biểu chưa chọn Đúng/Sai.');
+            }
+
+            q.reviewReasons = reasons;
+            q.needsReview = reasons.length > 0;
+            return q;
+        }
+
+        function refreshImportCardStatus(i) {
+            const q = computeImportReview(_importPreview.questions[i]);
+            const badge = document.getElementById('impBadge' + i);
+            if (badge) badge.innerHTML = importBadgeHtml(q);
+            const reasons = document.getElementById('impReasons' + i);
+            if (reasons) reasons.innerHTML = importReasonsHtml(q);
+            const card = document.getElementById('impCard' + i);
+            if (card) card.style.background = q.needsReview ? '#fffdf7' : '#fff';
+            updateImportSummaryCounts();
+        }
+
+        function updateImportSummaryCounts() {
+            if (!_importPreview) return;
+            const total = _importPreview.questions.length;
+            const need = _importPreview.questions.filter(q => q.needsReview).length;
+            const box = document.getElementById('importPreviewSummary');
+            if (!box) return;
+            let el = document.getElementById('importNeedsReviewLine');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'importNeedsReviewLine';
+                el.style.cssText = 'margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;';
+                box.appendChild(el);
+            }
+            if (need > 0) {
+                el.style.display = 'block';
+                el.textContent = '⚠ ' + need + '/' + total + ' câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+
+        function renderImportPreviewList() {
+            const data = _importPreview;
+            const list = document.getElementById('importPreviewList');
+            if (!data) { list.innerHTML = ''; return; }
+            const pool = data.imagePool || {};
+
+            list.innerHTML = data.questions.map((q, i) => {
+                const qThumb = imgTokenToThumb(q.question, pool);
+
+                const optionsHtml = (q.options || []).map((o, oi) => {
+                    const letter = String.fromCharCode(65 + oi);
+                    let control = '';
+                    if (q.type === 'single') {
+                        control = `<input type="radio" name="imp_correct_${i}" data-role="correct-single" data-qi="${i}" data-oi="${oi}" ${q.correct === oi ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
+                    } else if (q.type === 'multi') {
+                        const on = Array.isArray(q.correctList) && q.correctList.indexOf(oi) >= 0;
+                        control = `<input type="checkbox" data-role="correct-multi" data-qi="${i}" data-oi="${oi}" ${on ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
+                    } else {
+                        const tf = Array.isArray(q.correctTF) ? q.correctTF : [];
+                        const v = tf[oi];
+                        control = `<select data-role="tf" data-qi="${i}" data-oi="${oi}" onchange="onImportAnswerChange(this)" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:0.85em;">
+                            <option value="" ${(v !== true && v !== false) ? 'selected' : ''}>--</option>
+                            <option value="true" ${v === true ? 'selected' : ''}>Đúng</option>
+                            <option value="false" ${v === false ? 'selected' : ''}>Sai</option>
+                        </select>`;
+                    }
+                    return `<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">
+                        <div style="min-width:86px; padding-top:7px; font-size:0.9em;">${control} <b>${letter}.</b></div>
+                        <textarea data-role="otext" data-qi="${i}" data-oi="${oi}" oninput="onImportOptionInput(this)" style="flex:1; min-height:38px; padding:6px 8px; border:1px solid #ddd; border-radius:6px; font-size:0.9em; box-sizing:border-box; font-family:inherit;">${o}</textarea>
+                        <button type="button" onclick="removeImportOption(${i}, ${oi})" title="Xóa đáp án" style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:7px 10px;cursor:pointer;">✕</button>
+                    </div>`;
+                }).join('');
+
+                return `<div id="impCard${i}" style="border:1px solid #e0e0e0; border-radius:10px; padding:14px; margin-bottom:14px; background:${q.needsReview ? '#fffdf7' : '#fff'};">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+                        <div style="font-weight:600; color:#333;">Câu ${i + 1} <span id="impBadge${i}">${importBadgeHtml(q)}</span></div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <select data-role="qtype" data-qi="${i}" onchange="onImportTypeChange(this)" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:0.88em;">
+                                <option value="single" ${q.type === 'single' ? 'selected' : ''}>Một đáp án</option>
+                                <option value="multi" ${q.type === 'multi' ? 'selected' : ''}>Nhiều đáp án</option>
+                                <option value="truefalse" ${q.type === 'truefalse' ? 'selected' : ''}>Đúng/Sai</option>
+                            </select>
+                            <label style="font-size:0.86em; color:#555; cursor:pointer; white-space:nowrap;"><input type="checkbox" data-role="include" data-qi="${i}" ${q.include !== false ? 'checked' : ''} onchange="onImportIncludeChange(this)"> Lưu câu này</label>
+                        </div>
+                    </div>
+                    <textarea data-role="qtext" data-qi="${i}" oninput="onImportQuestionInput(this)" style="width:100%; min-height:52px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.92em; box-sizing:border-box; font-family:inherit;">${q.question || ''}</textarea>
+                    ${qThumb ? `<div style="margin-top:8px;">${qThumb}</div>` : ''}
+                    <div style="margin-top:10px;">
+                        <div style="font-size:0.86em; color:#666; margin-bottom:6px;">Đáp án (chọn đáp án đúng):</div>
+                        ${optionsHtml}
+                        <button type="button" onclick="addImportOption(${i})" style="background:#eef; color:#444; border:1px solid #ccd; border-radius:6px; padding:5px 12px; cursor:pointer; font-size:0.85em;">+ Thêm đáp án</button>
+                    </div>
+                    <div id="impReasons${i}">${importReasonsHtml(q)}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function onImportQuestionInput(el) {
+            _importPreview.questions[+el.getAttribute('data-qi')].question = el.value;
+        }
+        function onImportOptionInput(el) {
+            const i = +el.getAttribute('data-qi'), oi = +el.getAttribute('data-oi');
+            _importPreview.questions[i].options[oi] = el.value;
+        }
+        function onImportIncludeChange(el) {
+            _importPreview.questions[+el.getAttribute('data-qi')].include = el.checked;
+        }
+        function onImportAnswerChange(el) {
+            const i = +el.getAttribute('data-qi'), oi = +el.getAttribute('data-oi');
+            const q = _importPreview.questions[i];
+            const role = el.getAttribute('data-role');
+            if (role === 'correct-single') {
+                q.correct = oi;
+            } else if (role === 'correct-multi') {
+                let list = Array.isArray(q.correctList) ? q.correctList.slice() : [];
+                if (el.checked) { if (list.indexOf(oi) < 0) list.push(oi); }
+                else { list = list.filter(x => x !== oi); }
+                list.sort((a, b) => a - b);
+                q.correctList = list;
+            } else if (role === 'tf') {
+                let tf = Array.isArray(q.correctTF) ? q.correctTF.slice() : [];
+                while (tf.length < (q.options || []).length) tf.push(null);
+                tf[oi] = (el.value === '') ? null : (el.value === 'true');
+                q.correctTF = tf;
+            }
+            refreshImportCardStatus(i);
+        }
+
+        function onImportTypeChange(el) {
+            const i = +el.getAttribute('data-qi');
+            const q = _importPreview.questions[i];
+            q.type = el.value;
+            q.correct = -1;
+            q.correctList = [];
+            q.correctTF = (q.options || []).map(() => null);
+            computeImportReview(q);
+            renderImportPreviewList();
+            updateImportSummaryCounts();
+        }
+
+        function addImportOption(i) {
+            const q = _importPreview.questions[i];
+            q.options = q.options || [];
+            q.options.push('');
+            if (q.type === 'truefalse') { q.correctTF = q.correctTF || []; q.correctTF.push(null); }
+            computeImportReview(q);
+            renderImportPreviewList();
+            updateImportSummaryCounts();
+        }
+
+        function removeImportOption(i, oi) {
+            const q = _importPreview.questions[i];
+            q.options.splice(oi, 1);
+            if (q.type === 'single') {
+                if (q.correct === oi) q.correct = -1;
+                else if (q.correct > oi) q.correct -= 1;
+            } else if (q.type === 'multi') {
+                q.correctList = (q.correctList || [])
+                    .filter(x => x !== oi)
+                    .map(x => (x > oi ? x - 1 : x));
+            } else if (q.type === 'truefalse') {
+                q.correctTF = (q.correctTF || []).filter((v, idx) => idx !== oi);
+            }
+            computeImportReview(q);
+            renderImportPreviewList();
+            updateImportSummaryCounts();
+        }
+
+        function cancelImportPreview() {
+            _importPreview = null;
+            closeImportPreviewModal();
+            document.getElementById('importPreviewSummary').innerHTML = '';
+            document.getElementById('importPreviewList').innerHTML = '';
+            setImportStatus('');
+        }
+
+        async function confirmImportPreview() {
+            if (!_importPreview) return;
+
+            const destEl = document.querySelector('input[name="importDestination"]:checked');
+            const destination = destEl ? destEl.value : 'new';
+            const examName = document.getElementById('importNewExamName').value.trim();
+
+            if (destination === 'new' && !examName) {
+                alert('Vui lòng nhập tên bài kiểm tra mới.');
+                document.getElementById('importNewExamName').focus();
+                return;
+            }
+
+            const included = _importPreview.questions.filter(q => q.include !== false);
+            if (!included.length) { alert('Chưa chọn câu hỏi nào để lưu.'); return; }
+
+            const btn = document.getElementById('importConfirmBtn');
+            btn.disabled = true;
+            const oldLabel = btn.textContent;
+            btn.textContent = 'Đang lưu...';
+
+            try {
+                const res = await fetch('/api/import/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: _importPreview.sessionId,
+                        destination: destination,
+                        examName: examName,
+                        questions: included.map(q => ({
+                            include: true,
+                            type: q.type,
+                            question: q.question,
+                            options: q.options,
+                            correct: q.correct,
+                            correctList: q.correctList,
+                            correctTF: q.correctTF
+                        }))
+                    })
+                });
+                const result = await res.json();
+
+                if (!result.success) {
+                    let msg = result.error || 'Lỗi không xác định';
+                    if (result.skipped && result.skipped.length) {
+                        msg += '\n\nBỏ qua:\n' + result.skipped.map(s => '• ' + s.reason).join('\n');
+                    }
+                    alert('✘ ' + msg);
+                    return;
+                }
+
+                let msg = `✔ Đã lưu ${result.saved} câu hỏi`;
+                msg += (destination === 'new')
+                    ? ` vào bài "${result.examName}".`
+                    : ' vào bài đang soạn.';
+                if (result.skipped && result.skipped.length) {
+                    msg += `\n\nBỏ qua ${result.skipped.length} câu chưa hợp lệ:\n` +
+                        result.skipped.map(s => '• ' + s.reason).join('\n');
+                }
+                alert(msg);
+
+                cancelImportPreview();
+                loadQuestions();
+                loadSavedExams();
+            } catch (err) {
+                alert('Lỗi: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = oldLabel;
+            }
         }
 
         // Download sample JSON

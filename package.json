@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test:import": "node tests/test-import-docx.js",
     "build": "node build-scripts/build.js",
     "admin": "node license/admin-tool.js",
     "generate-license": "node license/admin-tool.js generate"

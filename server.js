@@ -27,6 +27,10 @@ var xmljs = require('xml-js');
 var DATA = require('./lib/datastore');
 // Xac thuc giao vien
 var auth = require('./lib/auth');
+// Kiem tra dinh dang/dung luong file tai len (Nhap de tu Word/Anh)
+var fileValidate = require('./lib/file-validate');
+// Phien xem truoc khi nhap de (luu RAM, co TTL)
+var importSessions = require('./lib/import-sessions');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -57,6 +61,47 @@ var APP_VERSION = '1.0.0';
 
 // Cấu hình multer để lưu file trong memory
 var upload = multer({ storage: multer.memoryStorage() });
+
+// Multer riêng cho tính năng "Nhập đề từ Word/Ảnh": có giới hạn dung lượng + lọc định dạng.
+// KHÔNG đụng tới `upload` ở trên để không làm đổi hành vi các API cũ.
+var importUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: fileValidate.FILE_LIMITS.maxDocxBytes,
+        files: fileValidate.FILE_LIMITS.maxImageCount + 1,
+        fields: 10
+    },
+    fileFilter: function (req, file, cb) {
+        if (!fileValidate.detectKind(file.originalname, file.mimetype)) {
+            var err = new Error('Định dạng không hỗ trợ: "' + (file.originalname || '') + '". Chỉ nhận .docx và file ảnh.');
+            err.code = 'UNSUPPORTED_TYPE';
+            return cb(err);
+        }
+        cb(null, true);
+    }
+});
+
+// Bọc multer để luôn trả JSON lỗi gọn gàng (thay vì trang lỗi HTML mặc định)
+function importUploadMiddleware(field, max) {
+    var handler = importUpload.array(field, max);
+    return function (req, res, next) {
+        handler(req, res, function (err) {
+            if (err) {
+                var msg;
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    msg = 'File quá lớn. Tối đa ' + Math.round(fileValidate.FILE_LIMITS.maxDocxBytes / 1024 / 1024) + ' MB cho Word và ' +
+                        Math.round(fileValidate.FILE_LIMITS.maxImageBytes / 1024 / 1024) + ' MB cho ảnh.';
+                } else if (err.code === 'LIMIT_FILE_COUNT') {
+                    msg = 'Quá nhiều file. Tối đa ' + (fileValidate.FILE_LIMITS.maxImageCount + 1) + ' file mỗi lần.';
+                } else {
+                    msg = err.message || 'Lỗi tải file lên.';
+                }
+                return res.status(400).json({ success: false, error: msg });
+            }
+            next();
+        });
+    };
+}
 
 var app = express();
 var server = http.createServer(app);
@@ -1793,6 +1838,27 @@ app.get('/api/exams', (req, res) => {
     });
 });
 
+// Xem nội dung 1 bài kiểm tra đã lưu (chỉ giáo viên).
+// Chỉ ĐỌC, không đổi bài đang dùng — dùng để kiểm tra kết quả sau khi nhập đề.
+app.get('/api/exams/:examId', (req, res) => {
+    if (!isTeacher(req)) {
+        return res.status(403).json({ error: 'Không có quyền truy cập' });
+    }
+    var data = loadExam(req.params.examId);
+    if (!data) {
+        return res.status(404).json({ success: false, error: 'Không tìm thấy bài kiểm tra' });
+    }
+    res.json({
+        success: true,
+        exam: {
+            id: req.params.examId,
+            name: data.name || req.params.examId,
+            questions: data.questions || [],
+            createdAt: data.createdAt || null
+        }
+    });
+});
+
 // Tạo bài kiểm tra mới (API ngắn gọn)
 app.post('/api/exams', (req, res) => {
     if (!isTeacher(req)) {
@@ -2848,6 +2914,293 @@ app.post('/api/import-word', upload.single('file'), async (req, res) => {
     });
 });
 
+// ===========================================================================
+// NHẬP ĐỀ THI TỪ WORD / ẢNH  (xem trước -> giáo viên sửa -> xác nhận mới lưu)
+// ===========================================================================
+// Tái sử dụng mammothToHtml() và parseQuestionsFromHtml() ở trên.
+// Ảnh được tách thành token [[IMG:n]]; dữ liệu ảnh giữ trong phiên (RAM, có TTL).
+// KHÔNG tự bịa đáp án: câu thiếu đáp án được đánh dấu needsReview.
+
+var IMG_TOKEN_RE = /\[\[IMG:(\d+)\]\]/g;
+
+// Tách mọi <img src="data:..."> trong câu hỏi/đáp án thành token [[IMG:n]]
+function extractImagesToTokens(questions) {
+    var pool = {};   // token -> dataUri
+    var order = [];  // thứ tự token để tái sử dụng ảnh trùng
+    var seq = 0;
+
+    function walk(html) {
+        if (!html || typeof html !== 'string') return html;
+        return html.replace(/<img\b[^>]*?src\s*=\s*("([^"]*)"|'([^']*)')[^>]*>/gi, function (full, _q, dq, sq) {
+            var src = dq !== undefined ? dq : sq;
+            if (!/^data:image\//i.test(src)) return '';
+            for (var i = 0; i < order.length; i++) {
+                if (pool[order[i]] === src) return '[[IMG:' + order[i] + ']]';
+            }
+            var token = String(seq++);
+            pool[token] = src;
+            order.push(token);
+            return '[[IMG:' + token + ']]';
+        });
+    }
+
+    questions.forEach(function (q) {
+        q.question = walk(q.question);
+        if (q.options) q.options = q.options.map(walk);
+    });
+    return pool;
+}
+
+// Thay token [[IMG:n]] bằng lại ảnh gốc từ pool của phiên (không tin dữ liệu client)
+function expandTokens(html, pool) {
+    if (!html || typeof html !== 'string') return html || '';
+    return html.replace(IMG_TOKEN_RE, function (m, n) {
+        return Object.prototype.hasOwnProperty.call(pool, n) ? '<img src="' + pool[n] + '" />' : '';
+    });
+}
+
+// Câu hỏi giữ chỗ cho 1 file ảnh: có ảnh, KHÔNG bịa nội dung/đáp án
+function placeholderQuestionFromImage(dataUri) {
+    return {
+        type: 'single',
+        question: '<img src="' + dataUri + '" />',
+        options: [],
+        correct: -1,
+        correctList: null,
+        correctTF: null,
+        image: null,
+        answerDetected: false,
+        needsReview: true,
+        reviewReasons: ['Câu hỏi tạo từ file ảnh — cần nhập nội dung chữ và đáp án.']
+    };
+}
+
+// Chuẩn hoá 1 câu hỏi do client gửi về (đã qua chỉnh sửa ở bản xem trước)
+function normalizeEditedQuestion(raw, qNum) {
+    if (!raw || typeof raw !== 'object') return { error: 'Câu ' + qNum + ': dữ liệu không hợp lệ' };
+    var type = raw.type;
+    if (type !== 'single' && type !== 'multi' && type !== 'truefalse') {
+        return { error: 'Câu ' + qNum + ': loại câu hỏi không hợp lệ' };
+    }
+    var out = {
+        type: type,
+        question: String(raw.question == null ? '' : raw.question),
+        options: Array.isArray(raw.options) ? raw.options.map(function (o) { return String(o == null ? '' : o); }) : [],
+        correct: 0,
+        correctList: null,
+        correctTF: null,
+        image: null
+    };
+    if (type === 'single') {
+        out.correct = (typeof raw.correct === 'number') ? raw.correct : -1;
+    } else if (type === 'multi') {
+        out.correctList = Array.isArray(raw.correctList)
+            ? raw.correctList.filter(function (v) { return typeof v === 'number'; })
+            : [];
+        out.correct = out.correctList.length ? out.correctList[0] : -1;
+    } else {
+        out.correctTF = Array.isArray(raw.correctTF)
+            ? raw.correctTF.map(function (v) { return v === true ? true : (v === false ? false : null); })
+            : [];
+    }
+    return { question: out };
+}
+
+// ---- Bước 1: phân tích file -> trả về bản xem trước để giáo viên sửa ----
+app.post('/api/import/preview',
+    importUploadMiddleware('files', fileValidate.FILE_LIMITS.maxImageCount + 1),
+    function (req, res) {
+        if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+        var files = req.files || [];
+        if (files.length === 0) {
+            return res.json({ success: false, error: 'Chưa chọn file nào.' });
+        }
+
+        // 1) Kiểm tra định dạng + dung lượng từng file
+        var docxFile = null;
+        var imageFiles = [];
+        var errors = [];
+        var totalBytes = 0;
+
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            totalBytes += (f.size || (f.buffer ? f.buffer.length : 0));
+            var v = fileValidate.validateUpload(f);
+            if (!v.ok) { errors.push(v.error); continue; }
+            if (v.kind === 'docx') {
+                if (docxFile) { errors.push('Mỗi lần chỉ nhập được 1 file Word. Đã bỏ qua "' + f.originalname + '".'); continue; }
+                docxFile = f;
+            } else {
+                imageFiles.push({ file: f, imageType: v.imageType });
+            }
+        }
+
+        if (totalBytes > fileValidate.FILE_LIMITS.maxTotalBytes) {
+            return res.json({
+                success: false,
+                error: 'Tổng dung lượng quá lớn (tối đa ' +
+                    Math.round(fileValidate.FILE_LIMITS.maxTotalBytes / 1024 / 1024) + ' MB).'
+            });
+        }
+        if (!docxFile && imageFiles.length === 0) {
+            return res.json({ success: false, error: errors.join(' ') || 'Không có file hợp lệ.' });
+        }
+
+        // 2) Phân tích file Word (nếu có)
+        var parsePromise = Promise.resolve([]);
+        if (docxFile) {
+            parsePromise = mammothToHtml(docxFile.buffer).then(function (result) {
+                return parseQuestionsFromHtml(result.value, { trackReview: true });
+            });
+        }
+
+        parsePromise.then(function (docxQuestions) {
+            var questions = docxQuestions.slice();
+
+            // Ảnh rời: mỗi ảnh thành 1 câu giữ chỗ, đánh dấu cần giáo viên nhập
+            imageFiles.forEach(function (item) {
+                var dataUri = 'data:' + item.imageType + ';base64,' + item.file.buffer.toString('base64');
+                questions.push(placeholderQuestionFromImage(dataUri));
+            });
+
+            // 3) Tách ảnh thành token cho payload xác nhận gọn nhẹ
+            var pool = extractImagesToTokens(questions);
+
+            // 4) Lưu phiên (RAM, có TTL, tự dọn)
+            var sessionId = importSessions.create({ pool: pool });
+
+            var needsReview = questions.filter(function (q) { return q.needsReview; }).length;
+
+            res.json({
+                success: true,
+                sessionId: sessionId,
+                count: questions.length,
+                needsReview: needsReview,
+                warnings: errors,
+                imagePool: pool,
+                source: {
+                    docx: docxFile ? docxFile.originalname : null,
+                    images: imageFiles.map(function (it) { return it.file.originalname; })
+                },
+                questions: questions.map(function (q, idx) {
+                    return {
+                        index: idx,
+                        type: q.type || 'single',
+                        question: q.question || '',
+                        options: q.options || [],
+                        correct: (typeof q.correct === 'number') ? q.correct : -1,
+                        correctList: q.correctList || null,
+                        correctTF: q.correctTF || null,
+                        needsReview: !!q.needsReview,
+                        reviewReasons: q.reviewReasons || [],
+                        answerDetected: !!q.answerDetected
+                    };
+                })
+            });
+        }).catch(function (err) {
+            console.error('Lỗi đọc file khi xem trước:', err);
+            res.json({
+                success: false,
+                error: 'Không thể đọc file: ' + (err && err.message ? err.message : 'lỗi không xác định')
+            });
+        });
+    }
+);
+
+// ---- Bước 2: lưu SAU KHI giáo viên xác nhận (không lưu trước đó) ----
+app.post('/api/import/confirm', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+    var body = req.body || {};
+    var session = importSessions.get(body.sessionId);
+    if (!session) {
+        return res.json({ success: false, error: 'Phiên nhập đề đã hết hạn hoặc không tồn tại. Vui lòng chọn lại file.' });
+    }
+    var pool = session.pool || {};
+
+    var incoming = Array.isArray(body.questions) ? body.questions : [];
+    if (incoming.length === 0) {
+        return res.json({ success: false, error: 'Không có câu hỏi nào để lưu.' });
+    }
+
+    var saved = [];
+    var skipped = [];
+
+    incoming.forEach(function (raw, i) {
+        var num = i + 1;
+        if (raw && raw.include === false) return;
+
+        var norm = normalizeEditedQuestion(raw, num);
+        if (norm.error) { skipped.push({ index: i, reason: norm.error }); return; }
+        var q = norm.question;
+
+        // Thay token ảnh -> data URI gốc (chỉ lấy từ pool của phiên)
+        q.question = expandTokens(q.question, pool);
+        q.options = q.options.map(function (o) { return expandTokens(o, pool); });
+
+        // Làm sạch HTML
+        q.question = sanitizeHtml(q.question);
+        q.options = q.options.map(function (o) { return sanitizeHtml(o); });
+
+        // Đúng/Sai: bắt buộc mọi phát biểu đã được chọn (không lưu dữ liệu bỏ trống)
+        if (q.type === 'truefalse') {
+            var undecided = q.correctTF.filter(function (v) { return v !== true && v !== false; }).length;
+            if (undecided > 0) {
+                skipped.push({ index: i, reason: 'Câu ' + num + ': còn ' + undecided + ' phát biểu chưa chọn Đúng/Sai' });
+                return;
+            }
+        }
+
+        var errs = [];
+        var normalized = validateAndNormalizeQuestion(q, num, errs);
+        if (!normalized) { skipped.push({ index: i, reason: errs.join('; ') }); return; }
+        saved.push(normalized);
+    });
+
+    if (saved.length === 0) {
+        return res.json({
+            success: false,
+            error: 'Không có câu hỏi hợp lệ để lưu. Vui lòng kiểm tra các câu bị đánh dấu.',
+            skipped: skipped
+        });
+    }
+
+    var destination = (body.destination === 'current') ? 'current' : 'new';
+
+    if (destination === 'current') {
+        questions = questions.concat(saved);
+        saveQuestions();
+        io.emit('questionsUpdated', questions.length);
+        importSessions.remove(body.sessionId);
+        return res.json({
+            success: true, destination: 'current',
+            saved: saved.length, skipped: skipped, total: questions.length
+        });
+    }
+
+    var name = String(body.examName == null ? '' : body.examName).replace(/[<>]/g, '').trim();
+    if (!name) {
+        return res.json({ success: false, error: 'Vui lòng nhập tên bài kiểm tra mới.', skipped: skipped });
+    }
+
+    var newExamId = 'exam_' + Date.now();
+    var examData = {
+        id: newExamId,
+        name: name.slice(0, 40),
+        questions: saved,
+        createdAt: new Date().toISOString()
+    };
+    DATA.writeJson(path.join(__dirname, 'data', 'exams', newExamId + '.json'), examData);
+    importSessions.remove(body.sessionId);
+
+    res.json({
+        success: true, destination: 'new',
+        examId: newExamId, examName: examData.name,
+        saved: saved.length, skipped: skipped, total: saved.length
+    });
+});
+
 // ========== HTML SANITIZER (server-side, regex-based) ==========
 var ALLOWED_HTML_TAGS = {
     'b': [], 'strong': [], 'i': [], 'em': [], 'u': [],
@@ -3119,8 +3472,19 @@ function stripTypeTags(html) {
                .trim();
 }
 
-function buildQuestionObj(type, question, options, correctAnswer, correctList, correctTF) {
-    return {
+function buildQuestionObj(type, question, options, correctAnswer, correctList, correctTF, opts) {
+    opts = opts || {};
+    var answerDetected;
+    if (type === 'multi') {
+        answerDetected = !!(correctList && correctList.length > 0);
+    } else if (type === 'truefalse') {
+        answerDetected = !!(correctTF && correctTF.length > 0) &&
+            correctTF.every(function (v) { return v === true || v === false; });
+    } else {
+        answerDetected = correctAnswer >= 0;
+    }
+
+    var obj = {
         type: type,
         question: sanitizeHtml(question),
         options: options.map(function(o) { return sanitizeHtml(o); }),
@@ -3129,9 +3493,20 @@ function buildQuestionObj(type, question, options, correctAnswer, correctList, c
         correctTF: type === 'truefalse' ? correctTF : null,
         image: null
     };
+
+    // Chế độ "nhập đề có xem trước": KHÔNG tự gán đáp án A khi chưa nhận diện được,
+    // mà đánh dấu để giáo viên kiểm tra.
+    if (opts.trackReview) {
+        obj.answerDetected = answerDetected;
+        if (!answerDetected && type === 'single') obj.correct = -1;
+        obj.needsReview = false;
+        obj.reviewReasons = [];
+    }
+    return obj;
 }
 
-function parseQuestionsFromHtml(html) {
+function parseQuestionsFromHtml(html, opts) {
+    opts = opts || {};
     var parsedQuestions = [];
     var paragraphs = [];
 
@@ -3212,7 +3587,7 @@ function parseQuestionsFromHtml(html) {
 
     // Fallback nếu không có thẻ <p>
     if (paragraphs.length === 0) {
-        return parseQuestionsFromText(html.replace(/<[^>]+>/g, '\n'));
+        return parseQuestionsFromText(html.replace(/<[^>]+>/g, '\n'), opts);
     }
 
     var currentQuestion = null;
@@ -3221,6 +3596,38 @@ function parseQuestionsFromHtml(html) {
     var correctAnswer = -1;
     var correctList = [];
     var correctTF = [];
+    var currentReasons = [];
+
+    // Đẩy câu hỏi đang dựng vào kết quả.
+    // Chế độ xem trước (opts.trackReview): giữ cả câu thiếu đáp án/đáp án <2 và
+    // gắn cờ "cần kiểm tra" thay vì âm thầm bỏ hoặc tự bịa đáp án.
+    function pushCurrent() {
+        if (currentQuestion === null) return;
+        var enoughOptions = currentOptions.length >= 2;
+        if (!opts.trackReview && !enoughOptions) return;
+
+        var obj = buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF, opts);
+
+        if (opts.trackReview) {
+            var reasons = currentReasons.slice();
+            var qPlain = stripHtmlTags(obj.question).trim();
+            var qHasImg = /<img\b/i.test(obj.question);
+            if (qPlain === '' && qHasImg) {
+                reasons.push('Câu hỏi chỉ có hình ảnh — cần bổ sung nội dung chữ.');
+            } else if (qPlain === '') {
+                reasons.push('Thiếu nội dung câu hỏi.');
+            }
+            if (!enoughOptions) {
+                reasons.push('Chỉ có ' + currentOptions.length + ' đáp án (cần ít nhất 2).');
+            }
+            if (!obj.answerDetected) {
+                reasons.push('Chưa xác định được đáp án đúng — giáo viên cần chọn.');
+            }
+            obj.reviewReasons = reasons;
+            obj.needsReview = reasons.length > 0;
+        }
+        parsedQuestions.push(obj);
+    }
 
     for (var i = 0; i < paragraphs.length; i++) {
         var paraHtml = paragraphs[i];
@@ -3228,14 +3635,13 @@ function parseQuestionsFromHtml(html) {
 
         var questionMatch = plainText.match(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)(.*)/i);
         if (questionMatch) {
-            if (currentQuestion !== null && currentOptions.length >= 2) {
-                parsedQuestions.push(buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF));
-            }
+            pushCurrent();
             currentType = 'single';
             correctAnswer = -1;
             correctList = [];
             correctTF = [];
             currentOptions = [];
+            currentReasons = [];
 
             if (/\[MULTI\]/i.test(plainText)) {
                 currentType = 'multi';
@@ -3274,14 +3680,24 @@ function parseQuestionsFromHtml(html) {
 
             while (currentOptions.length < optIndex) currentOptions.push('');
             currentOptions[optIndex] = optHtml;
-        } else if (currentQuestion !== null && currentOptions.length === 0) {
-            currentQuestion += ' ' + paraHtml;
+        } else if (currentQuestion !== null) {
+            var tailHasImg = /<img\b/i.test(paraHtml);
+            if (currentOptions.length === 0) {
+                currentQuestion += ' ' + paraHtml;
+            } else if (tailHasImg && plainText.trim() === '') {
+                // Đoạn chỉ có hình ảnh nằm sau các đáp án -> gắn vào câu hỏi và đánh dấu vị trí
+                currentQuestion += ' ' + paraHtml;
+                if (opts.trackReview) {
+                    currentReasons.push('Có hình ảnh nằm riêng — kiểm tra xem thuộc câu hỏi hay đáp án nào.');
+                }
+            } else if (opts.trackReview && plainText.trim() !== '') {
+                // Đoạn văn bản không nhận dạng được -> đánh dấu, không tự đoán
+                currentReasons.push('Đoạn chưa nhận dạng được: "' + plainText.trim().slice(0, 60) + '"');
+            }
         }
     }
 
-    if (currentQuestion !== null && currentOptions.length >= 2) {
-        parsedQuestions.push(buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF));
-    }
+    pushCurrent();
 
     return parsedQuestions;
 }
@@ -3358,13 +3774,36 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
 }
 
 // Hàm parse câu hỏi từ text
-function parseQuestionsFromText(text) {
+function parseQuestionsFromText(text, opts) {
+    opts = opts || {};
     var questions = [];
     var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l; });
     
     var currentQuestion = null;
     var currentOptions = [];
     var correctAnswer = -1;
+
+    function pushQ() {
+        var detected = correctAnswer >= 0;
+        var enough = currentOptions.length >= 2;
+        var item = {
+            question: currentQuestion,
+            options: currentOptions,
+            correct: detected ? correctAnswer : 0,
+            image: null
+        };
+        if (opts.trackReview) {
+            item.type = 'single';
+            item.answerDetected = detected;
+            if (!detected) item.correct = -1;
+            var reasons = [];
+            if (!enough) reasons.push('Chỉ có ' + currentOptions.length + ' đáp án (cần ít nhất 2).');
+            if (!detected) reasons.push('Chưa xác định được đáp án đúng — giáo viên cần chọn.');
+            item.reviewReasons = reasons;
+            item.needsReview = reasons.length > 0;
+        }
+        questions.push(item);
+    }
     
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
@@ -3374,13 +3813,8 @@ function parseQuestionsFromText(text) {
         
         if (questionMatch) {
             // Lưu câu hỏi trước đó
-            if (currentQuestion && currentOptions.length >= 2) {
-                questions.push({
-                    question: currentQuestion,
-                    options: currentOptions,
-                    correct: correctAnswer >= 0 ? correctAnswer : 0,
-                    image: null
-                });
+            if (currentQuestion && (currentOptions.length >= 2 || opts.trackReview)) {
+                pushQ();
             }
             
             currentQuestion = questionMatch[2] || '';
@@ -3416,13 +3850,8 @@ function parseQuestionsFromText(text) {
     }
     
     // Lưu câu hỏi cuối cùng
-    if (currentQuestion && currentOptions.length >= 2) {
-        questions.push({
-            question: currentQuestion,
-            options: currentOptions,
-            correct: correctAnswer >= 0 ? correctAnswer : 0,
-            image: null
-        });
+    if (currentQuestion && (currentOptions.length >= 2 || opts.trackReview)) {
+        pushQ();
     }
     
     return questions;

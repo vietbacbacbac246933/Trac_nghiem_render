@@ -76,6 +76,41 @@ node server.js
 3. Học sinh mở `/`, chọn tên mình, nhập **mã PIN** do giáo viên phát.
 4. Học sinh làm bài và nộp. Giáo viên xem điểm, xuất Excel.
 
+### Nhập đề thi từ Word (.docx) và ảnh
+
+Trong **Quản lý Bài kiểm tra** → nút **“Nhập Word/Ảnh”**:
+
+1. Chọn 1 file `.docx` và/hoặc nhiều file ảnh (`.png .jpg .jpeg .gif .bmp .webp`).
+2. Server kiểm tra phần mở rộng, MIME type, **magic bytes** và dung lượng.
+3. Server trích văn bản (kèm công thức toán và ảnh nhúng) rồi phân tích thành
+   câu hỏi / đáp án.
+4. Hiện **bản xem trước cho sửa được**: nội dung câu, đáp án, chọn đáp án đúng,
+   đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, bật/tắt
+   từng câu.
+5. Giáo viên bấm **Xác nhận lưu** thì mới ghi dữ liệu, vào **bài mới** hoặc
+   **bài đang soạn** (tự chọn).
+
+Nguyên tắc:
+
+- **Không tự bịa dữ liệu.** Câu thiếu đáp án / thiếu nội dung / không xác định
+  được ranh giới sẽ bị gắn nhãn *“cần kiểm tra”* kèm lý do, chứ không tự gán
+  đáp án A. Khi bấm lưu, câu chưa hợp lệ sẽ bị **bỏ qua** và báo rõ lý do.
+- **File ảnh rời**: mỗi ảnh tạo 1 câu có sẵn hình, **để trống** nội dung/đáp án
+  và đánh dấu cần kiểm tra (không dùng OCR, giáo viên tự nhập chữ).
+- **Ảnh nhúng trong `.docx`** được giữ và gắn vào đúng câu hỏi.
+- **Không lưu file tạm vô thời hạn:** file được xử lý trong RAM; ảnh chỉ được
+  giữ trong “phiên xem trước” 30 phút rồi tự xoá. Không ghi file tạm ra đĩa và
+  **không bao giờ thực thi file tải lên**.
+- Giới hạn: `.docx` ≤ 15 MB, mỗi ảnh ≤ 8 MB, tổng ≤ 25 MB, tối đa 30 ảnh/lần.
+
+API mới (đều yêu cầu đăng nhập giáo viên):
+
+| API | Việc |
+|---|---|
+| `POST /api/import/preview` | Nhận file, kiểm tra, phân tích, trả bản xem trước + `sessionId` |
+| `POST /api/import/confirm` | Lưu câu hỏi sau khi giáo viên xác nhận |
+| `GET /api/exams/:examId` | Đọc nội dung 1 bài đã lưu (chỉ đọc) |
+
 ## 6. Giới hạn đã biết
 
 - **Socket.IO lưu trong RAM** → bắt buộc 1 instance. Muốn nhiều instance phải
@@ -95,8 +130,25 @@ node server.js
 server.js            # Toàn bộ server (giữ nguyên nghiệp vụ bản LAN)
 lib/datastore.js     # Lớp lưu trữ PostgreSQL / file
 lib/auth.js          # Xác thực giáo viên (cookie ký HMAC)
+lib/file-validate.js # Kiểm tra định dạng/dung lượng file nhập đề
+lib/import-sessions.js # Phiên xem trước khi nhập đề (RAM, tự hết hạn)
 public/              # Giao diện học sinh, giáo viên, trang đăng nhập
 data/                # Dữ liệu gieo ban đầu (câu hỏi, đề thi, file mẫu)
+tests/               # Test (chạy tay, cần server đang chạy)
 render.yaml          # Cấu hình deploy Render
 .env.example         # Mẫu biến môi trường
 ```
+
+## 8. Chạy test
+
+Test nhập đề cần server đang chạy ở cổng 3999:
+
+```powershell
+# Cửa sổ 1
+$env:PORT="3999"; $env:TEACHER_PASSWORD="test123"; node server.js
+
+# Cửa sổ 2
+npm run test:import        # hoặc: node tests/test-import-docx.js
+```
+
+Đổi địa chỉ bằng biến môi trường `TEST_BASE` / mật khẩu bằng `TEST_PASSWORD`.

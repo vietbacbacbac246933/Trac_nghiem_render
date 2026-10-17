@@ -36,13 +36,23 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 | `render.yaml` | Blueprint deploy Render (Web Service + PostgreSQL). |
 | `.env.example` | Mẫu biến môi trường. |
 | `README.md` | Hướng dẫn dùng & triển khai. |
+| `lib/file-validate.js` | Kiểm tra file nhập đề: phần mở rộng + MIME + **magic bytes** + giới hạn dung lượng. Không thực thi file. |
+| `lib/import-sessions.js` | Phiên “xem trước khi nhập đề”, giữ ảnh base64 trong RAM (TTL 30 phút, tự dọn). |
+| `tests/test-import-docx.js` | Test nhập đề từ Word/ảnh (38 trường hợp). |
+
+### File mới (tính năng nhập đề Word/Ảnh)
+| File | Vai trò |
+|---|---|
+| `lib/file-validate.js` | Nhận dạng `.docx` (chữ ký ZIP) và ảnh (PNG/JPEG/GIF/BMP/WEBP) theo nội dung thật; giới hạn `.docx` 15 MB, ảnh 8 MB, tổng 25 MB, ≤ 30 ảnh. |
+| `lib/import-sessions.js` | Lưu tạm kết quả phân tích để giáo viên xem/sửa trước khi lưu; ảnh giữ trong RAM dưới dạng token `[[IMG:n]]`; hết hạn 30 phút. |
+| `tests/test-import-docx.js` | Test DOCX hợp lệ, thiếu đáp án, sai định dạng, file giả, docx hỏng, ảnh, quá dung lượng, chặn ẩn danh, chống lưu lặp. |
 
 ### File sửa
 | File | Nội dung chính |
 |---|---|
-| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; quản lý PIN + `/api/student-pins*`; `/api/select-student` đòi PIN; bootstrap bất đồng bộ + shutdown. |
-| `package.json` | Thêm `jszip`, `xml-js`, `pg`; `engines.node >= 18`. |
-| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401; nút + hộp thoại “Mã PIN học sinh” (xem/tạo lại/tải Excel). |
+| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; quản lý PIN + `/api/student-pins*`; `/api/select-student` đòi PIN; bootstrap bất đồng bộ + shutdown. **Thêm:** `/api/import/preview`, `/api/import/confirm`, `GET /api/exams/:examId`; multer riêng có giới hạn + lọc định dạng; `parseQuestionsFromHtml` chế độ `trackReview` (đánh dấu câu cần kiểm tra, không tự gán đáp án). |
+| `package.json` | Thêm `jszip`, `xml-js`, `pg`; `engines.node >= 18`; thêm script `test:import`. |
+| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401; nút + hộp thoại “Mã PIN học sinh” (xem/tạo lại/tải Excel). **Thêm:** nút “Nhập Word/Ảnh” + modal xem trước cho sửa (nội dung, đáp án, loại câu, chọn đáp án đúng) và chọn nơi lưu. |
 | `public/index.html` | Hộp thoại nhập PIN khi chọn tên; gửi `{stt, socketId, pin}`. |
 | `.gitignore` | Bỏ qua dữ liệu chạy + thông tin học sinh (mục 6). |
 
@@ -141,6 +151,39 @@ vào dịch vụ PostgreSQL sẵn có trên máy.
 ### D. Kiểm tra toàn vẹn dữ liệu
 `data/questions.json` và 8 file `data/exams/*.json` khớp MD5 tuyệt đối với bản
 gốc (không bị sửa nhầm trong quá trình test).
+
+### E. Nhập đề từ Word/Ảnh — 38/38 đạt
+`node tests/test-import-docx.js` (server cổng 3999, `TEACHER_PASSWORD=test123`):
+
+- **DOCX hợp lệ**: `mau-cau-hoi`/đề tự sinh → nhận đúng 2 câu, đúng đáp án `*`,
+  câu 1 không bị đánh dấu.
+- **Thiếu đáp án**: câu không có dấu đáp án → `needsReview = true`,
+  `correct = -1` (**không** tự gán đáp án A), có lý do cụ thể.
+- **Xác nhận lưu**: câu thiếu đáp án bị **bỏ qua** kèm lý do; bài mới chỉ chứa
+  câu hợp lệ (kiểm chứng lại bằng `GET /api/exams/:examId`).
+- **Chống lưu lặp**: gọi lại cùng `sessionId` → bị từ chối.
+- **Sai định dạng**: `.txt` → HTTP 400; file `.docx` giả (nội dung là văn bản
+  thường) → bị chặn nhờ kiểm tra magic bytes.
+- **Lỗi đọc file**: `.docx` hỏng (ZIP rác) → trả `success:false` kèm thông báo,
+  **server không sập**.
+- **Ảnh**: ảnh PNG → tạo câu giữ chỗ có ảnh, đánh dấu cần kiểm tra; chưa nhập
+  đáp án thì **không lưu**; sau khi bổ sung thì lưu được và ảnh được thay từ
+  token `[[IMG:0]]` thành `<img src="data:image/png;base64,...">` (kiểm chứng
+  bằng `GET /api/exams/:examId`).
+- **Quá dung lượng**: file 16 MB → HTTP 400.
+- **Bảo vệ**: `preview`/`confirm` khi ẩn danh → 403.
+- Test tự xoá các bài kiểm tra nó tạo ra và **không** đổi bài đang soạn.
+
+### F. Kiểm thử giao diện thật (Chromium)
+Mở `/teacher` trên trình duyệt (đã đăng nhập), chạy luồng nhập đề bằng chính
+hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImportPreview`):
+
+- 11 thẻ câu hỏi + 11 ô nội dung + 44 ô đáp án được dựng; 5 nhãn “cần kiểm tra”.
+- Chọn đáp án đúng → nhãn đổi ngay sang “OK”; thêm đáp án, sửa nội dung câu đều
+  cập nhật đúng vào dữ liệu.
+- Bấm **Xác nhận lưu** → lưu 11 câu vào bài mới, đóng modal, xoá sạch bản xem
+  trước. Không có lỗi nào trong Console.
+- Đã xoá bài kiểm tra test; 8 đề gieo ban đầu còn nguyên.
 
 ---
 
