@@ -315,6 +315,22 @@ const createdExams = [];
     const anonConfirm = await confirm(null, { sessionId: 'x', questions: [{ type: 'single', question: 'a', options: ['1', '2'], correct: 0 }] });
     check('confirm khi chưa đăng nhập -> 403', anonConfirm.status === 403, 'status=' + anonConfirm.status);
 
+    // Trang giáo viên phải chặn cả khi đường dẫn bị "ngụy trang"
+    // (//teacher.html, /%74eacher.html...). Trước đây các dạng này LỌT QUA guard
+    // rồi được express.static trả về nguyên trang giáo viên.
+    for (const p of ['/teacher.html', '//teacher.html', '/%74eacher.html', '/./teacher.html']) {
+        const r = await fetch(BASE + p, { redirect: 'manual' });
+        const guarded = r.status === 302 || r.status === 301 || r.status === 403;
+        let body = '';
+        if (!guarded) { try { body = await r.text(); } catch (e) { /* ignore */ } }
+        check('chưa đăng nhập, "' + p + '" -> bị chặn (không trả trang giáo viên)',
+            guarded && !/gạch chân/.test(body), 'status=' + r.status + ' len=' + body.length);
+    }
+    const okTeacher = await fetch(BASE + '/teacher.html', { headers: { Cookie: cookie } });
+    const okBody = okTeacher.ok ? await okTeacher.text() : '';
+    check('giáo viên ĐÃ đăng nhập vẫn mở được trang giáo viên',
+        okTeacher.status === 200 && /gạch chân/.test(okBody), 'status=' + okTeacher.status + ' len=' + okBody.length);
+
     // ------------------------------------------------------------------
     console.log('\n=== 12. Word: đáp án đúng được GẠCH CHÂN (không dùng dấu *) ===');
     const ulDocx = await buildUnderlinedDocx();

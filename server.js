@@ -124,9 +124,24 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(express.json({ limit: '2mb' }));
 
+// Chuan hoa duong dan truoc khi so sanh: phai giai ma %xx, gop dau "/" thua,
+// bo "/./" va bo phan biet chu HOA/thuong. Neu so sanh tho thi
+// "//teacher.html" hoac "/%74eacher.html" se LOT QUA guard roi duoc
+// express.static tra ve nguyen trang giao vien.
+function normalizePath(p) {
+    var s = String(p || '');
+    for (var i = 0; i < 3; i++) {
+        var before = s;
+        try { s = decodeURIComponent(s); } catch (e) { break; }
+        if (s === before) break;
+    }
+    return s.replace(/\\/g, '/').replace(/\/\.\//g, '/').replace(/\/+/g, '/').toLowerCase();
+}
+
 // Chan truy cap truc tiep /teacher.html (express.static se bo qua route /teacher)
 app.use(function(req, res, next) {
-    if (req.path === '/teacher.html' && !isTeacher(req)) {
+    var p = normalizePath(req.path);
+    if ((p === '/teacher.html' || p === '/teacher.htm') && !isTeacher(req)) {
         return res.redirect('/teacher/login');
     }
     next();

@@ -14,7 +14,7 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 |---|---|---|
 | 1 | Cổng bị hard-code 3456 | Đọc `process.env.PORT` |
 | 2 | Trang giáo viên chỉ chặn theo `localhost` (Internet sẽ hở) | Đăng nhập bằng `TEACHER_PASSWORD` + cookie ký HMAC |
-| 3 | `/teacher.html` mở tự do qua static | Chặn, chuyển về `/teacher/login` |
+| 3 | `/teacher.html` mở tự do qua static | Chặn, chuyển về `/teacher/login` (đường dẫn được **chuẩn hoá** trước khi so sánh) |
 | 4 | File lưu trong `data/` (ổ đĩa Render tạm, mất khi restart) | PostgreSQL khi có `DATABASE_URL`, không thì vẫn dùng file |
 | 5 | `/api/settings`, `/api/session` lộ mật khẩu phòng thi | Ẩn với người không phải giáo viên |
 | 6 | `/data/*.json` tải trực tiếp được (lộ đáp án) | Chỉ cho tải 2 file mẫu; chặn toàn bộ `.json` |
@@ -23,6 +23,7 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 | 9 | Thiếu khai báo gói `jszip`, `xml-js` | Thêm vào `package.json` |
 | 10 | Không bắt tín hiệu tắt của Render | Bắt `SIGTERM`/`SIGINT`, ghi nốt dữ liệu rồi thoát |
 | 11 | Nhập đề thủ công tốn thời gian | Thêm nhập đề từ **Word (.docx) / ảnh** và từ **ảnh bằng OCR** (tesseract.js) — có bản xem trước cho sửa, không tự bịa đáp án |
+| 12 | Đề in từ Word thường **gạch chân** đáp án đúng (không dùng dấu `*`) | Nhận diện **đáp án gạch chân**: với Word đọc thẻ `<u>`; với ảnh thì dò **điểm ảnh** (đoạn mực dài ngay dưới chân chữ) — xem mục 5.G/5.K |
 
 ---
 
@@ -165,7 +166,7 @@ vào dịch vụ PostgreSQL sẵn có trên máy.
 `data/questions.json` và 8 file `data/exams/*.json` khớp MD5 tuyệt đối với bản
 gốc (không bị sửa nhầm trong quá trình test).
 
-### E. Nhập đề từ Word/Ảnh — 56/56 đạt
+### E. Nhập đề từ Word/Ảnh — 61/61 đạt
 `node tests/test-import-docx.js` (server cổng 3999, `TEACHER_PASSWORD=test123`):
 
 - **DOCX hợp lệ**: `mau-cau-hoi`/đề tự sinh → nhận đúng 2 câu, đúng đáp án `*`,
@@ -258,7 +259,13 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
 - `test-render-local.js` **21/21**, `test-render-exam.js` **14/14**
   (nộp đúng hết = 10 điểm, `/api/exam` **không** lộ đáp án),
   `test-render-import.js` **5/5**, `test-render-pins.js` **13/13**,
-  `test-import-docx.js` **56/56**, `test-ocr-import.js` **84/84** ⇒ **199/199**.
+  `test-import-docx.js` **61/61**, `test-ocr-import.js` **84/84** ⇒ **204/204**.
+- **Guard `/teacher.html` được siết lại**: trước đây so sánh thô `req.path` nên
+  `//teacher.html` và `/%74eacher.html` **lọt qua** rồi được `express.static` trả
+  về nguyên trang giáo viên. Nay đường dẫn được giải mã + gộp `/` + bỏ `/./` +
+  không phân biệt HOA/thường trước khi so sánh ⇒ **5 trường hợp chặn-đúng** đã
+  được thêm vào test (vẫn 302 cho người chưa đăng nhập, 200 cho giáo viên đã
+  đăng nhập).
 - Kiểm tra 7 file `.docx` mẫu sẵn trong `data/` (đọc trực tiếp `word/document.xml`)
   → **không file nào** dùng gạch chân ⇒ bật `styleMap "u => u"` **không** làm đổi
   kết quả của các đề mẫu cũ.
