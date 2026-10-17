@@ -3699,21 +3699,176 @@ function removeTFMarkers(html) {
     return html.replace(TF_ALL_MARKERS, '').trim();
 }
 
+// ---------- Bo tien to ("Câu 80.", "D.") trong HTML cua Word ----------
+// Word hay IN DAM / GACH CHAN / to mau cho chinh tien to, nen HTML co dang
+//   "<strong>Câu 80.</strong> noi dung..."
+//   "<u>D</u><strong>.</strong> noi dung..."
+//   "<strong>D. noi dung...</strong>"
+// Vi vay khong the dung regex tren chuoi HTML: phai tim tien to tren VAN BAN
+// THUAN (bo qua the) roi cat dung vi tri tuong ung trong HTML. Neu khong lam
+// vay, "Câu 80." se bi giu lai trong noi dung cau hoi -> trong ban xem truoc
+// trong nhu cau 71 bi "long" cau 80 (loi giao vien da bao).
+
+// Ban do: moi ky tu cua van ban thuan -> vi tri tuong ung trong HTML
+function mapHtmlText(html) {
+    var chars = [];
+    var i = 0;
+    while (i < html.length) {
+        var c = html.charAt(i);
+        if (c === '<') {
+            var e = html.indexOf('>', i);
+            if (e === -1) break;
+            i = e + 1;
+            continue;
+        }
+        if (c === '&') {
+            var ent = html.slice(i).match(/^&(amp|lt|gt|quot|apos|#39|nbsp);/i);
+            if (ent) {
+                var name = ent[1].toLowerCase();
+                var ch = ' ';
+                if (name === 'amp') ch = '&';
+                else if (name === 'lt') ch = '<';
+                else if (name === 'gt') ch = '>';
+                else if (name === 'quot') ch = '"';
+                else if (name !== 'nbsp') ch = "'";
+                chars.push({ text: ch, start: i, end: i + ent[0].length });
+                i += ent[0].length;
+                continue;
+            }
+        }
+        chars.push({ text: c, start: i, end: i + 1 });
+        i++;
+    }
+    var text = '';
+    for (var k = 0; k < chars.length; k++) text += chars[k].text;
+    return { text: text, chars: chars, htmlLen: html.length };
+}
+
+var VOID_HTML_TAGS = { br: 1, img: 1, hr: 1, input: 1, wbr: 1, col: 1 };
+
+// Can bang the: bo the dong le, tu dong dong cac the mo con lai.
+// Dung sau khi cat tien to (the boc quanh tien to bi cat mat, the dong cua no
+// con lai -> phai bo di).
+function balanceHtml(html) {
+    var out = '';
+    var stack = [];
+    var re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g;
+    var last = 0;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        out += html.slice(last, m.index);
+        last = re.lastIndex;
+        var name = m[2].toLowerCase();
+        if (VOID_HTML_TAGS[name] || /\/$/.test(String(m[3] || ''))) { out += m[0]; continue; }
+        if (m[1] !== '/') { stack.push(name); out += m[0]; continue; }
+        var at = stack.lastIndexOf(name);
+        if (at === -1) continue;               // the dong khong co the mo -> bo
+        for (var k = stack.length - 1; k > at; k--) out += '</' + stack[k] + '>';
+        out += '</' + name + '>';
+        stack.length = at;
+    }
+    out += html.slice(last);
+    for (var k2 = stack.length - 1; k2 >= 0; k2--) out += '</' + stack[k2] + '>';
+    return out;
+}
+
+// Bo `n` ky tu dau tien cua van ban thuan (kem cac the boc quanh chung)
+function cutHtmlPrefix(html, n) {
+    if (n <= 0) return html;
+    var map = mapHtmlText(html);
+    if (map.chars.length < n) return '';
+    return balanceHtml(html.slice(map.chars[n - 1].end));
+}
+
 function stripOptionPrefix(html) {
-    // Bo the gach chan cua Word TRUOC khi bo "A." / "B)".
-    // Ly do: de thi thuong gach chan chu cai dap an dung, nen HTML co dang
-    // "<u>D.</u> noi dung..." hoac "<u>D. noi dung...</u>" — neu khong bo the
-    // truoc thi regex "A." o dau chuoi se khong khop va chu cai se bi giu lai
-    // trong noi dung dap an.
-    // Gach chan trong 1 dong dap an duoc coi la dau hieu "dap an dung" (giong
-    // dau "*"), nen khong can giu lai dinh dang nay.
+    // Bo the gach chan cua Word TRUOC khi bo "A." / "B)" vi gach chan trong 1
+    // dong dap an duoc coi la dau hieu "dap an dung" (giong dau "*").
     var s = String(html).replace(/<\/?u\b[^>]*>/gi, '');
-    return s.replace(/^[A-Za-z][\.\)]\s*/, '');
+    var m = mapHtmlText(s).text.match(/^\s*([A-Za-z])[\.\)]\s*/);
+    if (!m) return s.trim();
+    return cutHtmlPrefix(s, m[0].length).trim();
 }
 
 function stripQuestionPrefix(html) {
-    // Loại bỏ "Câu N:" hoặc "N." ở đầu
-    return html.replace(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)/i, '');
+    // Loai bo "Câu N:" / "N." o dau, ke ca khi bi in dam/gach chan
+    var s = String(html);
+    var m = mapHtmlText(s).text.match(/^\s*(Câu\s*\d+\s*[\.:]\s*|\d+\s*[\.:]\s*)/i);
+    if (!m) return s.trim();
+    return cutHtmlPrefix(s, m[0].length).trim();
+}
+
+// Bo cac the dinh dang "trang tri" cua Word (in dam/nghieng/gach chan/mau) khoi
+// noi dung cau hoi & dap an: chung chi lam ban ban xem truoc (hien ra chu
+// "<strong>") va khong mang thong tin cho de thi. Giu nguyen anh, khoi code,
+// chi so tren/duoi va cac token [[IMG:n]] / MATHPLACEHOLDER.
+var INLINE_FMT_TAG_RX = /<\/?(?:b|strong|i|em|u|span|font|mark)\b[^>]*>/gi;
+
+function stripInlineFormatting(html) {
+    return String(html == null ? '' : html)
+        .replace(INLINE_FMT_TAG_RX, '')
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+}
+
+// Chuoi cac the MO dang bao quanh vi tri `pos` (de khi cat 1 dong thanh nhieu
+// dap an, moi dap an van giu du the dinh dang cua no, ke ca the gach chan)
+function openTagPrefixAt(html, pos) {
+    var stack = [];
+    var re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        if (m.index >= pos) break;
+        var name = m[2].toLowerCase();
+        if (VOID_HTML_TAGS[name] || /\/$/.test(String(m[3] || ''))) continue;
+        if (m[1] !== '/') { stack.push(m[0]); continue; }
+        for (var k = stack.length - 1; k >= 0; k--) {
+            if (new RegExp('^<' + name + '\\b', 'i').test(stack[k])) { stack.length = k; break; }
+        }
+    }
+    return stack.join('');
+}
+
+// Tach 1 doan chua NHIEU dap an cung dong. Nhieu file Word (de 2025) trinh bay
+// 2 cot bang khoang trang nen 1 doan co ca A, B (hoac ca A, B, C, D):
+//   "A. Campuchia      B. Mianma      C. Brunay      D. Malaixia"
+//   "A. Cộng đồng ASEAN.B. Hiệp hội Đông Nam Á."
+// Neu khong tach, ca dong bi coi la 1 dap an -> cau do bi danh dau "can kiem
+// tra" va dap an dung co the bi gan sai cho (gach chan nam o B nhung lai tinh
+// cho A). Tra ve null neu doan chi co 1 dap an.
+function splitInlineOptions(paraHtml) {
+    var map = mapHtmlText(paraHtml);
+    var text = map.text;
+    var rx = /(^|[\s\u00a0]|[\.\)])([A-Za-z])[\.\)]/g;
+    var marks = [];
+    var m;
+    while ((m = rx.exec(text)) !== null) {
+        var after = text.charAt(rx.lastIndex);
+        if (after !== '' && !/[\s\u00a0]/.test(after)) continue;   // "A.abc" khong phai nhan dap an
+        marks.push({ letter: m[2].toUpperCase(), pos: m.index + m[1].length });
+    }
+    if (marks.length < 2) return null;
+    if (text.slice(0, marks[0].pos).trim() !== '') return null;    // doan phai bat dau bang nhan dap an
+
+    // Chi lay chuoi nhan LIEN TIEP tang dan: A, B, C, D...
+    var run = [marks[0]];
+    var expect = marks[0].letter.charCodeAt(0) + 1;
+    for (var k = 1; k < marks.length; k++) {
+        if (marks[k].letter.charCodeAt(0) === expect) { run.push(marks[k]); expect++; }
+    }
+    if (run.length < 2) return null;
+
+    var segs = [];
+    for (var s2 = 0; s2 < run.length; s2++) {
+        var fromChar = run[s2].pos;
+        var toChar = (s2 + 1 < run.length) ? run[s2 + 1].pos : map.chars.length;
+        var htmlStart = map.chars[fromChar].start;
+        var htmlEnd = (toChar < map.chars.length) ? map.chars[toChar].start : map.htmlLen;
+        segs.push({
+            letter: run[s2].letter,
+            html: openTagPrefixAt(paraHtml, htmlStart) + paraHtml.slice(htmlStart, htmlEnd)
+        });
+    }
+    return segs;
 }
 
 function stripTypeTags(html) {
@@ -3738,8 +3893,8 @@ function buildQuestionObj(type, question, options, correctAnswer, correctList, c
 
     var obj = {
         type: type,
-        question: sanitizeHtml(question),
-        options: options.map(function(o) { return sanitizeHtml(o); }),
+        question: sanitizeHtml(stripInlineFormatting(question)),
+        options: options.map(function(o) { return sanitizeHtml(stripInlineFormatting(o)); }),
         correct: correctAnswer >= 0 ? correctAnswer : 0,
         correctList: type === 'multi' ? correctList : null,
         correctTF: type === 'truefalse' ? correctTF : null,
@@ -3848,13 +4003,41 @@ function parseQuestionsFromHtml(html, opts) {
     var correctAnswer = -1;
     var correctList = [];
     var correctTF = [];
+    var tfMarkerSeen = false;
     var currentReasons = [];
+    // Loai cau mac dinh theo "Phần" dang mo (de 2025: Phần II = câu đúng/sai)
+    var sectionType = null;
+
+    // "Phần II. Câu trắc nghiệm đúng sai. ..." la TIÊU ĐỀ PHẦN, khong phai noi
+    // dung cau hoi. Truoc day dong nay bi coi la "đoạn chưa nhận dạng được" =>
+    // tao ly do "cần kiểm tra" gia cho cau dung ngay truoc no.
+    var SECTION_RE = /^\s*(?:Phần|PHẦN|Phan)\s+[IVX0-9]+\s*[\.:]/i;
+
+    function sectionTypeOf(text) {
+        if (/trắc nghiệm\s+đúng\s*[-\/–—]?\s*sai/i.test(text)) return 'truefalse';
+        if (/trắc nghiệm\s+nhiều phương án/i.test(text)) return 'single';
+        return null;
+    }
 
     // Đẩy câu hỏi đang dựng vào kết quả.
     // Chế độ xem trước (opts.trackReview): giữ cả câu thiếu đáp án/đáp án <2 và
     // gắn cờ "cần kiểm tra" thay vì âm thầm bỏ hoặc tự bịa đáp án.
     function pushCurrent() {
         if (currentQuestion === null) return;
+
+        if (currentType === 'truefalse') {
+            // Chuan hoa correctTF cho khop so dap an (khong de lo hong)
+            var nTF = currentOptions.length;
+            for (var t = 0; t < nTF; t++) {
+                if (typeof correctTF[t] !== 'boolean') correctTF[t] = null;
+            }
+            correctTF.length = nTF;
+            if (!tfMarkerSeen && nTF > 0) {
+                for (var t2 = 0; t2 < nTF; t2++) correctTF[t2] = null;
+                currentReasons.push('Chưa nhận ra phát biểu nào đúng/sai — giáo viên cần chọn.');
+            }
+        }
+
         var enoughOptions = currentOptions.length >= 2;
         if (!opts.trackReview && !enoughOptions) return;
 
@@ -3881,17 +4064,65 @@ function parseQuestionsFromHtml(html, opts) {
         parsedQuestions.push(obj);
     }
 
+    // Ap 1 dong dap an (co the la 1 phan sau khi tach dong chua nhieu dap an)
+    function applyOption(letterRaw, optParaHtml) {
+        var optIndex = String(letterRaw).toUpperCase().charCodeAt(0) - 65;
+        if (optIndex < 0 || optIndex > 25) return;
+        var optPlain = stripHtmlTags(optParaHtml);
+        var optHtml = stripOptionPrefix(optParaHtml).trim();
+
+        if (currentType === 'single') {
+            if (optPlain.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(optPlain) || hasUnderlineMarker(optParaHtml)) {
+                correctAnswer = optIndex;
+            }
+            optHtml = removeCorrectMarkers(optHtml);
+        } else if (currentType === 'multi') {
+            if (optPlain.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(optPlain) || hasUnderlineMarker(optParaHtml)) {
+                correctList.push(optIndex);
+            }
+            optHtml = removeCorrectMarkers(optHtml);
+        } else if (currentType === 'truefalse') {
+            // Gach chan duoi 1 phat bieu = phat bieu DUNG (cung quy uoc voi
+            // gach chan chan duoi dap an o phan I cua de)
+            var marked = hasUnderlineMarker(optParaHtml) || TF_TRUE_REGEX.test(optPlain);
+            correctTF[optIndex] = marked;
+            if (marked) tfMarkerSeen = true;
+            optHtml = removeTFMarkers(optHtml);
+        }
+
+        while (currentOptions.length < optIndex) currentOptions.push('');
+        // Khong de 1 dong dap an RONG ghi de len noi dung da co
+        if (optHtml !== '' || !currentOptions[optIndex]) currentOptions[optIndex] = optHtml;
+    }
+
     for (var i = 0; i < paragraphs.length; i++) {
         var paraHtml = paragraphs[i];
         var plainText = stripHtmlTags(paraHtml);
 
-        var questionMatch = plainText.match(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)(.*)/i);
-        if (questionMatch) {
+        // Tieu de phan -> chot cau dang dung, doi loai cau mac dinh cho phan sau
+        if (SECTION_RE.test(plainText)) {
             pushCurrent();
-            currentType = 'single';
+            currentQuestion = null;
+            currentOptions = [];
             correctAnswer = -1;
             correctList = [];
             correctTF = [];
+            tfMarkerSeen = false;
+            currentReasons = [];
+            currentType = 'single';
+            sectionType = sectionTypeOf(plainText);
+            if (sectionType) currentType = sectionType;
+            continue;
+        }
+
+        var questionMatch = plainText.match(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)(.*)/i);
+        if (questionMatch) {
+            pushCurrent();
+            currentType = sectionType || 'single';
+            correctAnswer = -1;
+            correctList = [];
+            correctTF = [];
+            tfMarkerSeen = false;
             currentOptions = [];
             currentReasons = [];
 
@@ -3902,36 +4133,20 @@ function parseQuestionsFromHtml(html, opts) {
             }
 
             // Lấy inner HTML của câu hỏi, bỏ prefix "Câu N:" và type tags
-            var qHtml = stripQuestionPrefix(stripTypeTags(paraHtml));
-            // Nếu plain text prefix còn sót lại
-            qHtml = qHtml.replace(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)/i, '');
-            currentQuestion = qHtml.trim();
+            currentQuestion = stripQuestionPrefix(stripTypeTags(paraHtml)).trim();
             continue;
         }
 
         var optionMatch = plainText.match(/^([A-Za-z])[\.\)]\s*(.*)/);
+        var optSegments = null;
         if (optionMatch && currentQuestion !== null) {
-            var optLetter = optionMatch[1].toUpperCase();
-            var optIndex = optLetter.charCodeAt(0) - 65;
-            var optHtml = stripOptionPrefix(paraHtml).trim();
-
-            if (currentType === 'single') {
-                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText) || hasUnderlineMarker(paraHtml)) {
-                    correctAnswer = optIndex;
-                }
-                optHtml = removeCorrectMarkers(optHtml);
-            } else if (currentType === 'multi') {
-                if (plainText.indexOf('*') >= 0 || /\(đúng\)|\(dung\)/i.test(plainText) || hasUnderlineMarker(paraHtml)) {
-                    correctList.push(optIndex);
-                }
-                optHtml = removeCorrectMarkers(optHtml);
-            } else if (currentType === 'truefalse') {
-                correctTF[optIndex] = TF_TRUE_REGEX.test(plainText);
-                optHtml = removeTFMarkers(optHtml);
+            // 1 doan co the chua nhieu dap an (A. ... B. ... C. ... D. ...)
+            optSegments = splitInlineOptions(paraHtml) || [{ letter: optionMatch[1], html: paraHtml }];
+        }
+        if (optSegments) {
+            for (var si = 0; si < optSegments.length; si++) {
+                applyOption(optSegments[si].letter, optSegments[si].html);
             }
-
-            while (currentOptions.length < optIndex) currentOptions.push('');
-            currentOptions[optIndex] = optHtml;
         } else if (currentQuestion !== null) {
             var tailHasImg = /<img\b/i.test(paraHtml);
             if (currentOptions.length === 0) {

@@ -102,6 +102,52 @@ async function buildUnderlinedDocx() {
     return Packer.toBuffer(doc);
 }
 
+// .docx mo phong de 2025 in 2 COT: nhieu dap an tren CUNG 1 dong (cach nhau
+// bang khoang trang), "Câu N." in dam, dap an dung gach chan o CHU CAI, va
+// PHAN II la cau dung/sai voi cac phat bieu a) b) c) d).
+async function buildCompactTwoColumnDocx() {
+    const bold = (t) => new TextRun({ text: t, bold: true });
+    const under = (t) => new TextRun({ text: t, underline: {} });
+    const gap = ' '.repeat(40);
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({ children: [bold('PHẦN I.'), new TextRun(' Câu trắc nghiệm nhiều phương án lựa chọn.')] }),
+
+                new Paragraph({ children: [bold('Câu 1.'), new TextRun(' Năm 1967, quốc gia nào tham gia sáng lập ASEAN?')] }),
+                // 2 dap an tren 1 dong, dap an dung (B) bi gach chan
+                new Paragraph({ children: [new TextRun('A. Campuchia' + gap), under('B.'), new TextRun(' Mianma')] }),
+                new Paragraph({ children: [new TextRun('C. Brunây' + gap + 'D. Malaixia')] }),
+
+                new Paragraph({ children: [bold('Câu 2.'), new TextRun(' Cộng đồng ASEAN được xây dựng trên 3 trụ cột chính là chính trị - an ninh, văn hóa – xã hội và')] }),
+                new Paragraph({ children: [new TextRun('A. tiền tệ' + gap + 'B. đối ngoại')] }),
+                // dap an dung (C) nam trong dong bat dau bang C
+                new Paragraph({ children: [under('C.'), new TextRun(' kinh tế' + gap + 'D. quân sự')] }),
+
+                new Paragraph({ children: [bold('Câu 3.'), new TextRun(' Năm 1967, tổ chức nào được thành lập?')] }),
+                // 4 dap an tren CUNG 1 dong, dap an dung (D) bi gach chan
+                new Paragraph({ children: [new TextRun('A. Campuchia' + gap + 'B. Mianma' + gap + 'C. Brunây' + gap), under('D.'), new TextRun(' Malaixia')] }),
+
+                new Paragraph({ children: [bold('PHẦN II.'), new TextRun(' Câu trắc nghiệm đúng sai. Trong mỗi ý a), b), c), d) thí sinh chọn đúng hoặc sai.')] }),
+                new Paragraph({ children: [bold('Câu 1.'), new TextRun(' Cho đoạn tư liệu sau đây:')] }),
+                new Paragraph('"Đại hội đồng Liên hợp quốc thông qua bản Tuyên ngôn về thủ tiêu hoàn toàn chủ nghĩa thực dân."'),
+                // gach chan o a) va d) => hai phat bieu DUNG
+                new Paragraph({ children: [under('a)'), new TextRun(' Tuyên ngôn khẳng định các nước thực dân đã vi phạm luật pháp quốc tế.')] }),
+                new Paragraph({ children: [new TextRun('b) Liên hợp quốc duy trì hệ thống thuộc địa.')] }),
+                new Paragraph({ children: [new TextRun('c) Tuyên ngôn tạo cơ sở pháp lý cho kháng chiến chống Pháp.')] }),
+                new Paragraph({ children: [under('d)'), new TextRun(' Tuyên ngôn tác động sâu sắc đến phong trào giải phóng dân tộc.')] }),
+
+                new Paragraph({ children: [bold('Câu 2.'), new TextRun(' Cho đoạn tư liệu sau đây:')] }),
+                new Paragraph({ children: [new TextRun('a) Vai trò của Liên hợp quốc bị hạn chế bởi nguyên tắc tôn trọng chủ quyền.')] }),
+                new Paragraph({ children: [under('b)'), new TextRun(' Liên hợp quốc thường xuyên dùng vũ lực để chấm dứt xung đột.')] }),
+                new Paragraph({ children: [new TextRun('c) Việt Nam đã góp phần gìn giữ hòa bình và an ninh quốc tế.')] }),
+                new Paragraph({ children: [new TextRun('d) Mọi tranh chấp trên thế giới đều đã được giải quyết.')] })
+            ]
+        }]
+    });
+    return Packer.toBuffer(doc);
+}
+
 async function login() {
     const res = await fetch(BASE + '/api/teacher/login', {
         method: 'POST',
@@ -386,7 +432,89 @@ const createdExams = [];
     }
 
     // ------------------------------------------------------------------
-    console.log('\n=== 13. Dọn dẹp: xoá các bài test đã tạo ===');
+    console.log('\n=== 13. Word: đề in 2 cột (nhiều đáp án 1 dòng) + "Câu N." in đậm + Phần II đúng/sai ===');
+    // Mo phong dung kieu file giao vien gui: Word trinh bay 2 cot bang khoang
+    // trang nen 1 doan co 2 (hoac 4) dap an; "Câu N." bi in dam; dap an dung
+    // gach chan o chu cai; Phan II la cau dung/sai voi a) b) c) d).
+    const compactDocx = await buildCompactTwoColumnDocx();
+    const pc = await preview(cookie, [{
+        name: 'de-2-cot.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: compactDocx
+    }]);
+    check('đề 2 cột -> preview success', pc.json && pc.json.success === true, JSON.stringify(pc.json).slice(0, 200));
+    check('nhận diện 5 câu (3 trắc nghiệm + 2 đúng/sai)', pc.json && pc.json.count === 5, 'count=' + (pc.json && pc.json.count));
+
+    const cq = (pc.json && pc.json.questions) || [];
+    const cText = (s) => String(s == null ? '' : s).replace(/<[^>]*>/g, '').trim();
+
+    // Loi giao vien bao: "cau 71 long cau 80" = tien to "Câu N." con nam trong
+    // noi dung cau hoi (vi no bi in dam nen regex cu khong khop).
+    check('bỏ được tiền tố "Câu N." in đậm ở đầu câu hỏi',
+        cq[0] && !/^Câu\s*\d/i.test(cText(cq[0].question)), JSON.stringify(cText(cq[0] && cq[0].question).slice(0, 60)));
+    check('nội dung câu hỏi không còn thẻ HTML hiện ra chữ (no <strong>)',
+        cq.every(q => !/<\/?[a-z]/i.test(String(q.question))), JSON.stringify(String(cq[0] && cq[0].question).slice(0, 90)));
+    check('đáp án không còn thẻ HTML hiện ra chữ',
+        cq.every(q => (q.options || []).every(o => !/<\/?[a-z]/i.test(String(o)))));
+
+    // Tach 2 dap an tren cung 1 dong: "A. ... B. ..." (dap an dung la B)
+    check('tách được 2 đáp án cùng dòng thành 4 đáp án',
+        cq[0] && cq[0].options.length === 4, 'len=' + (cq[0] && cq[0].options.length));
+    check('nội dung đáp án A sạch (không dính "B.")',
+        cText(cq[0] && cq[0].options[0]) === 'Campuchia', JSON.stringify(cText(cq[0] && cq[0].options[0])));
+    check('nội dung đáp án B sạch (không dính chữ cái "B.")',
+        cText(cq[0] && cq[0].options[1]) === 'Mianma', JSON.stringify(cText(cq[0] && cq[0].options[1])));
+    check('không còn khoảng trắng cột trong đáp án',
+        cq.every(q => (q.options || []).every(o => !/\s{2,}/.test(cText(o)))));
+
+    // Dap an dung gach chan nam trong DONG co nhieu dap an -> phai gan dung
+    // (truoc day gach chan o B/C bi tinh cho dap an dau dong).
+    check('gạch chân ở B (dòng có A,B) -> đáp án B', cq[0] && cq[0].correct === 1, 'correct=' + (cq[0] && JSON.stringify(cq[0].correct)));
+    check('gạch chân ở C (dòng có C,D) -> đáp án C', cq[1] && cq[1].correct === 2, 'correct=' + (cq[1] && JSON.stringify(cq[1].correct)));
+    check('gạch chân ở D (dòng có đủ A,B,C,D) -> đáp án D', cq[2] && cq[2].correct === 3, 'correct=' + (cq[2] && JSON.stringify(cq[2].correct)));
+
+    // "Phần II. Câu trắc nghiệm đúng sai." -> các câu sau là đúng/sai, và gạch
+    // chân dưới phát biểu = phát biểu ĐÚNG.
+    check('Phần II -> câu 4 là loại đúng/sai', cq[3] && cq[3].type === 'truefalse', JSON.stringify(cq[3] && cq[3].type));
+    check('Phần II -> câu 5 là loại đúng/sai', cq[4] && cq[4].type === 'truefalse', JSON.stringify(cq[4] && cq[4].type));
+    check('Phần II câu 4: gạch chân a) và d) -> Đúng/Sai = T,F,F,T',
+        cq[3] && JSON.stringify(cq[3].correctTF) === JSON.stringify([true, false, false, true]), JSON.stringify(cq[3] && cq[3].correctTF));
+    check('Phần II câu 5: gạch chân b) -> Đúng/Sai = F,T,F,F',
+        cq[4] && JSON.stringify(cq[4].correctTF) === JSON.stringify([false, true, false, false]), JSON.stringify(cq[4] && cq[4].correctTF));
+    check('tiêu đề "Phần II" KHÔNG tạo lý do "cần kiểm tra" giả',
+        cq.every(q => (q.reviewReasons || []).every(r => !/chưa nhận dạng được/i.test(r))),
+        JSON.stringify(cq.map(q => q.reviewReasons || [])));
+    check('đề 2 cột: không câu nào bị đánh dấu cần kiểm tra',
+        pc.json && pc.json.needsReview === 0 && cq.every(q => q.needsReview === false),
+        'needsReview=' + (pc.json && pc.json.needsReview));
+
+    // Lưu thật rồi đọc lại (cả câu đúng/sai)
+    const cc = await confirm(cookie, {
+        sessionId: pc.json.sessionId,
+        destination: 'new',
+        examName: 'TEST-IMPORT-2COT',
+        questions: cq.map(q => ({
+            include: true, type: q.type, question: q.question, options: q.options,
+            correct: q.correct, correctList: q.correctList, correctTF: q.correctTF
+        }))
+    });
+    check('lưu được cả 5 câu (3 trắc nghiệm + 2 đúng/sai)',
+        cc.json && cc.json.success === true && cc.json.saved === 5, JSON.stringify(cc.json).slice(0, 200));
+    if (cc.json && cc.json.examId) createdExams.push(cc.json.examId);
+    if (cc.json && cc.json.examId) {
+        const cRe = await fetch(BASE + '/api/exams/' + cc.json.examId, { headers: { Cookie: cookie } });
+        const cJson = await cRe.json();
+        const savedC = (cJson && cJson.exam && cJson.exam.questions) || [];
+        check('đọc lại được 5 câu đã lưu', savedC.length === 5, 'len=' + savedC.length);
+        check('câu 1 lưu đáp án đúng B', savedC[0] && savedC[0].correct === 1, JSON.stringify(savedC[0] && savedC[0].correct));
+        check('câu 4 lưu đúng loại đúng/sai + Đ/S',
+            savedC[3] && savedC[3].type === 'truefalse' &&
+            JSON.stringify(savedC[3].correctTF) === JSON.stringify([true, false, false, true]),
+            JSON.stringify(savedC[3] && savedC[3].correctTF));
+    }
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 14. Dọn dẹp: xoá các bài test đã tạo ===');
     let cleaned = 0;
     for (const id of createdExams) {
         const r = await fetch(BASE + '/api/exams/' + id, { method: 'DELETE', headers: { Cookie: cookie } });

@@ -24,6 +24,8 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 | 10 | Không bắt tín hiệu tắt của Render | Bắt `SIGTERM`/`SIGINT`, ghi nốt dữ liệu rồi thoát |
 | 11 | Nhập đề thủ công tốn thời gian | Thêm nhập đề từ **Word (.docx) / ảnh** và từ **ảnh bằng OCR** (tesseract.js) — có bản xem trước cho sửa, không tự bịa đáp án |
 | 12 | Đề in từ Word thường **gạch chân** đáp án đúng (không dùng dấu `*`) | Nhận diện **đáp án gạch chân**: với Word đọc thẻ `<u>`; với ảnh thì dò **điểm ảnh** (đoạn mực dài ngay dưới chân chữ) — xem mục 5.G/5.K |
+| 13 | Đề thực tế in **2 cột** (nhiều đáp án trên 1 dòng) và **“Câu N.” in đậm** ⇒ câu bị “lồng” câu khác, nhiều câu bị đánh dấu *cần kiểm tra*, **đáp án gạch chân bị gán sai chữ cái**, bản xem trước hiện cả thẻ `<strong>` | Phân tích lại theo **văn bản thuần**: tách nhiều đáp án trên cùng dòng, bỏ tiền tố kể cả khi in đậm/gạch chân, nhận `PHẦN I/II/III` (Phần II đúng/sai ⇒ câu **Đúng/Sai**, gạch chân = phát biểu Đúng), bỏ định dạng trang trí khỏi nội dung lưu — xem mục 5.L |
+| 14 | Nhập file dài (100+ câu) phải cuộn tìm câu lỗi | Thêm **bộ lọc** trong bản xem trước: *Tất cả (N) / ✓ Đọc hoàn hảo (n) / ⚠ Cần kiểm tra (n)*, số đếm cập nhật ngay khi sửa — xem mục 5.M |
 
 ---
 
@@ -255,11 +257,11 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
 - Trả lại trọng số 1 → sai 1 câu còn 19/20 → **9.5 điểm**, **giống hệt** cách
   chấm cũ ⇒ **tương thích ngược**.
 
-### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số + gạch chân)
+### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số + gạch chân + tách đề 2 cột)
 - `test-render-local.js` **21/21**, `test-render-exam.js` **14/14**
   (nộp đúng hết = 10 điểm, `/api/exam` **không** lộ đáp án),
   `test-render-import.js` **5/5**, `test-render-pins.js` **13/13**,
-  `test-import-docx.js` **61/61**, `test-ocr-import.js` **84/84** ⇒ **204/204**.
+  `test-import-docx.js` **83/83**, `test-ocr-import.js` **84/84** ⇒ **226/226**.
 - **Guard `/teacher.html` được siết lại**: trước đây so sánh thô `req.path` nên
   `//teacher.html` và `/%74eacher.html` **lọt qua** rồi được `express.static` trả
   về nguyên trang giáo viên. Nay đường dẫn được giải mã + gộp `/` + bỏ `/./` +
@@ -305,6 +307,80 @@ chân `C.`, câu 3 gạch chân cả dòng `D. Mười một`), **không** dùng
 - Bấm **Xác nhận lưu** → tạo bài “TEST-UI-GACH-CHAN”; đọc lại bằng API thấy đáp án
   đúng lần lượt **B, C, D** (đúng như ảnh). **0 lỗi trong Console.** Đã xoá bài
   test, còn đúng 8 đề, bài đang chọn không đổi, `data/questions.json` khôi phục 20 câu.
+
+### L. Sửa lỗi “câu bị lồng nhau” + tách đề in 2 cột — 22 trường hợp mới (thêm vào test A: 61 → 83)
+
+**Lỗi giáo viên báo** (đối chiếu file `THỰC-HÀNH-LỊCH-SỬ-12_-BÀI_12345.docx`):
+thẻ câu thứ **71** trong bản xem trước hiện nội dung `Câu 80. Từ năm 2015 …` nên
+trông như câu 71 bị “lồng” câu 80. Truy vết trên file thật:
+
+1. Word **in đậm** tiền tố (`<w:b>` cho `"Câu 80"` và `"."`) nên HTML là
+   `<strong>Câu 80</strong><strong>.</strong> Từ năm 2015 …`; hàm bỏ tiền tố cũ chạy
+   regex trên **chuỗi HTML** nên không khớp ⇒ **tiền tố còn nguyên trong nội dung**.
+   Vì số thứ tự trên thẻ là **vị trí** (71) còn chữ trong ô là “Câu 80” nên nhìn
+   như lồng nhau. Cùng nguyên nhân này, chữ cái đáp án bị lặp (`<strong>D</strong>.` →
+   `D. D. Sự cạnh tranh…`) khi đáp án đúng vừa **in đậm** vừa **gạch chân**.
+2. Word trình bày **2 cột bằng khoảng trắng** trong *cùng một đoạn*:
+   `A. Campuchia        B. Mianma        C. Brunây        D. Malaixia`. Parser cũ coi
+   **cả dòng là 1 đáp án** ⇒ câu bị đánh dấu *cần kiểm tra* (6 câu), và nguy hiểm hơn:
+   **gạch chân nằm ở B/C/D nhưng bị gán cho đáp án đầu dòng** (Câu 77 lưu đáp án C
+   trong khi đề gạch chân D).
+3. Dòng `Phần II. Câu trắc nghiệm đúng sai. …` không được nhận là **tiêu đề phần**
+   ⇒ sinh lý do “đoạn chưa nhận dạng được” cho câu liền trước; và **Phần II bị đọc
+   thành câu 1 đáp án** với đáp án *đoán* theo gạch chân cuối cùng (sai loại câu).
+
+**Đã sửa** (`server.js`):
+
+- Bỏ tiền tố trên **văn bản thuần** rồi cắt đúng vị trí trong HTML (`mapHtmlText`,
+  `cutHtmlPrefix`, `balanceHtml`): xử lý được mọi kiểu bọc thẻ của Word
+  (`<strong>Câu 1.</strong>`, `<u>A</u><strong>.</strong>`, gạch chân cả dòng…);
+  sau khi cắt, thẻ lệch được tự cân bằng.
+- `splitInlineOptions`: tách đoạn có **nhiều nhãn đáp án liên tiếp** (A, B, C, D)
+  thành từng đáp án; mỗi đáp án **giữ lại đúng thẻ định dạng đang bao quanh nó**
+  (`openTagPrefixAt`) nên dấu gạch chân ở B/C/D vẫn nhận đúng **chữ cái của nó**.
+- Nhận **tiêu đề phần** `PHẦN I/II/III…`: chốt câu đang dựng, không tính là nội dung;
+  `Phần II. Câu trắc nghiệm đúng sai` ⇒ các câu sau là **Đúng/Sai**, **gạch chân dưới
+  một phát biểu = phát biểu ĐÚNG**; không có dấu hiệu nào ⇒ để trống + đánh dấu cần
+  kiểm tra (không tự bịa).
+- Bỏ **định dạng trang trí** (b/strong/i/em/u/span/font/mark) khỏi nội dung câu hỏi
+  và đáp án trước khi lưu (giữ ảnh, `<pre>`/code, `<sub>`/`<sup>`, token
+  `[[IMG:n]]`/`MATHPLACEHOLDER…`) ⇒ bản xem trước đọc được như văn bản bình thường.
+- Không để một dòng đáp án **rỗng** ghi đè nội dung đã có.
+
+**Kết quả trên đúng file giáo viên gửi** (qua `/api/import/preview`):
+
+| Trước | Sau |
+|---|---|
+| 107 câu, **7 câu** cần kiểm tra, có câu nội dung còn `Câu 80.`, đáp án lặp chữ cái `D. D.`, đáp án gán sai (Câu 77 = C thay vì D), Phần II là câu 1 đáp án | 107 câu, **0 câu** cần kiểm tra, không còn tiền tố/thẻ HTML/khoảng trắng cột, **87 câu 1 đáp án + 20 câu Đúng/Sai** (Phần II đúng), đáp án gạch chân đúng chữ cái (B, C, D…), Phần II `correctTF` = Đ/S theo gạch chân (ví dụ câu 1 Phần II: `[Đ,S,S,Đ]`) |
+
+**Test tự động** — thêm **mục 13** trong `tests/test-import-docx.js` (**22 trường
+hợp mới**, tổng **83/83**): dựng file `.docx` ngay trong test (`buildCompactTwoColumnDocx`)
+đúng kiểu đề trên — *2 đáp án trên 1 dòng*, *4 đáp án trên 1 dòng*, *“Câu N.” in đậm*,
+*gạch chân nằm ở B / C / D*, *Phần II. Câu trắc nghiệm đúng sai*. Kiểm tra: bỏ sạch
+tiền tố, không còn thẻ HTML trong ô sửa, tách đúng 2 → 4 đáp án, **đáp án gạch chân
+gán đúng chữ cái**, Phần II ra loại `truefalse` với `correctTF` đúng, không có lý do
+“cần kiểm tra” giả, lưu 5/5 câu và đọc lại đúng cả câu Đúng/Sai.
+
+### M. Kiểm thử giao diện BỘ LỌC thật (Chromium)
+
+Trên `/teacher` (đã đăng nhập), mở **Quản lý Bài kiểm tra → Nhập Word/Ảnh** và nạp
+file thật qua `DataTransfer` + sự kiện `change` (đúng luồng người dùng):
+
+- File nhỏ (1 câu có đáp án gạch chân + 1 câu không có đáp án): thanh lọc hiện
+  **“Tất cả (2) · ✓ Đọc hoàn hảo (1) · ⚠ Cần kiểm tra (1)”**. Bấm **⚠ Cần kiểm tra**
+  → chỉ còn thẻ `câu 2` (nhãn *cần kiểm tra*); bấm **✓ Đọc hoàn hảo** → chỉ còn
+  `câu 1` (nhãn *OK*); bấm **Tất cả** → đủ 2 thẻ. Nút đang chọn đổi màu (nền cam,
+  chữ trắng, đậm), các nút còn lại trắng/xám.
+- **Đúng file giáo viên gửi**: bản xem trước hiện **107** thẻ và **“Tất cả (107) ·
+  ✓ Đọc hoàn hảo (107) · ⚠ Cần kiểm tra (0)”**. Thẻ thứ **71** (đúng chỗ giáo viên
+  phản ánh) nay hiện `Từ năm 2015 đến nay, Cộng đồng ASEAN …` — **không còn “Câu 80.”**,
+  nhãn `OK`, 4 đáp án sạch (tiền tệ / đối ngoại / kinh tế / quân sự) và **tự chọn sẵn
+  đáp án C (kinh tế)**. Quét toàn bộ 107×2 ô sửa: **0 ô nào còn lộ thẻ HTML**
+  (`<strong>`…). **87 thẻ** dùng nút chọn 1 đáp án, **20 thẻ** dùng ô chọn Đúng/Sai
+  (ví dụ thẻ 88: Đúng / Sai / Sai / Đúng — đúng như gạch chân trong file).
+- **0 lỗi JavaScript** trong Console (chỉ có log Socket.IO ngắt kết nối do tiến
+  trình server được khởi động lại giữa lúc kiểm thử). Bản xem trước được **huỷ**
+  (không lưu gì); 2 file `.docx` dùng để thử đã xoá khỏi `public/`.
 
 ---
 

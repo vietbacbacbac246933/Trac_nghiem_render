@@ -100,7 +100,8 @@ Trong **Quản lý Bài kiểm tra** → nút **“Nhập Word/Ảnh”**:
    câu hỏi / đáp án.
 4. Hiện **bản xem trước cho sửa được**: nội dung câu, đáp án, chọn đáp án đúng,
    đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, **điểm
-   (trọng số)** từng câu, bật/tắt từng câu.
+   (trọng số)** từng câu, bật/tắt từng câu. Có **bộ lọc nhanh** *Tất cả / ✓ Đọc
+   hoàn hảo / ⚠ Cần kiểm tra* (xem mục *Lọc nhanh câu hỏi trong bản xem trước*).
 5. Giáo viên bấm **Xác nhận lưu** thì mới ghi dữ liệu, vào **bài mới** hoặc
    **bài đang soạn** (tự chọn).
 
@@ -122,6 +123,41 @@ Nguyên tắc:
   giữ trong “phiên xem trước” 30 phút rồi tự xoá. Không ghi file tạm ra đĩa và
   **không bao giờ thực thi file tải lên**.
 - Giới hạn: `.docx` ≤ 15 MB, mỗi ảnh ≤ 8 MB, tổng ≤ 25 MB, tối đa 30 ảnh/lần.
+
+Các kiểu trình bày “khó” đã được xử lý riêng (rút ra từ đề thực tế của giáo viên):
+
+- **Nhiều đáp án trên CÙNG một dòng** (đề in 2 cột, các cột cách nhau bằng khoảng
+  trắng, ví dụ `A. Campuchia      B. Mianma` hoặc cả `A… B… C… D…` trên 1 dòng):
+  server **tách thành từng đáp án riêng** đúng thứ tự A, B, C, D. Nhờ vậy đáp án
+  gạch chân nằm ở B/C/D vẫn được gán **đúng chữ cái** (trước đây cả dòng bị coi là
+  1 đáp án nên câu bị đánh dấu “cần kiểm tra”, và gạch chân ở B bị tính nhầm cho A).
+- **“Câu N.” (hoặc “A.”) bị IN ĐẬM / GẠCH CHÂN trong Word**: việc bỏ tiền tố được
+  làm trên **văn bản thuần** rồi cắt đúng vị trí trong HTML, nên tiền tố luôn được
+  bỏ sạch. Trước đây, khi “Câu 80.” bị in đậm thì nó **còn sót lại trong nội dung
+  câu hỏi**, làm câu 71 (thứ tự thứ 71 trong bản xem trước) trông như bị “lồng” câu 80.
+- **Tiêu đề phần** `PHẦN I/II/III…` được nhận là **mốc chuyển phần**, không phải nội
+  dung câu hỏi (trước đây nó tạo lý do “đoạn chưa nhận dạng được” cho câu liền trước).
+  Riêng **“Phần II. Câu trắc nghiệm đúng sai”** → các câu sau được đặt sẵn loại
+  **Đúng/Sai** với đáp án từng phát biểu a) b) c) d); **gạch chân dưới một phát biểu
+  = phát biểu ĐÚNG** (cùng quy ước với gạch chân ở phần I). Không có dấu hiệu nào thì
+  các phát biểu được để trống và câu bị đánh dấu *cần kiểm tra*.
+- **Định dạng trang trí** (in đậm / nghiêng / gạch chân / màu chữ) bị **bỏ khỏi nội
+  dung lưu** để bản xem trước đọc được như văn bản bình thường (trước đây ô sửa hiện
+  ra cả thẻ `<strong>`). Ảnh nhúng, khối code và công thức toán vẫn được giữ nguyên.
+
+### Lọc nhanh câu hỏi trong bản xem trước
+
+Ngay trên bản xem trước có 3 nút lọc theo trạng thái **tính tại thời điểm đang xem**:
+
+- **Tất cả (N)** — xem toàn bộ như trước.
+- **✓ Đọc hoàn hảo (n)** — chỉ hiện các câu đã có nội dung, ≥ 2 đáp án và **đã xác
+  định được đáp án đúng** (không có lý do cần kiểm tra nào).
+- **⚠ Cần kiểm tra (n)** — chỉ hiện các câu còn thiếu nội dung / thiếu đáp án / chưa
+  xác định đáp án; nếu không còn câu nào thì báo “🎉 Không có câu nào cần kiểm tra”.
+
+Số trên nút được cập nhật ngay khi giáo viên sửa (chọn đáp án, sửa nội dung…), nên
+có thể lọc “Cần kiểm tra” rồi sửa lần lượt cho đến khi về 0. Đổi bộ lọc **không**
+làm mất nội dung đã sửa và **không** tự lưu gì.
 
 ### Nhập đề từ ẢNH bằng OCR
 

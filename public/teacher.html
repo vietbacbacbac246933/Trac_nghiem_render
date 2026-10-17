@@ -1106,6 +1106,8 @@
                 <div style="padding:18px 22px; max-height:calc(100vh - 210px); overflow-y:auto;">
                     <div id="importPreviewSummary" style="margin-bottom:14px;"></div>
 
+                    <div id="importFilterBar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;"></div>
+
                     <div style="border:1px solid #e0e0e0; border-radius:10px; padding:14px 16px; margin-bottom:16px; background:#fafaff;">
                         <div style="font-weight:600; color:#444; margin-bottom:8px; font-size:0.92em;">Lưu vào đâu?</div>
                         <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
@@ -3986,6 +3988,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
         }
 
         function renderImportPreview(result) {
+            _importFilter = 'all';
             const nameInput = document.getElementById('importNewExamName');
             if (!nameInput.value) {
                 let base = 'Bài nhập từ file';
@@ -4022,6 +4025,38 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
             updateImportDestinationUI();
             renderImportPreviewList();
+        }
+
+        // ---- Bộ lọc trong bản xem trước: Tất cả / Đọc hoàn hảo / Cần kiểm tra ----
+        let _importFilter = 'all';
+
+        function setImportFilter(mode) {
+            _importFilter = mode;
+            renderImportPreviewList();
+        }
+
+        function renderImportFilterBar() {
+            const bar = document.getElementById('importFilterBar');
+            if (!bar) return;
+            if (!_importPreview) { bar.innerHTML = ''; return; }
+            const qs = _importPreview.questions || [];
+            const okCount = qs.filter(q => !q.needsReview).length;
+            const badCount = qs.length - okCount;
+            const btn = (mode, label, count, color) => {
+                const active = _importFilter === mode;
+                return `<button type="button" onclick="setImportFilter('${mode}')" style="border:1px solid ${active ? color : '#ddd'}; background:${active ? color : '#fff'}; color:${active ? '#fff' : '#555'}; padding:7px 14px; border-radius:20px; cursor:pointer; font-size:0.88em; font-weight:${active ? '600' : '400'};">${label} (${count})</button>`;
+            };
+            bar.innerHTML =
+                btn('all', 'Tất cả', qs.length, '#667eea') +
+                btn('ok', '✓ Đọc hoàn hảo', okCount, '#2e7d32') +
+                btn('review', '⚠ Cần kiểm tra', badCount, '#e65100');
+        }
+
+        // Lọc theo trạng thái "cần kiểm tra" hiện tại của từng câu
+        function importQuestionVisible(q) {
+            if (_importFilter === 'ok') return !q.needsReview;
+            if (_importFilter === 'review') return !!q.needsReview;
+            return true;
         }
 
         function importBadgeHtml(q) {
@@ -4080,6 +4115,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             if (!_importPreview) return;
             const total = _importPreview.questions.length;
             const need = _importPreview.questions.filter(q => q.needsReview).length;
+            renderImportFilterBar();
             const box = document.getElementById('importPreviewSummary');
             if (!box) return;
             let el = document.getElementById('importNeedsReviewLine');
@@ -4100,10 +4136,22 @@ C. Công thức nước là H₂O. (Đ)</pre>
         function renderImportPreviewList() {
             const data = _importPreview;
             const list = document.getElementById('importPreviewList');
-            if (!data) { list.innerHTML = ''; return; }
+            if (!data) { list.innerHTML = ''; renderImportFilterBar(); return; }
             const pool = data.imagePool || {};
 
-            list.innerHTML = data.questions.map((q, i) => {
+            renderImportFilterBar();
+
+            const visible = (data.questions || []).map((q, i) => ({ q: q, i: i }))
+                .filter(x => importQuestionVisible(x.q));
+            if (!visible.length) {
+                const msg = _importFilter === 'review'
+                    ? '🎉 Không có câu nào cần kiểm tra — tất cả đều đọc hoàn hảo.'
+                    : 'Không có câu nào trong nhóm này.';
+                list.innerHTML = `<div style="padding:24px; color:#666; text-align:center; border:1px dashed #ddd; border-radius:10px; background:#fafafa;">${msg}</div>`;
+                return;
+            }
+
+            list.innerHTML = visible.map(({ q, i }) => {
                 const qThumb = imgTokenToThumb(q.question, pool);
 
                 const optionsHtml = (q.options || []).map((o, oi) => {
