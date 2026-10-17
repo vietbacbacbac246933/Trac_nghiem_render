@@ -18,7 +18,7 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 | 4 | File lưu trong `data/` (ổ đĩa Render tạm, mất khi restart) | PostgreSQL khi có `DATABASE_URL`, không thì vẫn dùng file |
 | 5 | `/api/settings`, `/api/session` lộ mật khẩu phòng thi | Ẩn với người không phải giáo viên |
 | 6 | `/data/*.json` tải trực tiếp được (lộ đáp án) | Chỉ cho tải 2 file mẫu; chặn toàn bộ `.json` |
-| 7 | Học sinh chọn tên tự do | Mã PIN riêng cho từng học sinh |
+| 7 | Học sinh chọn tên tự do | Mỗi tên chỉ cho **1 học sinh** (đã bỏ mã PIN) |
 | 8 | Trang phụ `simple.html` chọn tên **không cần PIN** | Đã xoá (cùng `debug.html`, `test.html`) |
 | 9 | Thiếu khai báo gói `jszip`, `xml-js` | Thêm vào `package.json` |
 | 10 | Không bắt tín hiệu tắt của Render | Bắt `SIGTERM`/`SIGINT`, ghi nốt dữ liệu rồi thoát |
@@ -60,17 +60,17 @@ nghiệp vụ. Chỉ thay lớp hạ tầng theo nhu cầu chạy trên Internet
 ### File sửa
 | File | Nội dung chính |
 |---|---|
-| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; quản lý PIN + `/api/student-pins*`; `/api/select-student` đòi PIN; bootstrap bất đồng bộ + shutdown. **Thêm:** `/api/import/preview`, `/api/import/confirm`, `GET /api/exams/:examId`; multer riêng có giới hạn + lọc định dạng; `parseQuestionsFromHtml` chế độ `trackReview` (đánh dấu câu cần kiểm tra, không tự gán đáp án). **Thêm (OCR):** `/api/ocr/extract`, `/api/ocr/analyze`, `/api/ocr/status`; trường `points` (trọng số) trong chuẩn hoá câu hỏi + công thức chấm điểm quy về thang 10 theo trọng số (không có `points` thì y như cũ); nạp trước OCR lúc khởi động và giải phóng worker khi tắt. **Thêm (gạch chân):** nạp `lib/underline.js` — dò gạch chân trong `/api/ocr/extract`, trả `underlined` (số đáp án suy ra từ gạch chân); `styleMap: "u => u"` khi đọc Word để giữ thẻ `<u>`, `hasUnderlineMarker()` coi `<u>` trong **dòng đáp án** là đáp án đúng, `stripOptionPrefix()`/`removeCorrectMarkers()` bỏ `<u>` khỏi nội dung đáp án. |
+| `server.js` | PORT động; trust proxy; guard `/teacher.html`; route `/teacher`, `/teacher/login`, `/api/teacher/login|logout|session`; thay `isLocalhost`→`isTeacher` (49 chỗ); toàn bộ đọc/ghi dữ liệu chuyển qua `DATA.*`; ẩn `examPassword`; `/api/select-student` chọn tên **không cần PIN** (khóa tên theo `socketId`); bootstrap bất đồng bộ + shutdown. **Bỏ (mã PIN):** xoá `studentPins`/`getPinsKey`/`loadPins`/`savePins`/`generatePin`/`ensurePins`/`regeneratePins`/`verifyPin` và 3 route `/api/student-pins`, `/api/student-pins/regenerate`, `/api/student-pins/export` (nay trả **404**) — xem mục 5.N. **Thêm:** `/api/import/preview`, `/api/import/confirm`, `GET /api/exams/:examId`; multer riêng có giới hạn + lọc định dạng; `parseQuestionsFromHtml` chế độ `trackReview` (đánh dấu câu cần kiểm tra, không tự gán đáp án). **Thêm (OCR):** `/api/ocr/extract`, `/api/ocr/analyze`, `/api/ocr/status`; trường `points` (trọng số) trong chuẩn hoá câu hỏi + công thức chấm điểm quy về thang 10 theo trọng số (không có `points` thì y như cũ); nạp trước OCR lúc khởi động và giải phóng worker khi tắt. **Thêm (gạch chân):** nạp `lib/underline.js` — dò gạch chân trong `/api/ocr/extract`, trả `underlined` (số đáp án suy ra từ gạch chân); `styleMap: "u => u"` khi đọc Word để giữ thẻ `<u>`, `hasUnderlineMarker()` coi `<u>` trong **dòng đáp án** là đáp án đúng, `stripOptionPrefix()`/`removeCorrectMarkers()` bỏ `<u>` khỏi nội dung đáp án. |
 | `package.json` | Thêm `jszip`, `xml-js`, `pg`, `tesseract.js`, `pngjs`, `jpeg-js`; `engines.node >= 18`; thêm script `test:import`, `test:ocr`. |
-| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401; nút + hộp thoại “Mã PIN học sinh” (xem/tạo lại/tải Excel). **Thêm:** nút “Nhập Word/Ảnh” + modal xem trước cho sửa (nội dung, đáp án, loại câu, chọn đáp án đúng) và chọn nơi lưu. **Thêm (OCR):** nút “📷 Nhập từ ảnh (OCR)”, modal chọn/xoá ảnh (thumbnail + nút ✕), xem văn bản OCR để đối chiếu, và ô **Điểm** từng câu trong bản xem trước. **Thêm (gạch chân):** dòng thông báo “🖍 Đã nhận ra N đáp án được gạch chân…” trên bản xem trước OCR. |
+| `public/teacher.html` | Nút Đăng xuất; tự chuyển trang khi 401. **Đã bỏ:** nút + hộp thoại “Mã PIN học sinh”. **Thêm:** nút “Nhập Word/Ảnh” + modal xem trước cho sửa (nội dung, đáp án, loại câu, chọn đáp án đúng) và chọn nơi lưu. **Thêm (OCR):** nút “📷 Nhập từ ảnh (OCR)”, modal chọn/xoá ảnh (thumbnail + nút ✕), xem văn bản OCR để đối chiếu, và ô **Điểm** từng câu trong bản xem trước. **Thêm (gạch chân):** dòng thông báo “🖍 Đã nhận ra N đáp án được gạch chân…” trên bản xem trước OCR. |
 | `.env.example` | Thêm `OCR_PROVIDER`, `OCR_LANGS`, `OCR_SPACE_API_KEY`, `OCR_DEBUG`. |
-| `public/index.html` | Hộp thoại nhập PIN khi chọn tên; gửi `{stt, socketId, pin}`. |
+| `public/index.html` | Hộp **xác nhận tên** khi chọn tên (không có ô PIN); gửi `{stt, socketId}` (bỏ trường `pin`). |
 | `.gitignore` | Bỏ qua dữ liệu chạy + thông tin học sinh (mục 6). |
 
 ### File đã xoá (có chủ đích)
 `public/simple.html`, `public/debug.html`, `public/test.html`
-→ Trang chẩn đoán cũ, không được link ở đâu, nhưng `simple.html` chọn tên **bỏ
-qua PIN** và `debug/test` hiển thị số lượng + tên học sinh cho bất kỳ ai.
+→ Trang chẩn đoán cũ, không được link ở đâu, nhưng `debug/test` hiển thị số lượng
++ tên học sinh cho bất kỳ ai. (Nay **toàn bộ** luồng đều không dùng mã PIN.)
 Bản gốc vẫn giữ nguyên trong `Trac_nghiem_LAN` nếu cần tham khảo.
 
 ---
@@ -135,15 +135,18 @@ node server.js
 
 Chạy tại máy với `TEACHER_PASSWORD=test123`, 2 học sinh mẫu.
 
-### A. Chế độ FILESYSTEM — 46/46 đạt
+### A. Chế độ FILESYSTEM — 60/60 đạt
 - Cơ bản (21): ping; chặn `/teacher`, `/teacher.html`; chặn tải
   `questions.json`/`exams/*.json`/`classes.json`; cho tải 2 file mẫu; ẩn
   `examPassword`; ẩn `/api/session`; đăng nhập sai/đúng; cookie httpOnly;
-  truy cập giáo viên; đăng xuất.
-- PIN (13): tạo PIN 4 số duy nhất; chọn thiếu PIN / sai PIN bị chặn; đúng PIN
-  thành công; không cướp được tên của phiên khác; tạo lại PIN làm PIN cũ hết
-  hiệu lực; xuất Excel; chặn xuất khi ẩn danh.
-- Đề thi (12): mở đề; `/api/exam` cho học sinh **không chứa** `correct`,
+  truy cập giáo viên; đăng xuất; 3 đường dẫn ngụy trang của `/teacher.html`;
+  `/api/student-pins` (đã xoá) trả **404**.
+- Chọn tên (25): 3 API mã PIN trả **404**; chọn tên **không cần PIN** → thành
+  công; phiên khác **không cướp được tên** (“Tên này đã được chọn bởi người
+  khác”); cùng phiên chọn lại tên mình vẫn được; hủy chọn → phiên khác chọn
+  được; client cũ gửi kèm `pin` thì server bỏ qua; `/api/students` không lộ
+  `pin`; mã nguồn + giao diện **không còn** tham chiếu PIN.
+- Đề thi (14): mở đề; `/api/exam` cho học sinh **không chứa** `correct`,
   `correctList`, `correctTF`; nộp đúng hết = 10 điểm; sai hết = 0 điểm; chặn
   nộp lại; đọc/xuất kết quả; đóng đề.
 
@@ -156,13 +159,17 @@ Dùng một PostgreSQL 18 tạm (`embedded-postgres`, cổng 55432) — **không
 vào dịch vụ PostgreSQL sẵn có trên máy.
 - Khởi động: `[STORE] PostgreSQL trong -> da seed 11 ban ghi tu data/`,
   chế độ `postgres`.
-- Chạy lại **toàn bộ** bộ test **48/48 đạt** (21 + 13 + 14).
+- Chạy lại **toàn bộ** bộ test **48/48 đạt** (21 + 13 + 14) — số liệu *tại thời
+  điểm đó*, lúc mã PIN còn tồn tại.
 - Kiểm tra trực tiếp bảng `quiz_kv`: 15 dòng, gồm `data/questions.json` (mảng
   20 câu), `data/results.json` (2 kết quả), `data/pins/default.json`, các đề
   thi, `student-status`, `current-session`.
 - **Tắt rồi mở lại server**: log `[STORE] PostgreSQL: da nap 15 ban ghi`
-  (nạp lại, không gieo lại); 2 kết quả vẫn còn (An: 10, Bình: 0); PIN giữ
-  nguyên → **dữ liệu bền vững qua restart**.
+  (nạp lại, không gieo lại); 2 kết quả vẫn còn (An: 10, Bình: 0) → **dữ liệu
+  bền vững qua restart**.
+- Sau khi **bỏ mã PIN** (mục 5.N): tầng lưu trữ **không đổi** nên **không cần
+  chuyển đổi dữ liệu**; bản ghi `data/pins/*` cũ (nếu còn) chỉ nằm im, không
+  được đọc nữa và có thể xoá.
 
 ### D. Kiểm tra toàn vẹn dữ liệu
 `data/questions.json` và 8 file `data/exams/*.json` khớp MD5 tuyệt đối với bản
@@ -257,11 +264,12 @@ hàm của trang (`startImportPreview` → `renderImportPreview` → `confirmImp
 - Trả lại trọng số 1 → sai 1 câu còn 19/20 → **9.5 điểm**, **giống hệt** cách
   chấm cũ ⇒ **tương thích ngược**.
 
-### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số + gạch chân + tách đề 2 cột)
+### I. Hồi quy các chức năng cũ (sau khi thêm OCR + trọng số + gạch chân + tách đề 2 cột + bỏ mã PIN)
 - `test-render-local.js` **21/21**, `test-render-exam.js` **14/14**
   (nộp đúng hết = 10 điểm, `/api/exam` **không** lộ đáp án),
-  `test-render-import.js` **5/5**, `test-render-pins.js` **13/13**,
-  `test-import-docx.js` **83/83**, `test-ocr-import.js` **84/84** ⇒ **226/226**.
+  `test-render-import.js` **5/5**, `test-render-select-name.js` **25/25**
+  (thay cho `test-render-pins.js` 13/13 cũ),
+  `test-import-docx.js` **83/83**, `test-ocr-import.js` **84/84** ⇒ **238/238**.
 - **Guard `/teacher.html` được siết lại**: trước đây so sánh thô `req.path` nên
   `//teacher.html` và `/%74eacher.html` **lọt qua** rồi được `express.static` trả
   về nguyên trang giáo viên. Nay đường dẫn được giải mã + gộp `/` + bỏ `/./` +
@@ -382,6 +390,59 @@ file thật qua `DataTransfer` + sự kiện `change` (đúng luồng người d
   trình server được khởi động lại giữa lúc kiểm thử). Bản xem trước được **huỷ**
   (không lưu gì); 2 file `.docx` dùng để thử đã xoá khỏi `public/`.
 
+### N. Bỏ mã PIN học sinh — mỗi tên chỉ 1 người (yêu cầu mới của giáo viên)
+
+**Yêu cầu:** bỏ hộp thoại “Nhập mã PIN của bạn” ở màn hình học sinh; **giữ
+nguyên** quy tắc “1 tên chỉ 1 học sinh chọn”. Thầy chọn phương án *giữ hộp xác
+nhận nhưng bỏ ô PIN* (để học sinh bấm nhầm tên vẫn hủy được).
+
+**Đã bỏ** (không còn đường vào nào dùng mã PIN):
+- `server.js`: biến `studentPins` + `getPinsKey`, `loadPins`, `savePins`,
+  `generatePin`, `ensurePins`, `regeneratePins`, `verifyPin`; 3 route
+  `GET /api/student-pins`, `POST /api/student-pins/regenerate`,
+  `GET /api/student-pins/export` (nay **404**); đoạn kiểm tra PIN trong
+  `/api/select-student` (không nhận trường `pin` nữa).
+- `public/index.html`: ô nhập PIN + hộp thoại PIN → thay bằng hộp **xác nhận
+  tên** (không có ô nhập), 2 nút *Xác nhận* / *Hủy*, `Enter` = xác nhận,
+  `Esc` = hủy; chỉ gửi `{stt, socketId}`.
+- `public/teacher.html`: nút + hộp thoại “Mã PIN học sinh” và 5 hàm liên quan
+  (`showPinManager`, `renderPinTable`, `closePinModal`, `regeneratePins`,
+  `exportPins`).
+- `.gitignore`: bỏ dòng `data/pins/`; xoá `data/pins/default.json` ở máy.
+
+**Giữ nguyên & vẫn kiểm thử** quy tắc “1 tên 1 người” (không đổi dòng nào):
+`/api/select-student` vẫn chặn `status.selected && status.selectedBy !==
+socketId` → lỗi *“Tên này đã được chọn bởi người khác”*; tên đã có người chọn
+hiện **xám, không chọn được** trong danh sách; `/api/deselect-student` mở lại
+tên khi học sinh bấm Hủy / rời trang; học sinh **đã nộp bài** vẫn bị chặn.
+
+**Tương thích ngược:** client cũ còn gửi kèm `pin` vẫn chạy (server bỏ qua);
+dữ liệu cũ `data/pins/*.json` không còn được đọc nhưng vô hại.
+
+**Test tự động** — bộ F viết lại thành `test-render-select-name.js` (**25/25**,
+thay `test-render-pins.js` 13/13); cập nhật 3 bộ cũ vốn lấy PIN qua
+`/api/student-pins` (`test-render-local.js`, `test-render-exam.js`,
+`test-points-scoring.js`) sang chọn tên không PIN.
+
+| Bộ | Trước | Sau |
+|---|---|---|
+| C. Cơ bản (local) | 21/21 | **21/21** (2 mục PIN → kiểm tra API trả 404) |
+| E. Vòng đời đề thi + chấm điểm | 14/14 | **14/14** |
+| F. Chọn tên | 13/13 (theo mã PIN) | **25/25** (không PIN, khóa tên) |
+| G. Trọng số điểm | 6/6 | **6/6** |
+| **Tổng (A–G)** | **226/226** | **238/238** |
+
+**Kiểm thử giao diện thật (Chromium — 2 tab = 2 phiên khác nhau):**
+- Tab 1: chọn `1. Nguyễn Văn An` → hộp thoại hiện tiêu đề **“Xác nhận tên của
+  bạn”**, dòng `1. Nguyễn Văn An`, **0 ô nhập**, 2 nút *Xác nhận* / *Hủy*;
+  `document.body.innerText` **không còn** chữ “PIN” nào hiện ra. Bấm **Xác nhận**
+  → sang bước 2 với `Nguyễn Văn An (STT 1)`.
+- Tab 2 (phiên khác): tên của An **bị xám, không chọn được**; ép gọi xác nhận →
+  hiện đúng lỗi **“Tên này đã được chọn bởi người khác”** và **không** sang bước 2.
+- `node --check server.js` sạch; 0 lỗi cú pháp script inline của `index.html`,
+  `teacher.html`, `teacher-login.html`. Trạng thái học sinh + bài thi trả về như
+  trước khi thử; `data/questions.json` khôi phục 20 câu, còn đúng 8 đề.
+
 ---
 
 ## 6. `.gitignore` — không commit dữ liệu chạy & thông tin học sinh
@@ -394,7 +455,6 @@ data/results.json
 data/results/
 data/reports.json
 data/progress/
-data/pins/
 data/default-students.json
 data/class-students/
 danhsach/
@@ -415,15 +475,17 @@ tự tải về — không chứa ảnh người dùng và có thể xoá bất 
 - [ ] Mở `/teacher` → chuyển tới `/teacher/login`.
 - [ ] Đăng nhập sai → báo lỗi; đăng nhập đúng → vào được.
 - [ ] Thử tải `https://.../data/questions.json` → **404**.
-- [ ] `/teacher` → “Mã PIN học sinh” → tạo PIN, tải Excel.
+- [ ] `/teacher` → **Quản lý học sinh**: **không còn** nút “Mã PIN học sinh”.
 - [ ] `/teacher` → **Quản lý Bài kiểm tra** → “Nhập Word/Ảnh” → chọn 1 file Word
       mẫu → xem trước → Xác nhận lưu.
 - [ ] `/teacher` → **Quản lý Bài kiểm tra** → “📷 Nhập từ ảnh (OCR)” → chọn 1 ảnh
       đề → Bắt đầu nhận dạng → thấy danh sách câu hỏi để sửa.
-- [ ] Học sinh chọn tên, nhập PIN đúng → vào làm bài; PIN sai → bị chặn.
+- [ ] Học sinh mở `/` → chọn tên → hộp **Xác nhận tên** (không có ô PIN) →
+      Xác nhận → vào làm bài; máy khác chọn đúng tên đó → **bị chặn**
+      (“Tên này đã được chọn bởi người khác”).
 - [ ] Mở đề, học sinh nộp bài, giáo viên xem điểm + xuất Excel.
 - [ ] Đổi đề thi → câu hỏi/điểm cập nhật đúng.
-- [ ] **Restart service trên Render** → kiểm tra lại điểm/PIN vẫn còn (xác nhận
+- [ ] **Restart service trên Render** → kiểm tra lại điểm/câu hỏi vẫn còn (xác nhận
       PostgreSQL đang hoạt động).
 - [ ] Đăng xuất → bị đẩy về `/teacher/login`.
 
@@ -435,8 +497,10 @@ tự tải về — không chứa ảnh người dùng và có thể xoá bất 
    phải gắn Redis adapter (chưa làm).
 2. **Gói Free Render** ngủ sau ~15 phút không truy cập (lần đầu vào chậm) và
    PostgreSQL free có thời hạn.
-3. **PIN 4 số** xác thực ở server nhưng học sinh vẫn tự chọn tên trong danh
-   sách; PIN chỉ chống chọn nhầm/chọn hộ, **không phải** tài khoản đăng nhập.
+3. **Không còn mã PIN**: học sinh tự chọn tên trong danh sách; server khóa tên
+   ngay khi học sinh bấm Xác nhận ⇒ **mỗi tên chỉ 1 học sinh** làm bài. Bấm nhầm
+   tên vẫn hủy được ở hộp xác nhận (chưa bị khóa). Đây **không phải** tài khoản
+   đăng nhập đầy đủ.
 4. `socketId` do trình duyệt gửi lên nên về lý thuyết có thể giả mạo (cần biết
    ID phiên khác) — rủi ro thấp.
 5. Chỉ `/api/teacher/login` có giới hạn số lần thử; các API khác không giới hạn.

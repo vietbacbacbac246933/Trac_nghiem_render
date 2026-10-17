@@ -1260,7 +1260,6 @@
             <div class="btn-group">
                 <button class="btn btn-danger" onclick="resetAllStudents()">Reset tất cả trạng thái</button>
                 <button class="btn btn-secondary" onclick="loadStudents()">Làm mới</button>
-                <button class="btn btn-primary" onclick="showPinManager()">Mã PIN học sinh</button>
             </div>
             
             <table class="results-table" style="margin-top: 20px;">
@@ -1544,28 +1543,6 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 <a href="/data/mau-cau-hoi.docx" download style="background:#43a047; color:white; padding:10px 28px; border-radius:8px; text-decoration:none; font-weight:bold; margin-right:10px;">Tải file mẫu Word</a>
                 <button onclick="document.getElementById('formatGuideModal').style.display='none'" style="background:#eee; color:#333; border:none; padding:10px 24px; border-radius:8px; cursor:pointer; font-size:0.95em;">Đóng</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal mã PIN học sinh -->
-    <div id="pinModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:2000; justify-content:center; align-items:center; padding:20px; box-sizing:border-box;">
-        <div style="background:white; border-radius:16px; max-width:560px; width:100%; max-height:85vh; overflow-y:auto; padding:26px; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-            <button onclick="closePinModal()" style="position:absolute;top:14px;right:18px;background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
-            <h2 style="margin:0 0 8px 0; color:#1A237E;">Mã PIN học sinh</h2>
-            <p style="color:#666; font-size:0.9em; margin:0 0 16px 0;">
-                Lớp: <strong id="pinClassLabel">--</strong> — mỗi học sinh dùng mã PIN riêng để chọn đúng tên khi vào phòng thi.
-            </p>
-            <div class="btn-group" style="margin-bottom:14px;">
-                <button class="btn btn-warning" onclick="regeneratePins()">Tạo lại tất cả PIN</button>
-                <button class="btn btn-success" onclick="exportPins()">Xuất Excel</button>
-                <button class="btn btn-secondary" onclick="closePinModal()">Đóng</button>
-            </div>
-            <table class="results-table">
-                <thead>
-                    <tr><th>STT</th><th>Họ và Tên</th><th>Mã PIN</th></tr>
-                </thead>
-                <tbody id="pinTableBody"></tbody>
-            </table>
         </div>
     </div>
 
@@ -3638,55 +3615,6 @@ C. Công thức nước là H₂O. (Đ)</pre>
             } catch (err) {
                 showNotification('Lỗi: ' + err.message);
             }
-        }
-
-        // ========== MÃ PIN HỌC SINH ==========
-        async function showPinManager() {
-            try {
-                const res = await fetch('/api/student-pins');
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
-                document.getElementById('pinClassLabel').textContent = data.className || '--';
-                renderPinTable(data.pins || []);
-                document.getElementById('pinModal').style.display = 'flex';
-            } catch (err) {
-                showNotification('Lỗi tải mã PIN: ' + err.message, 'error');
-            }
-        }
-
-        function renderPinTable(pins) {
-            const tbody = document.getElementById('pinTableBody');
-            if (!pins.length) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#666;">Chưa có học sinh</td></tr>';
-                return;
-            }
-            tbody.innerHTML = pins.map(p => `
-                <tr>
-                    <td>${p.stt}</td>
-                    <td>${escapeHtml(p.fullName)}</td>
-                    <td style="font-weight:bold; letter-spacing:2px;">${escapeHtml(p.pin)}</td>
-                </tr>
-            `).join('');
-        }
-
-        function closePinModal() {
-            document.getElementById('pinModal').style.display = 'none';
-        }
-
-        async function regeneratePins() {
-            if (!confirm('Tạo lại toàn bộ mã PIN cho lớp hiện tại?\n\nMã PIN cũ sẽ không còn hiệu lực. Hãy phát mã mới cho học sinh.')) return;
-            try {
-                const res = await fetch('/api/student-pins/regenerate', { method: 'POST' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                showNotification('Đã tạo lại mã PIN!');
-                showPinManager();
-            } catch (err) {
-                showNotification('Lỗi: ' + err.message, 'error');
-            }
-        }
-
-        function exportPins() {
-            window.location.href = '/api/student-pins/export';
         }
 
         // Load reports

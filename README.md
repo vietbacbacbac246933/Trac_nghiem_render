@@ -11,7 +11,7 @@ nguyên (Node.js + Express + Socket.IO, giao diện HTML thuần).
 | Lưu trữ | File JSON trong `data/` | PostgreSQL nếu có `DATABASE_URL`, ngược lại vẫn dùng file |
 | Cổng | Cố định 3456 | `process.env.PORT` (Render tự cấp) |
 | Trang giáo viên | `isLocalhost` (chỉ local) | Đăng nhập bằng `TEACHER_PASSWORD` + cookie ký HMAC |
-| Danh sách học sinh | Có thể truy cập tự do | Có mã PIN riêng cho từng học sinh |
+| Danh sách học sinh | Có thể truy cập tự do | Mỗi tên chỉ cho 1 học sinh chọn (không dùng mã PIN) |
 | `data/*.json` | Phục vụ tĩnh qua `/data` (lộ đáp án) | Chỉ cho tải 2 file mẫu; chặn mọi `.json` |
 | `/api/settings`, `/api/session` | Trả cả mật khẩu phòng thi | Ẩn mật khẩu với người không phải giáo viên |
 
@@ -79,15 +79,17 @@ node server.js
 ### Sau khi deploy
 - Lần đầu chạy, nếu bảng `quiz_kv` trống, server tự nạp (seed) câu hỏi và đề
   thi từ `data/` vào PostgreSQL.
-- Vào `/teacher`, đăng nhập, bấm **“Mã PIN học sinh”** để tạo và tải mã PIN
-  cho lớp, phát cho học sinh.
+- Vào `/teacher`, đăng nhập, chọn lớp + bài kiểm tra. **Học sinh không cần mã
+  PIN**: mỗi em tự chọn tên của mình, hệ thống khóa tên ngay nên 2 người không
+  thể cùng chọn 1 tên.
 - **Chỉ chạy 1 instance** (Socket.IO dùng RAM của process).
 
 ## 5. Luồng sử dụng
 
 1. Giáo viên đăng nhập `/teacher`.
 2. Chọn lớp + bài kiểm tra, mở bài thi.
-3. Học sinh mở `/`, chọn tên mình, nhập **mã PIN** do giáo viên phát.
+3. Học sinh mở `/`, chọn tên mình rồi bấm **Xác nhận** (không cần mã PIN).
+   Tên đã có người chọn sẽ bị khóa, người khác không chọn được nữa.
 4. Học sinh làm bài và nộp. Giáo viên xem điểm, xuất Excel.
 
 ### Nhập đề thi từ Word (.docx) và ảnh
@@ -216,9 +218,9 @@ API mới (đều yêu cầu đăng nhập giáo viên):
   gắn Redis adapter (chưa làm).
 - **Gói Free của Render** sẽ ngủ sau ~15 phút không dùng (lần đầu vào chậm) và
   Postgres free có thời hạn.
-- Mã PIN học sinh là 4 chữ số, xác thực phía server nhưng **học sinh tự chọn
-  tên** trong danh sách; PIN chỉ ngăn chọn nhầm/chọn hộ, không phải tài khoản
-  đăng nhập đầy đủ.
+- **Không còn mã PIN**: học sinh tự chọn tên trong danh sách, server khóa tên
+  ngay khi học sinh bấm Xác nhận nên **mỗi tên chỉ 1 học sinh** làm bài. Học
+  sinh bấm nhầm tên vẫn hủy được ở hộp xác nhận trước khi bị khóa.
 - `socketId` do trình duyệt gửi lên nên về lý thuyết có thể giả mạo (rủi ro
   thấp, cần biết ID của phiên khác).
 - Chưa giới hạn tần suất ở mọi API (chỉ có ở đăng nhập giáo viên).

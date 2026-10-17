@@ -47,8 +47,6 @@ data/results.json
 data/results/
 data/reports.json
 data/progress/
-# Ma PIN hoc sinh
-data/pins/
 # Cache du lieu ngon ngu OCR (tesseract.js tu tai ve, khong phai file nguoi dung)
 data/ocr-cache/
 # Danh sach hoc sinh (chua ho ten -> thong tin ca nhan)

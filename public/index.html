@@ -1928,34 +1928,24 @@
         </div>
     </div>
     
-    <!-- PIN Modal -->
-    <div class="report-modal" id="pinModal">
+    <!-- Hộp xác nhận tên (không dùng mã PIN) -->
+    <div class="report-modal" id="confirmNameModal">
         <div class="report-box" style="text-align: center;">
-            <h3 style="color:#6a1b9a;">Nhập mã PIN của bạn</h3>
+            <h3 style="color:#6a1b9a;">Xác nhận tên của bạn</h3>
             <p style="margin-bottom: 6px; color:#666;">Học sinh đang chọn:</p>
-            <p id="pinStudentName" style="font-weight: bold; color:#333; margin-bottom: 18px;"></p>
+            <p id="confirmStudentName" style="font-weight: bold; color:#333; margin-bottom: 18px; font-size: 1.15em;"></p>
 
-            <div style="margin-bottom: 14px;">
-                <input type="password" id="pinInput"
-                    placeholder="••••"
-                    style="width: 100%; padding: 15px; font-size: 1.6em; text-align: center; border: 3px solid #8e24aa; border-radius: 12px; letter-spacing: 8px; box-sizing: border-box;"
-                    maxlength="8"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    onkeypress="if(event.key === 'Enter') submitPin()">
-            </div>
+            <div id="confirmNameError" style="display:none; color:#c62828; background:#fdecea; border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.9em;"></div>
 
-            <div id="pinError" style="display:none; color:#c62828; background:#fdecea; border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.9em;"></div>
-
-            <div style="background:#f3e5f5; border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:0.85em; color:#6a1b9a;">
-                Mã PIN do giáo viên cấp riêng cho từng học sinh. Nếu quên, hãy báo giáo viên.
+            <div style="background:#fff8e1; border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:0.85em; color:#8d6e00;">
+                Hãy kiểm tra kỹ tên trước khi xác nhận. Mỗi tên chỉ cho <strong>1 học sinh</strong> làm bài.
             </div>
 
             <div class="btn-group" style="justify-content: center;">
-                <button class="btn btn-primary" onclick="submitPin()" style="padding: 12px 40px; font-size: 1.1em; background:#8e24aa;">
+                <button class="btn btn-primary" id="confirmNameOkBtn" onclick="confirmSelectStudent()" style="padding: 12px 40px; font-size: 1.1em; background:#8e24aa;">
                     Xác nhận
                 </button>
-                <button class="btn btn-danger" onclick="closePinModal()">Hủy</button>
+                <button class="btn btn-danger" onclick="closeConfirmNameModal()">Hủy</button>
             </div>
         </div>
     </div>
@@ -2705,11 +2695,11 @@
             var stt = e.target.value;
             if (!stt) return;
             pendingStt = stt;
-            openPinModal(stt);
+            openConfirmNameModal(stt);
         });
 
-        // Mở hộp thoại nhập PIN
-        function openPinModal(stt) {
+        // Mở hộp xác nhận tên (không dùng mã PIN)
+        function openConfirmNameModal(stt) {
             var name = '';
             for (var i = 0; i < filteredStudents.length; i++) {
                 if (String(filteredStudents[i].stt) === String(stt)) {
@@ -2717,32 +2707,26 @@
                     break;
                 }
             }
-            document.getElementById('pinStudentName').textContent = stt + '. ' + name;
-            document.getElementById('pinInput').value = '';
-            document.getElementById('pinError').style.display = 'none';
-            document.getElementById('pinModal').classList.add('show');
+            document.getElementById('confirmStudentName').textContent = stt + '. ' + name;
+            document.getElementById('confirmNameError').style.display = 'none';
+            document.getElementById('confirmNameModal').classList.add('show');
             setTimeout(function() {
-                var inp = document.getElementById('pinInput');
-                if (inp) inp.focus();
+                var okBtn = document.getElementById('confirmNameOkBtn');
+                if (okBtn) okBtn.focus();
             }, 60);
         }
 
-        function closePinModal() {
-            document.getElementById('pinModal').classList.remove('show');
+        function closeConfirmNameModal() {
+            document.getElementById('confirmNameModal').classList.remove('show');
+            document.getElementById('confirmNameError').style.display = 'none';
             document.getElementById('studentSelect').value = '';
             pendingStt = null;
         }
 
-        // Gửi STT + PIN lên server để chọn học sinh
-        function submitPin() {
-            var pin = document.getElementById('pinInput').value.trim();
-            var errBox = document.getElementById('pinError');
-            if (!pin) {
-                errBox.textContent = 'Vui lòng nhập mã PIN.';
-                errBox.style.display = 'block';
-                return;
-            }
-            if (!pendingStt) { closePinModal(); return; }
+        // Gửi STT lên server để chọn học sinh (server chặn 2 người cùng 1 tên)
+        function confirmSelectStudent() {
+            var errBox = document.getElementById('confirmNameError');
+            if (!pendingStt) { closeConfirmNameModal(); return; }
 
             var stt = pendingStt;
             var xhr = new XMLHttpRequest();
@@ -2759,8 +2743,7 @@
                                     selectedStudent.ho + ' ' + selectedStudent.ten;
                                 document.getElementById('selectedStudentSTT').textContent =
                                     'STT: ' + selectedStudent.stt;
-                                document.getElementById('pinModal').classList.remove('show');
-                                document.getElementById('pinInput').value = '';
+                                document.getElementById('confirmNameModal').classList.remove('show');
                                 pendingStt = null;
                                 updateSteps(2);
                             } else {
@@ -2777,8 +2760,21 @@
                     }
                 }
             };
-            xhr.send(JSON.stringify({ stt: stt, socketId: mySocketId, pin: pin }));
+            xhr.send(JSON.stringify({ stt: stt, socketId: mySocketId }));
         }
+
+        // Phím tắt khi hộp xác nhận tên đang mở: Enter = xác nhận, Esc = hủy
+        document.addEventListener('keydown', function(e) {
+            var modal = document.getElementById('confirmNameModal');
+            if (!modal || !modal.classList.contains('show')) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmSelectStudent();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeConfirmNameModal();
+            }
+        });
 
         function confirmSelection() {
             if (!selectedStudent) return;

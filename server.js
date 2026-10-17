@@ -857,59 +857,10 @@ function loadResults() {
     }
 }
 
-// ========== MÃ PIN HỌC SINH ==========
-// Mỗi học sinh có 1 mã PIN riêng để chọn đúng tên khi vào phòng thi.
-var studentPins = {}; // { stt: '1234' }
-
-function getPinsKey() {
-    return path.join(__dirname, 'data', 'pins', (currentSession.classId || 'default') + '.json');
-}
-function loadPins() {
-    var data = DATA.readJson(getPinsKey(), null);
-    studentPins = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
-}
-function savePins() {
-    DATA.writeJson(getPinsKey(), studentPins);
-}
-function generatePin(used) {
-    for (var attempt = 0; attempt < 300; attempt++) {
-        var pin = String(Math.floor(1000 + Math.random() * 9000));
-        if (!used[pin]) return pin;
-    }
-    return String(Math.floor(1000 + Math.random() * 9000));
-}
-// Tạo PIN cho học sinh chưa có (giữ nguyên PIN cũ)
-function ensurePins() {
-    var used = {};
-    Object.keys(studentPins).forEach(function(k) { used[studentPins[k]] = true; });
-    var changed = false;
-    students.forEach(function(s) {
-        if (!studentPins[s.stt]) {
-            var pin = generatePin(used);
-            studentPins[s.stt] = pin;
-            used[pin] = true;
-            changed = true;
-        }
-    });
-    if (changed) savePins();
-}
-// Tạo lại toàn bộ PIN cho lớp hiện tại
-function regeneratePins() {
-    studentPins = {};
-    var used = {};
-    students.forEach(function(s) {
-        var pin = generatePin(used);
-        studentPins[s.stt] = pin;
-        used[pin] = true;
-    });
-    savePins();
-}
-// Kiểm tra PIN: nếu học sinh chưa có PIN (ví dụ dữ liệu cũ) thì cho qua
-function verifyPin(stt, pin) {
-    var expected = studentPins[stt];
-    if (!expected) return true;
-    return String(pin == null ? '' : pin).trim() === String(expected);
-}
+// ========== CHỌN TÊN HỌC SINH ==========
+// Đã bỏ tính năng mã PIN học sinh.
+// Học sinh chỉ chọn tên của mình trong danh sách; server chặn 2 người cùng chọn
+// 1 tên (xem /api/select-student, /api/deselect-student).
 
 // Load danh sách học sinh từ lớp hiện tại hoặc file mặc định
 function loadStudents() {
@@ -926,10 +877,6 @@ function loadStudents() {
             };
         }
     });
-
-    // Nạp / tạo mã PIN cho lớp hiện tại
-    loadPins();
-    ensurePins();
 }
 
 // Lưu trạng thái học sinh - ƯU TIÊN lưu theo session
@@ -1017,75 +964,16 @@ app.get('/api/students', (req, res) => {
     res.json(studentsWithStatus);
 });
 
-// ========== MÃ PIN HỌC SINH (chỉ giáo viên) ==========
-
-// Danh sách mã PIN của lớp hiện tại
-app.get('/api/student-pins', (req, res) => {
-    if (!isTeacher(req)) {
-        return res.status(403).json({ error: 'Không có quyền truy cập' });
-    }
-    var list = students.map(function(s) {
-        return {
-            stt: s.stt,
-            ho: s.ho || '',
-            ten: s.ten || '',
-            fullName: ((s.ho || '') + ' ' + (s.ten || '')).trim(),
-            pin: studentPins[s.stt] || ''
-        };
-    });
-    res.json({
-        className: currentSession.className || 'Chưa chọn lớp',
-        pins: list
-    });
-});
-
-// Tạo lại toàn bộ mã PIN cho lớp hiện tại
-app.post('/api/student-pins/regenerate', (req, res) => {
-    if (!isTeacher(req)) {
-        return res.status(403).json({ error: 'Không có quyền thực hiện' });
-    }
-    regeneratePins();
-    io.emit('pinsUpdated');
-    res.json({ success: true, count: students.length, className: currentSession.className || 'Chưa chọn lớp' });
-});
-
-// Xuất mã PIN ra Excel
-app.get('/api/student-pins/export', (req, res) => {
-    if (!isTeacher(req)) {
-        return res.status(403).json({ error: 'Không có quyền xuất' });
-    }
-    var rows = students.map(function(s) {
-        return {
-            'STT': s.stt,
-            'Họ tên': ((s.ho || '') + ' ' + (s.ten || '')).trim(),
-            'Mã PIN': studentPins[s.stt] || ''
-        };
-    });
-    var ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }];
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'MaPIN');
-    var buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=ma-pin.xlsx');
-    res.send(buffer);
-});
-
 // Học sinh chọn tên
 app.post('/api/select-student', (req, res) => {
-    var { stt, socketId, pin } = req.body;
-    
+    var { stt, socketId } = req.body;
+
     // Kiểm tra học sinh có trong danh sách không
     var student = students.find(s => s.stt == stt);
     if (!student) {
         return res.json({ success: false, error: 'Không tìm thấy học sinh' });
     }
 
-    // Kiểm tra mã PIN cá nhân của học sinh
-    if (!verifyPin(stt, pin)) {
-        return res.json({ success: false, error: 'Mã PIN không đúng. Vui lòng kiểm tra lại.', needPin: true });
-    }
-    
     // Tạo status nếu chưa có
     if (!studentStatus[stt]) {
         studentStatus[stt] = { selected: false, selectedBy: null, completed: false, canRetry: false };
