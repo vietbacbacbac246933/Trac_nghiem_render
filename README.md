@@ -25,8 +25,17 @@ nguyên (Node.js + Express + Socket.IO, giao diện HTML thuần).
 | `DATABASE_URL` | **Có** (khi online) | Chuỗi kết nối PostgreSQL |
 | `PG_POOL_MAX` | Không | Số kết nối tối đa (mặc định 5) |
 | `NODE_ENV` | Không | `production` khi deploy |
+| `OCR_PROVIDER` | Không | `auto` (mặc định) \| `tesseract` \| `ocrspace` |
+| `OCR_LANGS` | Không | Ngôn ngữ OCR, mặc định `vie+eng` |
+| `OCR_SPACE_API_KEY` | Không | Khoá OCR.space (chỉ khi muốn dùng `ocrspace`) |
 
 Xem `.env.example`.
+
+**Về OCR:** mặc định dùng **tesseract.js** (chạy ngay trong tiến trình Node,
+WASM) nên **không cần API key, không cần cài thêm gói hệ thống** — hợp với
+Render ở chế độ Node thuần. Nếu muốn chất lượng tốt hơn với ảnh chụp bằng điện
+thoại, đặt `OCR_SPACE_API_KEY` (OCR.space có gói miễn phí) và hệ thống sẽ tự
+chuyển sang dùng OCR.space. **Không khoá nào được ghi trong mã nguồn.**
 
 ## 3. Chạy thử ở máy (chế độ file, không cần Postgres)
 
@@ -85,8 +94,8 @@ Trong **Quản lý Bài kiểm tra** → nút **“Nhập Word/Ảnh”**:
 3. Server trích văn bản (kèm công thức toán và ảnh nhúng) rồi phân tích thành
    câu hỏi / đáp án.
 4. Hiện **bản xem trước cho sửa được**: nội dung câu, đáp án, chọn đáp án đúng,
-   đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, bật/tắt
-   từng câu.
+   đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, **điểm
+   (trọng số)** từng câu, bật/tắt từng câu.
 5. Giáo viên bấm **Xác nhận lưu** thì mới ghi dữ liệu, vào **bài mới** hoặc
    **bài đang soạn** (tự chọn).
 
@@ -95,13 +104,49 @@ Nguyên tắc:
 - **Không tự bịa dữ liệu.** Câu thiếu đáp án / thiếu nội dung / không xác định
   được ranh giới sẽ bị gắn nhãn *“cần kiểm tra”* kèm lý do, chứ không tự gán
   đáp án A. Khi bấm lưu, câu chưa hợp lệ sẽ bị **bỏ qua** và báo rõ lý do.
-- **File ảnh rời**: mỗi ảnh tạo 1 câu có sẵn hình, **để trống** nội dung/đáp án
-  và đánh dấu cần kiểm tra (không dùng OCR, giáo viên tự nhập chữ).
+- **File ảnh rời** ở luồng này: mỗi ảnh tạo 1 câu có sẵn hình, **để trống** nội
+  dung/đáp án và đánh dấu cần kiểm tra (giáo viên tự nhập chữ). Muốn máy đọc chữ
+  từ ảnh thì dùng nút **“📷 Nhập từ ảnh (OCR)”** — xem mục dưới.
 - **Ảnh nhúng trong `.docx`** được giữ và gắn vào đúng câu hỏi.
 - **Không lưu file tạm vô thời hạn:** file được xử lý trong RAM; ảnh chỉ được
   giữ trong “phiên xem trước” 30 phút rồi tự xoá. Không ghi file tạm ra đĩa và
   **không bao giờ thực thi file tải lên**.
 - Giới hạn: `.docx` ≤ 15 MB, mỗi ảnh ≤ 8 MB, tổng ≤ 25 MB, tối đa 30 ảnh/lần.
+
+### Nhập đề từ ẢNH bằng OCR
+
+Trong **Quản lý Bài kiểm tra** → nút **“📷 Nhập từ ảnh (OCR)”**:
+
+1. **Chọn ảnh**: chọn nhiều ảnh PNG/JPG. Danh sách ảnh hiện thumbnail, hover vào
+   ảnh bấm **✕** để bỏ ảnh trước khi xử lý (chưa gửi gì lên server).
+2. Bấm **Bắt đầu nhận dạng** → server **đọc chữ (OCR)** trong từng ảnh, xong thì
+   chuẩn hoá văn bản và **tách thành câu hỏi / đáp án A-B-C-D**.
+3. Chuyển sang **bản xem trước cho sửa được** giống luồng Word/Ảnh. Mở mục
+   *“Xem văn bản OCR đọc được”* (ở bước chọn ảnh) để **đối chiếu với ảnh gốc**.
+4. Chỉ khi giáo viên bấm **Xác nhận lưu** thì mới ghi dữ liệu.
+
+Nguyên tắc riêng cho OCR:
+
+- **Không đoán đáp án.** Đáp án đúng chỉ được lấy khi ảnh có dấu hiệu rõ ràng
+  (`*` sau đáp án, `[x]`, `(đúng)`), ví dụ `B. Hà Nội *`. Nếu ảnh **không** ghi
+  đáp án đúng, câu đó có `correct = null` và bị đánh dấu **cần kiểm tra**; nếu
+  giáo viên cố lưu thì câu đó bị **bỏ qua** chứ không tự gán bừa.
+- **Ảnh mờ / không có chữ**: hệ thống báo rõ *“OCR không nhận ra câu hỏi nào”* và
+  hiện văn bản đọc được để giáo viên biết cần chụp lại ảnh rõ hơn.
+- **Tách bước rõ ràng**: *chọn ảnh → OCR → phân tích câu hỏi → xem trước → xác
+  nhận lưu*; bước OCR và phân tích **không** ghi gì vào dữ liệu.
+- **Không lưu ảnh lên đĩa**: ảnh nằm trong RAM (`multer.memoryStorage()`); cache
+  `data/ocr-cache/` chỉ chứa **dữ liệu ngôn ngữ công khai** của tesseract, không
+  chứa ảnh người dùng.
+- Lần chạy đầu, tesseract tải dữ liệu ngôn ngữ (~2 MB cho `vie`) về
+  `data/ocr-cache/`. Server **tự nạp trước ngay khi khởi động** nên lần OCR đầu
+  của giáo viên không bị chậm. Trên Render, ổ đĩa là tạm nên sau khi service ngủ
+  dậy sẽ tải lại một lần.
+
+**Điểm (trọng số) từng câu:** ô `Điểm` trong bản xem trước là **trọng số** (mặc
+định 1). Điểm bài vẫn quy về thang 10 theo tỉ lệ trọng số:
+`điểm = (Σ điểm từng câu × trọng số) / (Σ trọng số) × 10`. Nếu mọi câu đều để
+trọng số 1 thì **kết quả giống hệt trước đây** (tương thích ngược hoàn toàn).
 
 API mới (đều yêu cầu đăng nhập giáo viên):
 
@@ -110,6 +155,9 @@ API mới (đều yêu cầu đăng nhập giáo viên):
 | `POST /api/import/preview` | Nhận file, kiểm tra, phân tích, trả bản xem trước + `sessionId` |
 | `POST /api/import/confirm` | Lưu câu hỏi sau khi giáo viên xác nhận |
 | `GET /api/exams/:examId` | Đọc nội dung 1 bài đã lưu (chỉ đọc) |
+| `GET /api/ocr/status` | Cho biết OCR đã sẵn sàng chưa, đang dùng nhà cung cấp nào |
+| `POST /api/ocr/extract` | Nhận ảnh, kiểm tra, **OCR** → trả văn bản + `sessionId` (chưa lưu câu hỏi) |
+| `POST /api/ocr/analyze` | `{ sessionId }` → phân tích văn bản OCR thành câu hỏi xem trước |
 
 ## 6. Giới hạn đã biết
 
@@ -132,16 +180,20 @@ lib/datastore.js     # Lớp lưu trữ PostgreSQL / file
 lib/auth.js          # Xác thực giáo viên (cookie ký HMAC)
 lib/file-validate.js # Kiểm tra định dạng/dung lượng file nhập đề
 lib/import-sessions.js # Phiên xem trước khi nhập đề (RAM, tự hết hạn)
+lib/ocr.js           # Trích xuất chữ từ ảnh (tesseract.js / OCR.space)
+lib/ocr-parse.js     # Chuẩn hoá văn bản OCR trước khi phân tích câu hỏi
 public/              # Giao diện học sinh, giáo viên, trang đăng nhập
 data/                # Dữ liệu gieo ban đầu (câu hỏi, đề thi, file mẫu)
+data/ocr-cache/      # Cache dữ liệu ngôn ngữ OCR (tự sinh, không commit)
 tests/               # Test (chạy tay, cần server đang chạy)
+tests/fixtures/      # Ảnh mẫu cho test OCR (+ make-fixtures.ps1 để tạo lại)
 render.yaml          # Cấu hình deploy Render
 .env.example         # Mẫu biến môi trường
 ```
 
 ## 8. Chạy test
 
-Test nhập đề cần server đang chạy ở cổng 3999:
+Test nhập đề + OCR cần server đang chạy ở cổng 3999:
 
 ```powershell
 # Cửa sổ 1
@@ -149,6 +201,11 @@ $env:PORT="3999"; $env:TEACHER_PASSWORD="test123"; node server.js
 
 # Cửa sổ 2
 npm run test:import        # hoặc: node tests/test-import-docx.js
+npm run test:ocr           # hoặc: node tests/test-ocr-import.js
 ```
 
 Đổi địa chỉ bằng biến môi trường `TEST_BASE` / mật khẩu bằng `TEST_PASSWORD`.
+Ảnh mẫu nằm trong `tests/fixtures/`; tạo lại bằng
+`powershell -ExecutionPolicy Bypass -File tests/fixtures/make-fixtures.ps1`.
+
+Đặt `OCR_DEBUG=1` khi chạy server để in tiến trình OCR ra console.

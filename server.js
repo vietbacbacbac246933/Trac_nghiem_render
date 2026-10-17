@@ -31,6 +31,9 @@ var auth = require('./lib/auth');
 var fileValidate = require('./lib/file-validate');
 // Phien xem truoc khi nhap de (luu RAM, co TTL)
 var importSessions = require('./lib/import-sessions');
+// OCR (trich xuat chu tu anh) + chuan hoa van ban OCR
+var ocr = require('./lib/ocr');
+var ocrParse = require('./lib/ocr-parse');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -765,7 +768,8 @@ function migrateQuestion(q) {
         correct: correct,
         correctList: type === 'multi' ? correctList : null,
         correctTF: type === 'truefalse' ? correctTF : null,
-        image: q.image || null
+        image: q.image || null,
+        points: normalizePoints(q.points)
     };
 }
 
@@ -2299,7 +2303,8 @@ app.post('/api/submit', (req, res) => {
     }
     
     // Chấm điểm
-    var totalScore = 0; // tổng điểm thực (mỗi câu tối đa 1.0)
+    var totalScore = 0; // tổng điểm thực (đã nhân trọng số từng câu)
+    var totalPoints = 0; // tổng trọng số các câu (mặc định mỗi câu 1)
     var correctCount = 0;   // câu đúng hoàn toàn (score = 1)
     var partialCount = 0;   // câu đúng một phần (0 < score < 1, chỉ truefalse)
     var wrongCount = 0;     // câu sai hoàn toàn (score = 0, có trả lời)
@@ -2312,7 +2317,9 @@ app.post('/api/submit', (req, res) => {
         var isCorrect = questionScore === 1;
         var hasAnswer = studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== -1
             && !(Array.isArray(studentAnswer) && studentAnswer.length === 0);
-        totalScore += questionScore;
+        var qPoints = normalizePoints(q.points);
+        totalScore += questionScore * qPoints;
+        totalPoints += qPoints;
         if (isCorrect) correctCount++;
         else if (!hasAnswer) unansweredCount++;
         else if (questionScore > 0) partialCount++;
@@ -2351,9 +2358,10 @@ app.post('/api/submit', (req, res) => {
         };
     });
 
-    // Điểm = (tổng điểm thực / số câu) × 10
+    // Điểm = (tổng điểm thực đã nhân trọng số / tổng trọng số) × 10
+    // Khi mọi câu đều có trọng số 1 (mặc định) thì kết quả GIỐNG HỆT công thức cũ.
     // truefalse tính partial (số phát biểu đúng / tổng phát biểu), single/multi all-or-nothing
-    var score = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) / 10 : 0;
+    var score = totalPoints > 0 ? Math.round((totalScore / totalPoints) * 100) / 10 : 0;
     
     var result = {
         studentSTT,
@@ -2989,7 +2997,8 @@ function normalizeEditedQuestion(raw, qNum) {
         correct: 0,
         correctList: null,
         correctTF: null,
-        image: null
+        image: null,
+        points: normalizePoints(raw.points)
     };
     if (type === 'single') {
         out.correct = (typeof raw.correct === 'number') ? raw.correct : -1;
@@ -3084,17 +3093,20 @@ app.post('/api/import/preview',
                     images: imageFiles.map(function (it) { return it.file.originalname; })
                 },
                 questions: questions.map(function (q, idx) {
+                    var detected = !!q.answerDetected;
                     return {
                         index: idx,
                         type: q.type || 'single',
                         question: q.question || '',
                         options: q.options || [],
-                        correct: (typeof q.correct === 'number') ? q.correct : -1,
-                        correctList: q.correctList || null,
+                        // Chưa xác định được đáp án -> null (KHÔNG tự gán đáp án A)
+                        correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
+                        correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
                         correctTF: q.correctTF || null,
+                        points: normalizePoints(q.points),
                         needsReview: !!q.needsReview,
                         reviewReasons: q.reviewReasons || [],
-                        answerDetected: !!q.answerDetected
+                        answerDetected: detected
                     };
                 })
             });
@@ -3199,6 +3211,183 @@ app.post('/api/import/confirm', function (req, res) {
         examId: newExamId, examName: examData.name,
         saved: saved.length, skipped: skipped, total: saved.length
     });
+});
+
+// ===========================================================================
+// NHẬP ĐỀ TỪ ẢNH BẰNG OCR
+// ===========================================================================
+// Tách bước rõ ràng:
+//   B1  POST /api/ocr/extract   - upload (RAM) + kiểm tra + OCR      -> sessionId
+//   B2  POST /api/ocr/analyze   - chuẩn hoá + phân tích -> xem trước (chưa lưu)
+//   B3  POST /api/import/confirm- giáo viên xác nhận -> mới ghi dữ liệu
+// Ảnh KHÔNG ghi ra đĩa: multer dùng memoryStorage, OCR nhận Buffer trực tiếp.
+// Không tự bịa câu hỏi/đáp án: câu thiếu đáp án có correct = null + needsReview.
+
+var OCR_MAX_CHARS = ocrParse.MAX_TEXT_CHARS;
+
+// B1: upload + OCR
+app.post('/api/ocr/extract',
+    importUploadMiddleware('files', fileValidate.FILE_LIMITS.maxImageCount),
+    async function (req, res) {
+        if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+        var files = req.files || [];
+        if (files.length === 0) {
+            return res.json({ success: false, error: 'Chưa chọn ảnh nào.' });
+        }
+
+        var images = [];
+        var errors = [];
+        var totalBytes = 0;
+
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            totalBytes += (f.size || (f.buffer ? f.buffer.length : 0));
+            var v = fileValidate.validateUpload(f);
+            if (!v.ok) { errors.push(v.error); continue; }
+            if (v.kind !== 'image') {
+                errors.push('"' + f.originalname + '" không phải ảnh. Bước này chỉ nhận ảnh');
+                continue;
+            }
+            images.push({ name: f.originalname, buffer: f.buffer, mime: v.imageType });
+        }
+
+        if (totalBytes > fileValidate.FILE_LIMITS.maxTotalBytes) {
+            return res.json({
+                success: false,
+                error: 'Tổng dung lượng quá lớn (tối đa ' +
+                    Math.round(fileValidate.FILE_LIMITS.maxTotalBytes / 1024 / 1024) + ' MB).'
+            });
+        }
+        if (images.length === 0) {
+            return res.json({ success: false, error: errors.join(' ') || 'Không có ảnh hợp lệ.' });
+        }
+
+        // OCR tuần tự từng ảnh để giới hạn RAM
+        var results = [];
+        var parts = [];
+        try {
+            for (var k = 0; k < images.length; k++) {
+                var img = images[k];
+                var out = await ocr.recognize(img.buffer, img.mime);
+                results.push({
+                    name: img.name,
+                    provider: out.provider,
+                    confidence: out.confidence,
+                    chars: (out.text || '').length
+                });
+                parts.push(out.text || '');
+            }
+        } catch (err) {
+            console.error('Lỗi OCR:', err);
+            return res.json({
+                success: false,
+                error: 'OCR thất bại: ' + ((err && err.message) || 'lỗi không xác định') +
+                    '. Hãy thử ảnh rõ hơn hoặc kiểm tra cấu hình OCR.'
+            });
+        }
+
+        var text = parts.join('\n\n');
+        if (text.length > OCR_MAX_CHARS) text = text.slice(0, OCR_MAX_CHARS);
+
+        var sessionId = importSessions.create({ ocr: { images: results, text: text } });
+
+        res.json({
+            success: true,
+            sessionId: sessionId,
+            provider: ocr.resolveProvider(),
+            images: results,
+            chars: text.length,
+            // Van ban tho de giao vien doi chieu voi anh
+            text: text,
+            warnings: errors
+        });
+    }
+);
+
+// B2: phân tích văn bản OCR thành câu hỏi (xem trước, CHƯA lưu)
+app.post('/api/ocr/analyze', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+    var sessionId = (req.body || {}).sessionId;
+    var session = importSessions.get(sessionId);
+    if (!session || !session.ocr || !session.ocr.text) {
+        return res.json({ success: false, error: 'Phiên OCR đã hết hạn hoặc không tồn tại. Vui lòng chọn ảnh lại.' });
+    }
+
+    var raw = session.ocr.text;
+    var info = ocrParse.analyze(raw);
+
+    if (info.questionMarkers === 0) {
+        return res.json({
+            success: false,
+            ocrIssues: true,
+            error: 'OCR không nhận ra câu hỏi nào (ảnh có thể mờ, nghiêng hoặc không có chữ). ' +
+                'Hãy thử ảnh rõ hơn, chụp thẳng và đủ sáng.',
+            questionMarkers: info.questionMarkers,
+            optionMarkers: info.optionMarkers,
+            text: raw
+        });
+    }
+
+    var parsed = parseQuestionsFromText(info.normalized, { trackReview: true });
+    if (!parsed || parsed.length === 0) {
+        return res.json({
+            success: false,
+            ocrIssues: true,
+            error: 'Có dấu hiệu câu hỏi nhưng chưa tách được câu nào hoàn chỉnh. ' +
+                'Ảnh có thể bị mờ hoặc thiếu đáp án.',
+            questionMarkers: info.questionMarkers,
+            optionMarkers: info.optionMarkers,
+            text: raw
+        });
+    }
+
+    var questions = parsed.map(function (q, idx) {
+        var detected = !!q.answerDetected;
+        return {
+            index: idx,
+            type: q.type || 'single',
+            question: q.question || '',
+            options: q.options || [],
+            // Không xác định được đáp án đúng -> null + đánh dấu cần kiểm tra
+            correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
+            correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
+            correctTF: q.correctTF || null,
+            points: 1,
+            needsReview: !!q.needsReview,
+            reviewReasons: (q.reviewReasons || []).slice(),
+            answerDetected: detected,
+            source: 'ocr'
+        };
+    });
+
+    session.pool = session.pool || {};
+    session.ocr.questions = questions;
+
+    var needsReview = questions.filter(function (q) { return q.needsReview; }).length;
+
+    res.json({
+        success: true,
+        sessionId: sessionId,
+        count: questions.length,
+        needsReview: needsReview,
+        warnings: [],
+        imagePool: session.pool,
+        source: { ocr: (session.ocr.images || []).map(function (im) { return im.name; }) },
+        ocr: {
+            provider: ocr.resolveProvider(),
+            questionMarkers: info.questionMarkers,
+            optionMarkers: info.optionMarkers
+        },
+        questions: questions
+    });
+});
+
+// Trạng thái OCR (để giao diện biết đã sẵn sàng chưa)
+app.get('/api/ocr/status', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+    res.json({ success: true, ocr: ocr.status() });
 });
 
 // ========== HTML SANITIZER (server-side, regex-based) ==========
@@ -3703,6 +3892,15 @@ function parseQuestionsFromHtml(html, opts) {
 }
 
 // ========== VALIDATE CÂU HỎI (dùng chung) ==========
+// Trong so diem cua 1 cau (mac dinh 1). Giu tuong thich nguoc: khong co
+// `points` thi diem van duoc tinh nhu cu (moi cau trong so 1).
+function normalizePoints(v) {
+    var n = Number(v);
+    if (!isFinite(n) || n <= 0) return 1;
+    if (n > 100) return 100;
+    return Math.round(n * 100) / 100;
+}
+
 function validateAndNormalizeQuestion(q, qNum, errors) {
     if (!q.question || q.question.trim() === '') {
         errors.push('Câu ' + qNum + ': Thiếu nội dung câu hỏi');
@@ -3727,7 +3925,8 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correct: q.correct,
             correctList: null,
             correctTF: null,
-            image: q.image || null
+            image: q.image || null,
+            points: normalizePoints(q.points)
         };
     }
 
@@ -3749,7 +3948,8 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correct: q.correctList[0],
             correctList: q.correctList,
             correctTF: null,
-            image: q.image || null
+            image: q.image || null,
+            points: normalizePoints(q.points)
         };
     }
 
@@ -3765,7 +3965,8 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correct: 0,
             correctList: null,
             correctTF: q.correctTF,
-            image: q.image || null
+            image: q.image || null,
+            points: normalizePoints(q.points)
         };
     }
 
@@ -4031,6 +4232,11 @@ DATA.init().then(function() {
     printStartupInfo();
     safeLog('Dang khoi dong server...');
     startListening();
+    // Khoi dong truoc OCR o nen: tai du lieu ngon ngu tesseract ngay khi boot
+    // de request dau tien cua giao vien khong bi cham (Render proxy timeout).
+    ocr.warmUp().then(function(ok) {
+        if (ok) safeLog('[OCR] San sang (tesseract, ngon ngu: ' + ocr.getLangs().join('+') + ').');
+    });
 }).catch(function(err) {
     safeLog('[LOI] Khoi tao storage that bai: ' + (err && err.message));
     process.exit(1);
@@ -4040,7 +4246,9 @@ DATA.init().then(function() {
 function shutdown(signal) {
     safeLog('');
     safeLog('Nhan tin hieu ' + signal + '. Dang tat server...');
-    Promise.resolve(DATA.flush()).then(function() {
+    Promise.resolve(ocr.terminate()).catch(function() { return null; }).then(function() {
+        return DATA.flush();
+    }).then(function() {
         server.close(function() {
             safeLog('Server da tat.');
             process.exit(0);

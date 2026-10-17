@@ -1044,13 +1044,17 @@
                         <h4 style="margin: 0 0 14px 0; color: #555; font-size: 0.88em; text-transform: uppercase; letter-spacing: 0.06em;">Tạo bài mới từ file</h4>
                         <input type="text" id="newExamName" maxlength="40" placeholder="Tên bài kiểm tra (tối đa 40 ký tự)" style="width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 7px; margin-bottom: 12px; box-sizing: border-box; font-size: 0.95em; color: #333;">
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <button class="btn" onclick="createNewExam()" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; border: none;">
                                 Tạo bài trống
                             </button>
                             <label class="btn" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.9;">
                                 Nhập Word/Ảnh
                                 <input type="file" multiple accept=".docx,.png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;" onchange="startImportPreview(this)">
+                            </label>
+                            <label class="btn" style="background: #2e7d32; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.9;">
+                                📷 Nhập từ ảnh (OCR)
+                                <input type="file" multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;" onchange="openOcrImportFromPicker(this)">
                             </label>
                             <label class="btn" style="background: #667eea; color: white; padding: 10px; border-radius: 7px; font-weight: 600; font-size: 0.9em; text-align: center; cursor: pointer; border: none; opacity: 0.65;">
                                 Upload JSON
@@ -1123,6 +1127,45 @@
                     <div style="display:flex; gap:10px;">
                         <button onclick="cancelImportPreview()" style="background:#eee; color:#333; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:0.95em;">Hủy</button>
                         <button id="importConfirmBtn" onclick="confirmImportPreview()" style="background:#2e7d32; color:#fff; border:none; padding:10px 22px; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.95em;">Xác nhận lưu</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== MODAL NHẬP ĐỀ TỪ ẢNH (OCR) ========== -->
+        <div id="ocrImportModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:3050; justify-content:center; align-items:flex-start; overflow-y:auto; padding:20px; box-sizing:border-box;">
+            <div style="background:#fff; border-radius:12px; max-width:860px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25); margin:auto;">
+                <div style="background:#2e7d32; color:#fff; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; border-radius:12px 12px 0 0;">
+                    <h2 style="margin:0; font-size:1.1em; font-weight:600;">📷 Nhập đề từ ảnh (OCR)</h2>
+                    <button onclick="closeOcrImportModal()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.2em; cursor:pointer; padding:4px 10px; border-radius:6px; line-height:1;">&times;</button>
+                </div>
+
+                <div style="padding:18px 22px; max-height:calc(100vh - 210px); overflow-y:auto;">
+                    <div style="font-size:0.88em; color:#666; margin-bottom:12px;">
+                        Chọn một hoặc nhiều ảnh chụp đề. Hệ thống đọc chữ (OCR) rồi tách thành câu hỏi để bạn xem trước và sửa. <b>Chưa lưu gì</b> cho tới khi bạn bấm "Xác nhận lưu".
+                    </div>
+
+                    <label class="btn" style="display:block; text-align:center; background:#2e7d32; color:#fff; padding:12px; border-radius:8px; font-weight:600; cursor:pointer; margin-bottom:12px;">
+                        + Chọn ảnh đề thi
+                        <input type="file" id="ocrFileInput" multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" style="display:none;" onchange="addOcrFiles(this)">
+                    </label>
+
+                    <div id="ocrImageList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px;"></div>
+                    <div id="ocrEmptyHint" style="color:#999; font-size:0.88em; text-align:center; padding:10px 0 16px 0;">Chưa chọn ảnh nào.</div>
+
+                    <div id="ocrStatus" style="margin-top:10px; font-size:0.9em; color:#666;"></div>
+
+                    <details id="ocrTextBox" style="display:none; margin-top:12px;">
+                        <summary style="cursor:pointer; color:#555; font-size:0.9em;">Xem văn bản OCR đọc được (dùng để đối chiếu với ảnh)</summary>
+                        <textarea id="ocrTextArea" readonly style="width:100%; min-height:170px; margin-top:8px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.85em; box-sizing:border-box; font-family:monospace;"></textarea>
+                    </details>
+                </div>
+
+                <div style="padding:14px 22px; border-top:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div id="ocrHint" style="font-size:0.84em; color:#888; max-width:60%;">Ảnh rõ, chụp thẳng, đủ sáng sẽ cho kết quả tốt hơn.</div>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="closeOcrImportModal()" style="background:#eee; color:#333; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:0.95em;">Đóng</button>
+                        <button id="ocrRunBtn" onclick="runOcrImport()" disabled style="background:#2e7d32; color:#fff; border:none; padding:10px 22px; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.95em; opacity:0.6;">Bắt đầu nhận dạng</button>
                     </div>
                 </div>
             </div>
@@ -3945,23 +3988,30 @@ C. Công thức nước là H₂O. (Đ)</pre>
         function renderImportPreview(result) {
             const nameInput = document.getElementById('importNewExamName');
             if (!nameInput.value) {
-                let base = (result.source && result.source.docx)
-                    ? result.source.docx.replace(/\.docx$/i, '')
-                    : 'Bài nhập từ file';
+                let base = 'Bài nhập từ file';
+                if (result.source && result.source.docx) {
+                    base = result.source.docx.replace(/\.docx$/i, '');
+                } else if (result.source && result.source.ocr && result.source.ocr.length) {
+                    base = 'Đề từ ảnh (' + result.source.ocr.length + ' ảnh)';
+                }
                 nameInput.value = base.substring(0, 40);
             }
 
             const src = [];
             if (result.source && result.source.docx) src.push('Word: ' + escapeHtml(result.source.docx));
+            if (result.source && result.source.ocr && result.source.ocr.length) src.push('OCR ' + result.source.ocr.length + ' ảnh');
             if (result.source && result.source.images && result.source.images.length) src.push(result.source.images.length + ' ảnh');
 
             let html = `<div style="font-size:0.92em; color:#555;">Nhận diện <b>${result.count}</b> câu hỏi`;
             if (src.length) html += ' (' + src.join(', ') + ')';
             html += '.</div>';
 
-            if (result.needsReview > 0) {
-                html += `<div style="margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;">⚠ ${result.needsReview} câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).</div>`;
+            if (result.ocr) {
+                html += `<div style="margin-top:6px; font-size:0.85em; color:#777;">Đọc bằng ${escapeHtml(String(result.ocr.provider))} · thấy ${result.ocr.questionMarkers || 0} mốc câu hỏi, ${result.ocr.optionMarkers || 0} đáp án. Nếu thiếu câu, hãy mở "Xem văn bản OCR" ở bước chọn ảnh để kiểm tra.</div>`;
             }
+
+            // Luôn tạo sẵn dòng cảnh báo (có id) để updateImportSummaryCounts cập nhật/ẩn được
+            html += `<div id="importNeedsReviewLine" style="margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;${result.needsReview > 0 ? '' : 'display:none;'}">⚠ ${result.needsReview} câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).</div>`;
             if (result.warnings && result.warnings.length) {
                 html += `<div style="margin-top:6px; background:#ffebee; border:1px solid #ef9a9a; border-radius:8px; padding:8px 12px; color:#b71c1c; font-size:0.9em;">${result.warnings.map(escapeHtml).join('<br>')}</div>`;
             }
@@ -4086,6 +4136,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
                                 <option value="multi" ${q.type === 'multi' ? 'selected' : ''}>Nhiều đáp án</option>
                                 <option value="truefalse" ${q.type === 'truefalse' ? 'selected' : ''}>Đúng/Sai</option>
                             </select>
+                            <label style="font-size:0.86em; color:#555; white-space:nowrap;">Điểm
+                                <input type="number" min="1" max="100" step="0.5" value="${(Number(q.points) > 0) ? q.points : 1}" data-role="points" data-qi="${i}" onchange="onImportPointsChange(this)" style="width:66px; padding:4px 6px; border:1px solid #ddd; border-radius:6px; font-size:0.88em;">
+                            </label>
                             <label style="font-size:0.86em; color:#555; cursor:pointer; white-space:nowrap;"><input type="checkbox" data-role="include" data-qi="${i}" ${q.include !== false ? 'checked' : ''} onchange="onImportIncludeChange(this)"> Lưu câu này</label>
                         </div>
                     </div>
@@ -4110,6 +4163,15 @@ C. Công thức nước là H₂O. (Đ)</pre>
         }
         function onImportIncludeChange(el) {
             _importPreview.questions[+el.getAttribute('data-qi')].include = el.checked;
+        }
+        function onImportPointsChange(el) {
+            const i = +el.getAttribute('data-qi');
+            const q = _importPreview.questions[i];
+            let v = Number(el.value);
+            if (!isFinite(v) || v <= 0) v = 1;
+            if (v > 100) v = 100;
+            q.points = v;
+            el.value = v;
         }
         function onImportAnswerChange(el) {
             const i = +el.getAttribute('data-qi'), oi = +el.getAttribute('data-oi');
@@ -4136,7 +4198,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             const i = +el.getAttribute('data-qi');
             const q = _importPreview.questions[i];
             q.type = el.value;
-            q.correct = -1;
+            q.correct = null;
             q.correctList = [];
             q.correctTF = (q.options || []).map(() => null);
             computeImportReview(q);
@@ -4158,8 +4220,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             const q = _importPreview.questions[i];
             q.options.splice(oi, 1);
             if (q.type === 'single') {
-                if (q.correct === oi) q.correct = -1;
-                else if (q.correct > oi) q.correct -= 1;
+                if (q.correct === oi) q.correct = null;
+                else if (typeof q.correct === 'number' && q.correct > oi) q.correct -= 1;
             } else if (q.type === 'multi') {
                 q.correctList = (q.correctList || [])
                     .filter(x => x !== oi)
@@ -4216,7 +4278,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                             options: q.options,
                             correct: q.correct,
                             correctList: q.correctList,
-                            correctTF: q.correctTF
+                            correctTF: q.correctTF,
+                            points: (Number(q.points) > 0) ? Number(q.points) : 1
                         }))
                     })
                 });
@@ -4249,6 +4312,159 @@ C. Công thức nước là H₂O. (Đ)</pre>
             } finally {
                 btn.disabled = false;
                 btn.textContent = oldLabel;
+            }
+        }
+
+        // ===== NHẬP ĐỀ TỪ ẢNH (OCR): chọn ảnh -> OCR -> phân tích -> xem trước -> lưu =====
+        // Bước lưu dùng lại /api/import/confirm (không tự ghi dữ liệu ở bước OCR).
+        let _ocrFiles = [];            // [{ file, url }] - ảnh đang chờ xử lý (chưa gửi lên)
+        const OCR_MAX_MB = 8;          // giới hạn mỗi ảnh (server cũng kiểm tra lại)
+        const OCR_MAX_FILES = 30;
+
+        function openOcrImportFromPicker(input) {
+            const picked = Array.from(input.files || []);
+            input.value = '';
+            openOcrImportModal();
+            if (picked.length) pushOcrFiles(picked);
+        }
+
+        function openOcrImportModal() {
+            _ocrFiles.forEach(it => { try { URL.revokeObjectURL(it.url); } catch (e) { } });
+            _ocrFiles = [];
+            document.getElementById('ocrTextArea').value = '';
+            document.getElementById('ocrTextBox').style.display = 'none';
+            document.getElementById('ocrStatus').innerHTML = '';
+            renderOcrImageList();
+            document.getElementById('ocrImportModal').style.display = 'flex';
+            refreshOcrStatus();
+        }
+
+        function closeOcrImportModal() {
+            document.getElementById('ocrImportModal').style.display = 'none';
+        }
+
+        async function refreshOcrStatus() {
+            try {
+                const res = await fetch('/api/ocr/status');
+                const j = await res.json();
+                if (j && j.ocr) {
+                    const p = (j.ocr.provider === 'ocrspace') ? 'OCR.space' : 'Tesseract (chạy nội bộ)';
+                    document.getElementById('ocrHint').textContent =
+                        'Nhận dạng bằng ' + p + ' · ngôn ngữ: ' + (j.ocr.langs || []).join('+') +
+                        ' · ảnh rõ, chụp thẳng sẽ cho kết quả tốt hơn.';
+                }
+            } catch (e) { /* không chặn luồng chính */ }
+        }
+
+        function pushOcrFiles(list) {
+            for (const f of list) {
+                if (_ocrFiles.length >= OCR_MAX_FILES) { alert('Tối đa ' + OCR_MAX_FILES + ' ảnh mỗi lần nhập.'); break; }
+                if (!/^image\//.test(f.type || '')) { alert('"' + f.name + '" không phải ảnh.'); continue; }
+                if (f.size > OCR_MAX_MB * 1024 * 1024) { alert('"' + f.name + '" quá lớn (tối đa ' + OCR_MAX_MB + ' MB/ảnh).'); continue; }
+                _ocrFiles.push({ file: f, url: URL.createObjectURL(f) });
+            }
+            renderOcrImageList();
+        }
+
+        function addOcrFiles(input) {
+            const picked = Array.from(input.files || []);
+            input.value = '';
+            pushOcrFiles(picked);
+        }
+
+        function removeOcrFile(i) {
+            const it = _ocrFiles[i];
+            if (it) { try { URL.revokeObjectURL(it.url); } catch (e) { } }
+            _ocrFiles.splice(i, 1);
+            renderOcrImageList();
+        }
+
+        function renderOcrImageList() {
+            const box = document.getElementById('ocrImageList');
+            box.innerHTML = _ocrFiles.map((it, i) => `
+                <div style="position:relative; border:1px solid #ddd; border-radius:8px; overflow:hidden; background:#fafafa;">
+                    <img src="${it.url}" alt="${escapeHtml(it.file.name)}" style="width:100%; height:92px; object-fit:cover; display:block;">
+                    <button type="button" onclick="removeOcrFile(${i})" title="Bỏ ảnh này" style="position:absolute; top:4px; right:4px; background:rgba(198,40,40,0.92); color:#fff; border:none; border-radius:6px; width:24px; height:24px; cursor:pointer; line-height:1;">✕</button>
+                    <div style="font-size:0.72em; color:#666; padding:4px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(it.file.name)}</div>
+                </div>`).join('');
+
+            document.getElementById('ocrEmptyHint').style.display = _ocrFiles.length ? 'none' : 'block';
+            const btn = document.getElementById('ocrRunBtn');
+            btn.disabled = _ocrFiles.length === 0;
+            btn.style.opacity = _ocrFiles.length ? '1' : '0.6';
+        }
+
+        async function runOcrImport() {
+            if (!_ocrFiles.length) return;
+            if (_ocrFiles.length > OCR_MAX_FILES) { alert('Quá nhiều ảnh.'); return; }
+
+            const btn = document.getElementById('ocrRunBtn');
+            const status = document.getElementById('ocrStatus');
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            const oldLabel = btn.textContent;
+            btn.textContent = 'Đang nhận dạng...';
+            status.textContent = 'Đang tải ảnh lên và đọc chữ (có thể mất vài giây)...';
+
+            try {
+                // B1: upload + OCR
+                const fd = new FormData();
+                _ocrFiles.forEach(it => fd.append('files', it.file));
+
+                const resExtract = await fetch('/api/ocr/extract', { method: 'POST', body: fd });
+                const extract = await resExtract.json();
+                if (!extract.success) {
+                    status.innerHTML = '';
+                    alert('✘ ' + extract.error);
+                    return;
+                }
+                document.getElementById('ocrTextArea').value = extract.text || '';
+                document.getElementById('ocrTextBox').style.display = 'block';
+                if (extract.warnings && extract.warnings.length) {
+                    status.innerHTML = extract.warnings.map(w => '⚠ ' + escapeHtml(w)).join('<br>');
+                } else {
+                    status.textContent = 'Đã đọc ' + (extract.chars || 0) + ' ký tự. Đang tách câu hỏi...';
+                }
+
+                // B2: phân tích thành câu hỏi (chưa lưu)
+                const resAnalyze = await fetch('/api/ocr/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: extract.sessionId })
+                });
+                const analyze = await resAnalyze.json();
+
+                if (!analyze.success) {
+                    status.innerHTML = '';
+                    if (analyze.text) {
+                        document.getElementById('ocrTextArea').value = analyze.text;
+                        document.getElementById('ocrTextBox').style.display = 'block';
+                    }
+                    alert('✘ ' + analyze.error + '\n\nMở "Xem văn bản OCR đọc được" để đối chiếu với ảnh, rồi thử lại với ảnh rõ hơn.');
+                    return;
+                }
+
+                // B3: chuyển sang modal xem trước & sửa (dùng chung với luồng Word/Ảnh)
+                _importPreview = {
+                    sessionId: analyze.sessionId,
+                    imagePool: analyze.imagePool || {},
+                    questions: (analyze.questions || []).map(q => Object.assign({ include: true }, q))
+                };
+                closeOcrImportModal();
+                openImportPreviewModal();
+                document.getElementById('importPreviewSummary').innerHTML = '';
+                document.getElementById('importPreviewList').innerHTML = '';
+                document.getElementById('importNewExamName').value = '';
+                document.getElementById('importPreviewStatus').innerHTML = '';
+                renderImportPreview(analyze);
+                setImportStatus('');
+            } catch (err) {
+                status.innerHTML = '';
+                alert('Lỗi: ' + err.message);
+            } finally {
+                btn.textContent = oldLabel;
+                btn.disabled = _ocrFiles.length === 0;
+                btn.style.opacity = _ocrFiles.length ? '1' : '0.6';
             }
         }
 

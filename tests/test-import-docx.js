@@ -134,7 +134,7 @@ const createdExams = [];
     // ------------------------------------------------------------------
     console.log('\n=== 2. Câu hỏi THIẾU ĐÁP ÁN -> đánh dấu, KHÔNG tự bịa ===');
     check('câu 2 được đánh dấu needsReview', qs[1] && qs[1].needsReview === true, JSON.stringify(qs[1]));
-    check('câu 2 KHÔNG tự gán đáp án A (correct = -1)', qs[1] && qs[1].correct === -1, 'correct=' + (qs[1] && qs[1].correct));
+    check('câu 2 KHÔNG tự gán đáp án A (correct = null)', qs[1] && qs[1].correct === null, 'correct=' + (qs[1] && JSON.stringify(qs[1].correct)));
     check('câu 2 có lý do "chưa xác định được đáp án"',
         qs[1] && (qs[1].reviewReasons || []).join(' ').toLowerCase().indexOf('đáp án') >= 0,
         JSON.stringify(qs[1] && qs[1].reviewReasons));
@@ -214,7 +214,7 @@ const createdExams = [];
         sessionId: imgPreview.json.sessionId,
         destination: 'new',
         examName: 'TEST-IMPORT-IMAGE-EMPTY',
-        questions: [{ include: true, type: 'single', question: iq.question, options: [], correct: -1 }]
+        questions: [{ include: true, type: 'single', question: iq.question, options: [], correct: null }]
     });
     check('chưa nhập đáp án -> không lưu câu nào', c2.json && c2.json.success === false, JSON.stringify(c2.json).slice(0, 200));
     check('nêu rõ lý do bỏ qua',

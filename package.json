@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "test:import": "node tests/test-import-docx.js",
+    "test:ocr": "node tests/test-ocr-import.js",
     "build": "node build-scripts/build.js",
     "admin": "node license/admin-tool.js",
     "generate-license": "node license/admin-tool.js generate"
@@ -34,6 +35,7 @@
     "omml2mathml": "1.3.0",
     "pg": "^8.11.5",
     "socket.io": "^4.7.2",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5",
     "xml-js": "^1.6.11",
     "xmldom": "0.6.0"
