@@ -4330,6 +4330,7 @@
 
             // Dọn dẹp anti-cheat intervals
             if (sidebarCheckInterval) { clearInterval(sidebarCheckInterval); sidebarCheckInterval = null; }
+            stopFullscreenWatch();
             hideFullscreenWarning();
             hideAISidebarWarning();
             
@@ -4469,8 +4470,9 @@
             document.getElementById('examScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'flex';
 
-            // Thoát fullscreen sau khi nộp bài
+            // Thoát fullscreen sau khi nộp bài (không tính là vi phạm)
             exitFullscreen();
+            stopFullscreenWatch();
             hideFullscreenWarning();
             
             // Kiểm tra nếu giáo viên cho phép xem điểm
@@ -4884,6 +4886,12 @@
             document.getElementById('tabWarning').style.display = 'none';
             document.getElementById('fsWarningBadge').style.display = 'none';
 
+            // Reset trạng thái phát hiện thoát toàn màn hình
+            fsExitBySystem = false;
+            _fsWasFullscreen = false;
+            _fsSuppressUntil = 0;
+            _fsDebounceUntil = 0;
+
             createWatermark();
             enableAntiCopy();
             setupTabDetection();
@@ -4898,6 +4906,11 @@
         var initialViewportWidth = 0;
         var fsExitBySystem = false; // Flag: thoát fullscreen do hệ thống (nộp bài/hết giờ)
         var fsListenersSetup = false; // Guard: chỉ đăng ký listener 1 lần
+        // Chống đếm trùng và chống tính lỗi khi hệ thống tự thoát fullscreen:
+        var _fsWasFullscreen = false;   // trạng thái toàn màn hình ở lần kiểm tra trước
+        var _fsSuppressUntil = 0;       // mốc thời gian: bỏ qua mọi phát hiện thoát trước mốc này
+        var _fsDebounceUntil = 0;       // gộp nhiều sự kiện trùng lặp thành 1 vi phạm
+        var _fsCheckInterval = null;    // dò trạng thái toàn màn hình định kỳ (phòng trình duyệt không phát sự kiện)
 
         function requestFullscreen() {
             var el = document.documentElement;
@@ -4908,7 +4921,13 @@
         }
 
         function exitFullscreen() {
+            // Thoát do HỆ THỐNG (nộp bài / hết giờ) -> KHÔNG tính là vi phạm.
+            // Chặn phát hiện trong 8 giây, đủ để hấp thụ mọi sự kiện
+            // fullscreenchange (+webkit/moz/ms) và resize phát sinh sau khi thoát.
             fsExitBySystem = true;
+            _fsSuppressUntil = Date.now() + 8000;
+            _fsWasFullscreen = false;
+            hideFullscreenWarning();
             if (document.exitFullscreen) document.exitFullscreen();
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
@@ -4968,41 +4987,54 @@
 
         function setupFullscreen() {
             initialViewportWidth = window.innerWidth;
+            _fsWasFullscreen = isFullscreen();
             requestFullscreen();
 
             if (!fsListenersSetup) {
-                document.addEventListener('fullscreenchange', onFullscreenChange);
-                document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-                document.addEventListener('mozfullscreenchange', onFullscreenChange);
-                document.addEventListener('MSFullscreenChange', onFullscreenChange);
+                document.addEventListener('fullscreenchange', checkFullscreenState);
+                document.addEventListener('webkitfullscreenchange', checkFullscreenState);
+                document.addEventListener('mozfullscreenchange', checkFullscreenState);
+                document.addEventListener('MSFullscreenChange', checkFullscreenState);
 
                 // Fallback cho trình duyệt không fire fullscreenchange đúng (Cốc Cốc, v.v.)
-                window.addEventListener('resize', function() {
-                    if (document.getElementById('examScreen').style.display !== 'block') return;
-                    if (fsExitBySystem) return; // Thoát do hệ thống (nộp bài/hết giờ) — bỏ qua
-                    var isFS = isFullscreen();
-                    var screenH = window.screen.height;
-                    var winH = window.innerHeight;
-                    if (!isFS && winH < screenH * 0.9) {
-                        onFullscreenChange();
-                    }
-                });
+                window.addEventListener('resize', checkFullscreenState);
 
                 fsListenersSetup = true;
             }
+
+            // Dò định kỳ đề phòng trình duyệt không phát sự kiện (một số trình duyệt di động).
+            if (_fsCheckInterval) clearInterval(_fsCheckInterval);
+            _fsCheckInterval = setInterval(checkFullscreenState, 700);
         }
 
-        function onFullscreenChange() {
+        function stopFullscreenWatch() {
+            if (_fsCheckInterval) { clearInterval(_fsCheckInterval); _fsCheckInterval = null; }
+        }
+
+        // Chỉ xử lý khi trạng thái toàn màn hình THỰC SỰ thay đổi.
+        // Gộp các sự kiện trùng lặp (fullscreenchange + webkit + resize) trong 2 giây
+        // thành 1 vi phạm, và bỏ qua hoàn toàn khi hệ thống tự thoát (nộp bài/hết giờ).
+        function checkFullscreenState() {
             if (document.getElementById('examScreen').style.display !== 'block') return;
-            if (!isFullscreen()) {
-                if (fsExitBySystem) {
-                    fsExitBySystem = false; // Reset flag
-                    return; // Bỏ qua — do hệ thống thoát (nộp bài/hết giờ)
-                }
-                showFullscreenWarning();
-            } else {
+
+            var isFS = isFullscreen();
+            var wasFS = _fsWasFullscreen;
+            _fsWasFullscreen = isFS;
+
+            if (isFS) {
+                // Đang/đã vào toàn màn hình -> ẩn cảnh báo, hết hiệu lực chặn
+                if (Date.now() >= _fsSuppressUntil) fsExitBySystem = false;
                 hideFullscreenWarning();
+                return;
             }
+
+            // Không ở toàn màn hình:
+            if (fsExitBySystem || Date.now() < _fsSuppressUntil) return; // hệ thống tự thoát -> bỏ qua
+            if (!wasFS) return;                    // chưa từng vào toàn màn hình -> không phải mới thoát
+            if (Date.now() < _fsDebounceUntil) return; // sự kiện trùng lặp -> đã đếm rồi
+
+            _fsDebounceUntil = Date.now() + 2000;
+            showFullscreenWarning();
         }
 
         // ==================== AI SIDEBAR DETECTION ====================
