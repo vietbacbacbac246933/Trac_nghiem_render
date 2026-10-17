@@ -1,0 +1,743 @@
+{
+  "name": "Demo de tin",
+  "questions": [
+    {
+      "type": "single",
+      "question": "Độ phức tạp thời gian của thuật toán sắp xếp nổi bọt (Bubble Sort) trong trường hợp xấu nhất là:",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(n²)",
+        "O(log n)"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Cấu trúc dữ liệu nào hoạt động theo nguyên tắc LIFO (Last In First Out)?",
+      "options": [
+        "Queue (Hàng đợi)",
+        "Stack (Ngăn xếp)",
+        "Linked List",
+        "Tree"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code C++ sau, kết quả in ra màn hình là:<pre>#include &lt;iostream&gt;\nusing namespace std;\nint main() {\nint a[] = {5, 3, 8, 1, 9, 2};\nint n = 6, min = a[0];\nfor (int i = 1; i &lt; n; i++)\nif (a[i] &lt; min) min = a[i];\ncout &lt;&lt; min;\nreturn 0;\n}</pre>",
+      "options": [
+        "5",
+        "9",
+        "1",
+        "2"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thuật toán tìm kiếm nhị phân (Binary Search) yêu cầu mảng phải:",
+      "options": [
+        "Có số phần tử chẵn",
+        "Đã được sắp xếp",
+        "Chứa các số nguyên",
+        "Có độ dài cố định"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét hàm Python sau:<pre>def tinh(n):\nif n &lt;= 1:\nreturn n\nreturn tinh(n-1) + tinh(n-2)</pre> Gọi tinh(6) trả về giá trị:",
+      "options": [
+        "6",
+        "8",
+        "10",
+        "12"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong cây nhị phân tìm kiếm (BST), phép duyệt Inorder cho kết quả:",
+      "options": [
+        "Các nút theo thứ tự tăng dần",
+        "Các nút theo thứ tự giảm dần",
+        "Nút gốc trước, con trái, con phải",
+        "Con trái, con phải, nút gốc"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code Python sau:<pre>lst = [1, 2, 3, 4, 5]\nprint(lst[1:4])</pre> Kết quả in ra là:",
+      "options": [
+        "[1, 2, 3]",
+        "[2, 3, 4]",
+        "[2, 3, 4, 5]",
+        "[1, 2, 3, 4]"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Độ phức tạp thời gian của thuật toán tìm kiếm nhị phân là:",
+      "options": [
+        "O(1)",
+        "O(n)",
+        "O(log n)",
+        "O(n²)"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code C++ sau:<pre>int dem = 0;\nfor (int i = 1; i &lt;= 100; i++)\nif (i % 3 == 0 &amp;&amp; i % 5 == 0)\ndem++;\ncout &lt;&lt; dem;</pre> Kết quả in ra là:",
+      "options": [
+        "3",
+        "6",
+        "7",
+        "10"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàng đợi (Queue) sử dụng nguyên tắc:",
+      "options": [
+        "LIFO - Last In First Out",
+        "FIFO - First In First Out",
+        "Random Access",
+        "Priority Based"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Đoạn code C++ sau in ra giá trị gì?<pre>#include &lt;iostream&gt;\nusing namespace std;\nint f(int n) {\nif (n == 0) return 1;\nreturn n * f(n - 1);\n}\nint main() {\ncout &lt;&lt; f(5);\n}</pre>",
+      "options": [
+        "24",
+        "120",
+        "60",
+        "720"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong C++, khai báo nào sau đây tạo mảng động đúng cú pháp?",
+      "options": [
+        "int arr[n]; (n là biến)",
+        "int arr = new int[n];",
+        "int arr = new int[n];",
+        "int[] arr = new int[n];"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code C++:<pre>vector&lt;int&gt; v = {3, 1, 4, 1, 5, 9, 2, 6};\nsort(v.begin(), v.end());\ncout &lt;&lt; v[3];</pre> Kết quả là:",
+      "options": [
+        "1",
+        "3",
+        "4",
+        "5"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàm nào sau đây trong C++ dùng để tìm phần tử lớn nhất trong vector?",
+      "options": [
+        "max(v.begin(), v.end())",
+        "max_element(v.begin(), v.end())",
+        "v.max()",
+        "find_max(v)"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code C++ sau:<pre>string s = \"Hello World\";\ncout &lt;&lt; s.substr(6, 5);</pre> Kết quả in ra là:",
+      "options": [
+        "\"Hello\"",
+        "\"World\"",
+        "\"lo Wo\"",
+        "\" Worl\""
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong C++, con trỏ (pointer) được khai báo như thế nào?",
+      "options": [
+        "int &amp;p;",
+        "int p;",
+        "pointer int p;",
+        "ref int p;"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Đoạn code C++ sau có bao nhiêu lần in \"Tin\"?<pre>for (int i = 0; i &lt; 4; i++)\nfor (int j = i; j &lt; 4; j++)\ncout &lt;&lt; \"Tin\" &lt;&lt; endl;</pre>",
+      "options": [
+        "8",
+        "10",
+        "12",
+        "16"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Câu lệnh nào dùng để đọc cả dòng có khoảng trắng trong C++?",
+      "options": [
+        "cin &gt;&gt; s;",
+        "scanf(\"%s\", s);",
+        "getline(cin, s);",
+        "cin.read(s);"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code C++ sau, output là gì?<pre>int x = 5;\nint&amp; r = x;\nr = 10;\ncout &lt;&lt; x;</pre>",
+      "options": [
+        "5",
+        "10",
+        "Lỗi biên dịch",
+        "0"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong C++, từ khóa nào dùng để khai báo hằng số?",
+      "options": [
+        "static",
+        "const",
+        "final",
+        "fixed"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Kết quả của đoạn code Python sau là gì?<pre>x = [1, 2, 3, 4, 5]\nprint(sum(x[::2]))</pre>",
+      "options": [
+        "6",
+        "9",
+        "12",
+        "15"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong Python, kiểu dữ liệu nào là bất biến (immutable)?",
+      "options": [
+        "list",
+        "dict",
+        "set",
+        "tuple"
+      ],
+      "correct": 3,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code Python:<pre>d = {\"a\": 1, \"b\": 2, \"c\": 3}\nprint(sorted(d, key=d.get, reverse=True)[0])</pre> Kết quả là:",
+      "options": [
+        "\"a\"",
+        "\"b\"",
+        "\"c\"",
+        "3"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàm Python nào sau đây trả về danh sách các cặp (index, value)?",
+      "options": [
+        "zip()",
+        "enumerate()",
+        "map()",
+        "filter()"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code Python:<pre>result = [x**2 for x in range(1, 6) if x % 2 == 0]\nprint(result)</pre> Kết quả là:",
+      "options": [
+        "[1, 4, 9, 16, 25]",
+        "[4, 16]",
+        "[2, 4]",
+        "[4, 8]"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong Python, decorator được ký hiệu bằng:",
+      "options": [
+        "#",
+        "@",
+        "$",
+        "&amp;"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code Python sau:<pre>class Animal:\ndef __init__(self, name):\nself.name = name\ndef speak(self):\nreturn f\"{self.name} says...\"\nclass Dog(Animal):\ndef speak(self):\nreturn f\"{self.name} says Woof!\"\nd = Dog(\"Rex\")\nprint(d.speak())</pre> Kết quả là:",
+      "options": [
+        "\"Animal says...\"",
+        "\"Rex says...\"",
+        "\"Rex says Woof!\"",
+        "Lỗi"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàm lambda trong Python nào sau đây tính bình phương đúng cú pháp?",
+      "options": [
+        "lambda(x): x2",
+        "lambda x: x2",
+        "def lambda(x): return x2",
+        "lambda x =&gt; x2"
+      ],
+      "correct": 3,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn code Python:<pre>from collections import Counter\ns = \"programming\"\nc = Counter(s)\nprint(c.most_common(1)[0][0])</pre> Kết quả là ký tự xuất hiện nhiều nhất:",
+      "options": [
+        "\"p\"",
+        "\"r\"",
+        "\"g\"",
+        "\"m\""
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong Python, cách đọc file văn bản đúng và an toàn nhất là:",
+      "options": [
+        "f = open(\"file.txt\"); data = f.read()",
+        "with open(\"file.txt\", \"r\") as f: data = f.read()",
+        "data = read(\"file.txt\")",
+        "import file; data = file.read(\"file.txt\")"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét code Python:<pre>def tong(*args):\nreturn sum(args)\nprint(tong(1, 2, 3, 4, 5))</pre> Kết quả là:",
+      "options": [
+        "10",
+        "15",
+        "Lỗi vì quá nhiều tham số",
+        "(1, 2, 3, 4, 5)"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Module nào trong Python dùng để làm việc với dữ liệu JSON?",
+      "options": [
+        "xml",
+        "csv",
+        "json",
+        "data"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn HTML sau, thẻ nào tạo liên kết?<pre>&lt;!DOCTYPE html&gt;\n&lt;html&gt;\n&lt;body&gt;\n&lt;a href=\"https://example.com\"&gt;Click here&lt;/a&gt;\n&lt;p&gt;Hello World&lt;/p&gt;\n&lt;/body&gt;\n&lt;/html&gt;</pre>",
+      "options": [
+        "&lt;p&gt;",
+        "&lt;a&gt;",
+        "&lt;body&gt;",
+        "&lt;html&gt;"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong HTML, thuộc tính nào dùng để đặt tên cho input để nhận dữ liệu form?",
+      "options": [
+        "id",
+        "class",
+        "name",
+        "value"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn HTML/CSS sau:<pre>&lt;style&gt;\n.box {\nwidth: 100px;\npadding: 20px;\nborder: 5px solid black;\nbox-sizing: border-box;\n}\n&lt;/style&gt;</pre> Chiều rộng thực của phần tử .box là:",
+      "options": [
+        "100px",
+        "150px",
+        "145px",
+        "170px"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong JavaScript, đoạn code sau in ra gì?<pre>&lt;script&gt;\nlet arr = [1, 2, 3, 4, 5];\nlet result = arr.filter(x =&gt; x % 2 === 0).map(x =&gt; x * 2);\nconsole.log(result);\n&lt;/script&gt;</pre>",
+      "options": [
+        "[1, 3, 5]",
+        "[2, 4]",
+        "[4, 8]",
+        "[2, 4, 6, 8, 10]"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thẻ HTML nào dùng để tạo bảng?",
+      "options": [
+        "&lt;grid&gt;",
+        "&lt;table&gt;",
+        "&lt;matrix&gt;",
+        "&lt;data&gt;"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong CSS, thuộc tính nào dùng để căn giữa nội dung theo chiều ngang?",
+      "options": [
+        "align: center",
+        "text-align: center",
+        "center: true",
+        "margin: center"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn HTML sau:<pre>&lt;form method=\"POST\" action=\"/submit\"&gt;\n&lt;input type=\"text\" name=\"username\" required&gt;\n&lt;input type=\"password\" name=\"password\"&gt;\n&lt;button type=\"submit\"&gt;Đăng nhập&lt;/button&gt;\n&lt;/form&gt;</pre> Thuộc tính \"required\" có tác dụng gì?",
+      "options": [
+        "Mã hóa dữ liệu trước khi gửi",
+        "Bắt buộc người dùng phải điền vào trường đó",
+        "Đặt giá trị mặc định cho trường",
+        "Ẩn trường input"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong JavaScript, phương thức nào dùng để chọn phần tử theo class?",
+      "options": [
+        "document.getElementById()",
+        "document.getElementsByClassName()",
+        "document.getClass()",
+        "document.findClass()"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét đoạn JavaScript sau:<pre>async function getData() {\nconst response = await fetch(\"/api/data\");\nconst data = await response.json();\nreturn data;\n}</pre> Từ khóa \"await\" có tác dụng gì?",
+      "options": [
+        "Tạm dừng vòng lặp",
+        "Chờ Promise hoàn thành trước khi tiếp tục",
+        "Tạo luồng mới",
+        "Xử lý lỗi"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong HTML5, thẻ nào dùng để nhúng video?",
+      "options": [
+        "&lt;media&gt;",
+        "&lt;movie&gt;",
+        "&lt;video&gt;",
+        "&lt;stream&gt;"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Câu lệnh SQL nào dùng để lấy tất cả học sinh có điểm &gt;= 8 từ bảng HocSinh?<pre>SELECT * FROM HocSinh WHERE Diem &gt;= 8;</pre> Câu lệnh trên là:",
+      "options": [
+        "Sai cú pháp",
+        "Đúng và trả về tất cả HS có điểm &gt;= 8",
+        "Chỉ trả về cột Diem",
+        "Xóa các bản ghi có điểm &gt;= 8"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong SQL, lệnh nào dùng để đếm số bản ghi?",
+      "options": [
+        "SUM()",
+        "COUNT()",
+        "TOTAL()",
+        "NUMBER()"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xét câu truy vấn SQL:<pre>SELECT LopHoc, AVG(Diem) as DiemTB\nFROM HocSinh\nGROUP BY LopHoc\nHAVING AVG(Diem) &gt; 7;</pre> Câu truy vấn này trả về:",
+      "options": [
+        "Tất cả học sinh có điểm &gt; 7",
+        "Tên lớp và điểm trung bình của các lớp có ĐTB &gt; 7",
+        "Số học sinh trong mỗi lớp",
+        "Học sinh có điểm cao nhất trong mỗi lớp"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Khóa ngoại (Foreign Key) trong cơ sở dữ liệu quan hệ dùng để:",
+      "options": [
+        "Xác định tính duy nhất của bản ghi",
+        "Thiết lập mối quan hệ giữa hai bảng",
+        "Tăng tốc độ truy vấn",
+        "Mã hóa dữ liệu"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Xét đoạn code Python sau:<pre>numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\nresult = list(filter(lambda x: x % 2 == 0, numbers))</pre> Các khẳng định nào sau đây đúng?",
+      "options": [
+        "result = [2, 4, 6, 8, 10]",
+        "filter() trả về một iterator, list() chuyển thành danh sách",
+        "lambda x: x % 2 == 0 kiểm tra số chẵn",
+        "Kết quả result có 5 phần tử"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Xét đoạn HTML/JavaScript sau:<pre>&lt;button id=\"btn\"&gt;Click&lt;/button&gt;\n&lt;script&gt;\ndocument.getElementById(\"btn\")\n.addEventListener(\"click\", function() {\nalert(\"Hello!\");\n});\n&lt;/script&gt;</pre> Các khẳng định nào đúng?",
+      "options": [
+        "Khi click nút sẽ hiện hộp thoại \"Hello!\"",
+        "getElementById tìm phần tử theo thuộc tính id",
+        "addEventListener gắn sự kiện click vào nút",
+        "Đây là ví dụ về xử lý sự kiện DOM"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định đúng/sai về thuật toán và cấu trúc dữ liệu:",
+      "options": [
+        "Độ phức tạp O(1) nghĩa là thời gian thực thi không phụ thuộc vào kích thước đầu vào.",
+        "Quick Sort luôn có độ phức tạp O(n log n) trong mọi trường hợp.",
+        "Hash Table cho phép tìm kiếm trung bình O(1).",
+        "Đệ quy (Recursion) luôn hiệu quả hơn vòng lặp (Iteration)."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        false
+      ],
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định đúng/sai về lập trình Python:",
+      "options": [
+        "Python là ngôn ngữ thông dịch (interpreted language).",
+        "Trong Python, list và tuple đều có thể thay đổi sau khi tạo.",
+        "Hàm range(5) tạo dãy số từ 0 đến 4.",
+        "Python hỗ trợ đa kế thừa (multiple inheritance)."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    }
+  ],
+  "settings": {
+    "title": "Demo de tin",
+    "timeLimit": 30,
+    "isOpen": false,
+    "showScore": false,
+    "practiceMode": false,
+    "shuffleExam": true,
+    "examPassword": "",
+    "requirePassword": false,
+    "currentSession": {
+      "classId": "class_1764766952564",
+      "className": "11A4",
+      "examId": "exam_1764770257487",
+      "examName": "BaiTest_1764770257484"
+    },
+    "currentExamId": "exam_1764770257487"
+  },
+  "createdAt": "2026-09-25T04:50:50.447Z"
+}

@@ -1,0 +1,336 @@
+{
+  "name": "KTTX_K10_Lan1",
+  "questions": [
+    {
+      "type": "single",
+      "question": "Theo SGK Tin học 10, thông tin là gì?",
+      "options": [
+        "Tất cả những gì mang lại cho chúng ta hiểu biết",
+        "Dữ liệu được lưu trong bộ nhớ máy tính",
+        "Tín hiệu điện tử do máy tính tạo ra",
+        "Văn bản và hình ảnh thu thập từ môi trường"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trong máy tính, dữ liệu là gì?",
+      "options": [
+        "Thông tin chưa qua xử lí",
+        "Thông tin đã được đưa vào máy tính để máy tính có thể nhận biết và xử lí được",
+        "Kết quả sau khi máy tính xử lí",
+        "Các tín hiệu tương tự được máy tính ghi lại"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Quá trình xử lí thông tin/dữ liệu trong máy tính gồm các bước theo thứ tự nào?",
+      "options": [
+        "Xử lí dữ liệu → Tiếp nhận dữ liệu → Đưa ra kết quả",
+        "Tiếp nhận dữ liệu → Xử lí dữ liệu → Đưa ra kết quả",
+        "Đưa ra kết quả → Tiếp nhận dữ liệu → Xử lí dữ liệu",
+        "Tiếp nhận dữ liệu → Đưa ra kết quả → Xử lí dữ liệu"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phát biểu nào sau đây đúng về mối quan hệ giữa thông tin và dữ liệu?",
+      "options": [
+        "Thông tin và dữ liệu là hai khái niệm hoàn toàn giống nhau",
+        "Một thông tin chỉ có thể được thể hiện bởi đúng một loại dữ liệu",
+        "Cùng một thông tin có thể được thể hiện bởi nhiều loại dữ liệu khác nhau",
+        "Dữ liệu luôn mang đầy đủ thông tin, không bao giờ sai lệch"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu sau về thông tin và dữ liệu:",
+      "options": [
+        "Thông tin là ý nghĩa của dữ liệu.",
+        "Dữ liệu và thông tin là hai khái niệm hoàn toàn giống nhau.",
+        "Với cùng một bộ dữ liệu, cách xử lí khác nhau có thể đem lại những thông tin khác nhau.",
+        "Dữ liệu không đầy đủ có thể làm thông tin sai lệch hoặc không xác định được."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thiết bị số là thiết bị như thế nào?",
+      "options": [
+        "Thiết bị chỉ dùng trong máy tính để bàn",
+        "Thiết bị làm việc với thông tin số như lưu trữ, truyền hoặc xử lí thông tin số",
+        "Thiết bị dùng tín hiệu liên tục để biểu diễn thông tin",
+        "Thiết bị không có khả năng kết nối mạng"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Theo SGK, thiết bị số có những ưu điểm nào so với thiết bị tương tự?",
+      "options": [
+        "Có khả năng lưu trữ dữ liệu với dung lượng lớn, giá thành rẻ, tìm kiếm nhanh",
+        "Xử lí thông tin rất nhanh với độ chính xác cao",
+        "Luôn có giá thành thấp hơn mọi thiết bị tương tự",
+        "Có khả năng truyền tin với tốc độ rất lớn",
+        "Giúp thực hiện tự động nhiều công việc một cách chính xác"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        3,
+        4
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Byte là đơn vị như thế nào trong máy tính?",
+      "options": [
+        "Đơn vị nhỏ nhất mà máy tính truy cập được, gồm 8 bit",
+        "Đơn vị nhỏ nhất của thông tin, chỉ gồm 1 bit",
+        "Đơn vị đo tốc độ xử lí của máy tính",
+        "Đơn vị bằng 1024 bit"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "1 KB (Kilobyte) bằng bao nhiêu byte?",
+      "options": [
+        "1000 byte",
+        "100 byte",
+        "1024 byte",
+        "2048 byte"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Cho biết các phát biểu sau về đơn vị lưu trữ dữ liệu là đúng hay sai:",
+      "options": [
+        "Byte là đơn vị dữ liệu nhỏ nhất mà máy tính truy cập được.",
+        "1 KB = 1000 byte.",
+        "1 MB = 1024 KB.",
+        "Các đơn vị đo dữ liệu liền kề nhau hơn kém nhau 2^10 = 1024 lần."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thiết bị thông minh là gì?",
+      "options": [
+        "Thiết bị điện tử có thể hoạt động tự chủ nhờ phần mềm điều khiển và có khả năng kết nối với các thiết bị khác",
+        "Thiết bị điện tử bất kì có màn hình cảm ứng",
+        "Thiết bị chỉ dùng trong các nhà máy tự động hóa",
+        "Thiết bị điện tử có bộ nhớ dung lượng lớn"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Cuộc cách mạng công nghiệp lần thứ tư (4.0) dựa trên nền tảng nào?",
+      "options": [
+        "Động cơ hơi nước và cơ khí hóa",
+        "Điện năng và dây chuyền sản xuất hàng loạt",
+        "Công nghệ số tích hợp với các công nghệ thông minh như AI, IoT, dữ liệu lớn",
+        "Máy tính cá nhân và mạng LAN nội bộ"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Internet vạn vật (IoT) là gì?",
+      "options": [
+        "Hệ thống máy chủ lưu trữ dữ liệu toàn cầu",
+        "Việc kết nối các thiết bị thông minh với nhau để thu thập và xử lí thông tin tự động, tức thời trên diện rộng",
+        "Phần mềm quản lí thiết bị di động qua Internet",
+        "Công nghệ truyền dữ liệu không dây thế hệ mới"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu về ứng dụng của Tin học trong xã hội:",
+      "options": [
+        "Tin học được ứng dụng trong quản lí giúp xử lí công việc nhanh chóng, chính xác và tiết kiệm chi phí.",
+        "Tin học chỉ có vai trò trong lĩnh vực quản lí hành chính, không có ứng dụng trong khoa học kĩ thuật.",
+        "Nhờ Tin học, nhiều công việc có thể được thực hiện trực tuyến như dạy học, mua hàng.",
+        "Robot là một ví dụ điển hình về thành công của tự động hóa nhờ Tin học."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Trí tuệ nhân tạo (AI) được mô tả trong SGK là gì?",
+      "options": [
+        "Phần mềm chuyên dụng chỉ dùng trong nghiên cứu khoa học",
+        "Khả năng \"bắt chước\" một vài hành vi hay cách tư duy của con người ở các mức độ khác nhau của máy móc",
+        "Robot có hình dạng và cử chỉ giống con người hoàn toàn",
+        "Hệ thống máy tính kết nối mạng Internet toàn cầu"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Theo SGK, Tin học được ứng dụng phổ biến trong những lĩnh vực nào?",
+      "options": [
+        "Quản lí (trường học, ngân hàng, doanh nghiệp...)",
+        "Tự động hóa sản xuất",
+        "Giải quyết các bài toán khoa học kĩ thuật",
+        "Giao tiếp cộng đồng qua mạng xã hội, thư điện tử",
+        "Thay đổi cách thức làm việc của nhiều ngành nghề"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Nền kinh tế tri thức là nền kinh tế như thế nào?",
+      "options": [
+        "Nền kinh tế chủ yếu dựa vào khai thác tài nguyên thiên nhiên",
+        "Nền kinh tế chủ yếu dựa vào tri thức, lấy tri thức làm động lực chủ yếu tăng trưởng kinh tế",
+        "Nền kinh tế chỉ dành cho các quốc gia phát triển",
+        "Nền kinh tế không sử dụng lao động phổ thông"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thiết bị nào trong các thiết bị dưới đây KHÔNG phải là thiết bị thông minh theo SGK?",
+      "options": [
+        "Điện thoại di động thông minh (smartphone)",
+        "Camera kết nối Internet có khả năng tự ghi hình khi phát hiện chuyển động",
+        "Máy ảnh số thông thường",
+        "Máy tính bảng"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu về thiết bị thông minh và cách mạng công nghiệp 4.0:",
+      "options": [
+        "Thiết bị thông minh đóng vai trò chủ chốt trong các hệ thống IoT.",
+        "Máy ảnh số thông thường là thiết bị thông minh vì nó lưu ảnh dưới dạng số.",
+        "Cuộc cách mạng công nghiệp 4.0 đã thúc đẩy mạnh mẽ nền kinh tế tri thức.",
+        "Xe tự hành là một ví dụ về ứng dụng của thiết bị thông minh và trí tuệ nhân tạo."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thành tựu nào sau đây giúp phổ cập Internet, tạo ra phương tiện truy cập Internet dễ dàng và nhất quán?",
+      "options": [
+        "Sự ra đời của hệ điều hành DOS",
+        "Sự phát minh ra World Wide Web (WWW) vào năm 1992",
+        "Sự ra đời của ngôn ngữ lập trình FORTRAN năm 1957",
+        "Sự phát triển của các hệ quản trị cơ sở dữ liệu"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    }
+  ],
+  "settings": {
+    "title": "KTTX_K10_Lan1",
+    "timeLimit": 30,
+    "isOpen": false,
+    "showScore": true,
+    "practiceMode": true,
+    "shuffleExam": true,
+    "examPassword": "",
+    "requirePassword": false,
+    "currentSession": {
+      "classId": "class_1764766952564",
+      "className": "11A4",
+      "examId": "exam_1764770257487",
+      "examName": "BaiTest_1764770257484"
+    },
+    "currentExamId": "exam_1764770257487"
+  },
+  "createdAt": "2026-09-22T03:22:54.664Z"
+}

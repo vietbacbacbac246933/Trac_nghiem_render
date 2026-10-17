@@ -1,0 +1,338 @@
+{
+  "name": "KTTX_K11_Lan1",
+  "questions": [
+    {
+      "type": "single",
+      "question": "Hệ điều hành có bao nhiêu nhóm chức năng chính?",
+      "options": [
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu sau về chức năng của hệ điều hành:",
+      "options": [
+        "Hệ điều hành quản lí thiết bị như CPU, bộ nhớ và các thiết bị ngoại vi.",
+        "Hệ điều hành là môi trường để chạy các ứng dụng.",
+        "Hệ điều hành không có chức năng cung cấp giao diện làm việc với người dùng.",
+        "Hệ điều hành cung cấp một số tiện ích như định dạng đĩa, nén tệp, kiểm tra lỗi đĩa cứng."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        true,
+        false,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Cơ chế \"plug &amp; play\" trong hệ điều hành có tác dụng gì?",
+      "options": [
+        "Tăng tốc độ xử lí của CPU",
+        "Giúp hệ điều hành tự động nhận biết thiết bị ngoại vi khi khởi động và hỗ trợ cài đặt trình điều khiển",
+        "Cho phép chạy nhiều chương trình cùng lúc",
+        "Giúp máy tính kết nối mạng không dây tự động"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hệ điều hành Windows phiên bản nào đầu tiên tích hợp cơ chế plug &amp; play?",
+      "options": [
+        "Windows 3.1",
+        "Windows 3.11",
+        "Windows 95",
+        "Windows XP"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Những thành phần nào sau đây là thành phần cơ bản của giao diện đồ hoạ trong hệ điều hành?",
+      "options": [
+        "Cửa sổ",
+        "Biểu tượng (icon)",
+        "Con trỏ màn hình",
+        "Băng giấy đục lỗ",
+        "Lệnh dòng lệnh gõ bằng bàn phím"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hệ điều hành LINUX phiên bản 1.0 được công bố chính thức vào năm nào và dưới dạng gì?",
+      "options": [
+        "Năm 1991, dạng mã máy",
+        "Năm 1994, dạng mã nguồn mở",
+        "Năm 1999, dạng phần mềm thương mại",
+        "Năm 1969, dạng hệ điều hành UNIX"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phát biểu nào sau đây đúng về mối quan hệ giữa phần cứng, hệ điều hành và phần mềm ứng dụng?",
+      "options": [
+        "Phần mềm ứng dụng trực tiếp điều khiển phần cứng mà không cần hệ điều hành",
+        "Hệ điều hành là môi trường trung gian giúp phần mềm ứng dụng khai thác phần cứng",
+        "Phần cứng có thể hoạt động hiệu quả mà không cần hệ điều hành",
+        "Hệ điều hành chỉ cần thiết cho máy tính cá nhân, không cần cho thiết bị di động"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu về hệ điều hành máy tính cá nhân và thiết bị di động:",
+      "options": [
+        "macOS là hệ điều hành của Apple dùng cho dòng máy Mac.",
+        "Android được xây dựng trên lõi của LINUX.",
+        "iOS của Apple được dùng cho hầu hết các dòng điện thoại thông minh.",
+        "Hệ điều hành cho thiết bị di động chú trọng đến khả năng kết nối mạng không dây."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        true,
+        false,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Vì sao thiết bị đa năng như máy tính cần có hệ điều hành?",
+      "options": [
+        "Vì hệ điều hành giúp máy tính chạy nhanh hơn",
+        "Vì cần tổ chức dữ liệu, cung cấp giao diện làm việc và điều phối tài nguyên cho các ứng dụng",
+        "Vì không có hệ điều hành máy tính sẽ không có điện",
+        "Vì hệ điều hành cung cấp phần cứng cho máy tính"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Các hệ điều hành nào sau đây là biến thể hoặc có nguồn gốc từ LINUX?",
+      "options": [
+        "Ubuntu",
+        "RedHat",
+        "Android",
+        "macOS",
+        "Windows"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phần mềm thương mại là phần mềm như thế nào?",
+      "options": [
+        "Phần mềm miễn phí được cung cấp kèm mã nguồn",
+        "Phần mềm để bán, hầu hết ở dạng mã máy (nguồn đóng)",
+        "Phần mềm do nhà nước phát triển và phân phối",
+        "Phần mềm chỉ chạy được trên Internet"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phần mềm nguồn mở khác phần mềm thương mại nguồn đóng ở điểm cơ bản nào?",
+      "options": [
+        "Phần mềm nguồn mở luôn có giao diện đẹp hơn",
+        "Phần mềm nguồn mở được cung cấp cả mã nguồn, người dùng có thể sửa đổi, cải tiến và phân phối lại",
+        "Phần mềm nguồn mở chạy nhanh hơn phần mềm thương mại",
+        "Phần mềm nguồn mở chỉ dùng được trên hệ điều hành Linux"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu về phần mềm nguồn mở và phần mềm thương mại:",
+      "options": [
+        "Phần mềm nguồn mở thông thường là tự do và không được bảo hành.",
+        "Phần mềm nguồn mở không thể thay thế hoàn toàn phần mềm thương mại trong thực tế.",
+        "Người dùng phần mềm thương mại dễ bị phụ thuộc vào nhà cung cấp về giải pháp và hỗ trợ kĩ thuật.",
+        "Phần mềm nguồn mở có ưu điểm là chi phí thấp, minh bạch và không phụ thuộc nhiều vào nhà cung cấp."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giấy phép GNU GPL là giấy phép như thế nào?",
+      "options": [
+        "Giấy phép bảo vệ bản quyền phần mềm thương mại",
+        "Giấy phép áp dụng rộng rãi nhất cho phần mềm nguồn mở, đảm bảo quyền tiếp cận mã nguồn và sự phát triển bền vững",
+        "Giấy phép chỉ cho phép xem mã nguồn nhưng không được sửa đổi",
+        "Giấy phép do Microsoft phát triển cho các phần mềm Windows"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Theo giấy phép GNU GPL 3.0, người dùng phần mềm nguồn mở được phép làm những gì?",
+      "options": [
+        "Sao chép và phân phối phần mềm",
+        "Sửa đổi phần mềm và phân phối bản sửa đổi",
+        "Giữ bí mật phần mã nguồn đã sửa đổi mà không cần công bố",
+        "Yêu cầu trả phí cho việc chuyển giao phần mềm",
+        "Phân phối bản sửa đổi dưới giấy phép khác với GPL"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        3
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phần mềm \"đặt hàng\" (may-đo) khác phần mềm \"đóng gói\" ở điểm nào?",
+      "options": [
+        "Phần mềm đặt hàng rẻ hơn và dễ dùng hơn",
+        "Phần mềm đặt hàng được thiết kế theo yêu cầu riêng của từng khách hàng và được bảo hành theo hợp đồng",
+        "Phần mềm đóng gói chỉ dành cho doanh nghiệp lớn",
+        "Phần mềm đặt hàng là phần mềm nguồn mở còn phần mềm đóng gói là phần mềm thương mại"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phần mềm chạy trên Internet (phần mềm trực tuyến) là gì?",
+      "options": [
+        "Phần mềm phải cài đặt trên máy tính trước khi dùng qua mạng",
+        "Phần mềm cho phép sử dụng qua Internet mà không cần cài đặt vào máy",
+        "Phần mềm chỉ dùng được khi có kết nối cáp quang",
+        "Phần mềm diệt virus chạy trên nền tảng điện toán đám mây"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định tính đúng/sai của các phát biểu về phần mềm chạy trên Internet:",
+      "options": [
+        "Google Docs là phần mềm trực tuyến giúp soạn thảo văn bản.",
+        "Phần mềm trực tuyến có thể sử dụng ở bất cứ nơi nào miễn là có kết nối Internet.",
+        "Để dùng Google Docs, người dùng phải tải và cài đặt phần mềm về máy.",
+        "Google Sheets là phần mềm trực tuyến có chức năng tương tự Microsoft Excel."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        true,
+        false,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Cặp phần mềm nào sau đây gồm một phần mềm thương mại và một phần mềm nguồn mở có thể thay thế nhau?",
+      "options": [
+        "Windows và macOS",
+        "Microsoft Word và Writer (OpenOffice)",
+        "Google Docs và Google Sheets",
+        "iOS và Android"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phát biểu nào sau đây đúng về vai trò của phần mềm thương mại đối với sự phát triển của công nghệ phần mềm?",
+      "options": [
+        "Phần mềm thương mại không có vai trò gì vì phần mềm nguồn mở có thể thay thế hoàn toàn",
+        "Phần mềm thương mại là nguồn thu nhập chính của các tổ chức làm phần mềm chuyên nghiệp, góp phần tạo ra thị trường phần mềm phong phú",
+        "Phần mềm thương mại chỉ phục vụ nhu cầu cá nhân, không phục vụ tổ chức",
+        "Phần mềm thương mại sẽ biến mất hoàn toàn khi phần mềm nguồn mở phát triển đủ mạnh"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    }
+  ],
+  "settings": {
+    "title": "KTTX_K11_Lan1",
+    "timeLimit": 30,
+    "isOpen": false,
+    "showScore": false,
+    "practiceMode": false,
+    "shuffleExam": true,
+    "examPassword": "",
+    "requirePassword": false,
+    "currentSession": {
+      "classId": "class_1764766952564",
+      "className": "11A4",
+      "examId": "exam_1764770257487",
+      "examName": "BaiTest_1764770257484"
+    },
+    "currentExamId": "exam_1764770257487"
+  },
+  "createdAt": "2026-10-01T01:03:00.583Z"
+}

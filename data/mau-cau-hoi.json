@@ -1,0 +1,101 @@
+[
+  {
+    "type": "single",
+    "question": "Thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam là thành phố nào?",
+    "options": ["TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Cần Thơ"],
+    "correct": 1,
+    "correctList": null,
+    "correctTF": null
+  },
+  {
+    "type": "single",
+    "question": "Năm nào Việt Nam chính thức thống nhất đất nước?",
+    "options": ["1954", "1968", "1975", "1986"],
+    "correct": 2,
+    "correctList": null,
+    "correctTF": null
+  },
+  {
+    "type": "multi",
+    "question": "Chọn tất cả các tỉnh/thành phố trực thuộc Trung ương của Việt Nam:",
+    "options": ["Hà Nội", "Nghệ An", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ"],
+    "correct": 0,
+    "correctList": [0, 2, 3, 4],
+    "correctTF": null
+  },
+  {
+    "type": "multi",
+    "question": "Chọn các ngôn ngữ lập trình hướng đối tượng:",
+    "options": ["Python", "HTML", "Java", "CSS", "C++"],
+    "correct": 0,
+    "correctList": [0, 2, 4],
+    "correctTF": null
+  },
+  {
+    "type": "truefalse",
+    "question": "Xác định tính đúng/sai của các phát biểu sau về địa lý Việt Nam:",
+    "options": [
+      "Hà Nội là thủ đô và là thành phố lớn nhất Việt Nam.",
+      "Việt Nam có đường bờ biển dài hơn 3.000 km.",
+      "Sông Hồng chảy qua Hà Nội.",
+      "Việt Nam không có chung biên giới với Trung Quốc."
+    ],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": [false, true, true, false]
+  },
+  {
+    "type": "truefalse",
+    "question": "Cho biết các mệnh đề vật lý sau đúng hay sai:",
+    "options": [
+      "Nước tinh khiết sôi ở 100°C ở áp suất 1 atm.",
+      "Ánh sáng trong chân không di chuyển chậm hơn âm thanh.",
+      "Công thức hóa học của nước là H2O."
+    ],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": [true, false, true]
+  },
+  {
+    "type": "single",
+    "question": "【CÔNG THỨC TOÁN】 Giá trị của \\(\\sqrt{4} + \\sqrt{9}\\) bằng bao nhiêu?\n\n💡 Hướng dẫn viết công thức: Bọc LaTeX trong \\( ... \\) cho công thức inline, hoặc \\[ ... \\] cho công thức dòng riêng.\nVí dụ: \\(x^2 + y^2 = z^2\\), \\(\\frac{a}{b}\\), \\(\\sqrt{x}\\), \\(\\sum_{i=1}^{n} i\\)",
+    "options": [
+      "\\(2\\)",
+      "\\(3\\)",
+      "\\(5\\)",
+      "\\(7\\)"
+    ],
+    "correct": 2,
+    "correctList": null,
+    "correctTF": null
+  },
+  {
+    "type": "single",
+    "question": "【CÔNG THỨC TOÁN】 Nghiệm của phương trình \\(x^2 - 5x + 6 = 0\\) là:",
+    "options": [
+      "\\(x = 1\\) hoặc \\(x = 6\\)",
+      "\\(x = 2\\) hoặc \\(x = 3\\)",
+      "\\(x = -2\\) hoặc \\(x = -3\\)",
+      "\\(x = 0\\) hoặc \\(x = 5\\)"
+    ],
+    "correct": 1,
+    "correctList": null,
+    "correctTF": null
+  },
+  {
+    "type": "single",
+    "question": "【HIỂN THỊ CODE】 Xét đoạn code Python sau, kết quả in ra là gì?\n<pre>x = 10\ny = 3\nprint(x // y)</pre>",
+    "options": ["3", "3.33", "4", "1"],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": null
+  },
+  {
+    "type": "single",
+    "question": "【HIỂN THỊ CODE】 Đoạn code C++ sau in ra giá trị gì?\n<pre>#include &lt;iostream&gt;\nusing namespace std;\nint main() {\n    int x = 5;\n    cout &lt;&lt; x * x;\n}</pre>",
+    "options": ["5", "10", "25", "55"],
+    "correct": 2,
+    "correctList": null,
+    "correctTF": null
+  }
+]
