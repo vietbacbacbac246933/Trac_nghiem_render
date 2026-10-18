@@ -4711,8 +4711,14 @@
 
             updateQuestionNavigation();
 
-            // Scroll to top
-            document.getElementById('questionsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Scroll to top. Thanh tiêu đề dính (.exam-header) che mất mấy dòng
+            // đầu của câu hỏi sau khi cuộn, nên chừa đúng chiều cao thật của nó.
+            var qContainer = document.getElementById('questionsContainer');
+            var examHeader = document.querySelector('.exam-header');
+            if (qContainer && examHeader) {
+                qContainer.style.scrollMarginTop = (examHeader.offsetHeight + 8) + 'px';
+            }
+            qContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
             // Render công thức toán nếu có
             renderKatex(document.getElementById('questionsContainer'));

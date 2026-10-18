@@ -964,11 +964,11 @@
             </div>
         </div>
 
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('questions')">Câu hỏi</button>
-            <button class="tab" onclick="showTab('students')">Học sinh</button>
-            <button class="tab" onclick="showTab('results')">Kết quả</button>
-            <button class="tab" onclick="showTab('settings')">Cài đặt</button>
+        <div class="tabs" role="tablist" aria-label="Khu vực quản lý">
+            <button class="tab active" id="tabBtn-questions" role="tab" aria-selected="true" aria-controls="questions" onclick="showTab('questions')">Câu hỏi</button>
+            <button class="tab" id="tabBtn-students" role="tab" aria-selected="false" aria-controls="students" onclick="showTab('students')">Học sinh</button>
+            <button class="tab" id="tabBtn-results" role="tab" aria-selected="false" aria-controls="results" onclick="showTab('results')">Kết quả</button>
+            <button class="tab" id="tabBtn-settings" role="tab" aria-selected="false" aria-controls="settings" onclick="showTab('settings')">Cài đặt</button>
         </div>
 
         <!-- ========== MODAL QUẢN LÝ LỚP ========== -->
@@ -1175,7 +1175,7 @@
         </div>
 
         <!-- Panel Câu hỏi -->
-        <div id="questions" class="panel active">
+        <div id="questions" class="panel active" role="tabpanel" aria-labelledby="tabBtn-questions">
 
             <!-- Banner hướng dẫn -->
             <div style="background: #f0f0ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px;">
@@ -1216,7 +1216,7 @@
         </div>
 
         <!-- Panel Học sinh -->
-        <div id="students" class="panel">
+        <div id="students" class="panel" role="tabpanel" aria-labelledby="tabBtn-students">
             <h2>Quản lý Học sinh</h2>
             
             <!-- Báo cáo chọn nhầm -->
@@ -1279,7 +1279,7 @@
         </div>
 
         <!-- Panel Kết quả -->
-        <div id="results" class="panel">
+        <div id="results" class="panel" role="tabpanel" aria-labelledby="tabBtn-results">
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3 id="statSubmitted">0</h3>
@@ -1329,7 +1329,7 @@
         </div>
 
         <!-- Panel Cài đặt -->
-        <div id="settings" class="panel">
+        <div id="settings" class="panel" role="tabpanel" aria-labelledby="tabBtn-settings">
             <!-- Card Mở/Đóng bài thi - tách riêng, hiệu lực ngay -->
             <div class="settings-card" id="examOpenCard">
                 <h3>Trạng thái bài thi</h3>
@@ -1747,10 +1747,22 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
         // Tab navigation
         function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+            var btn = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
             document.getElementById(tabName).classList.add('active');
+
+            // Màn hẹp: dải tab cuộn ngang, đưa tab vừa chọn vào giữa khung nhìn.
+            // Dùng scrollLeft thay vì scrollIntoView để không cuộn cả trang.
+            var strip = btn.parentElement;
+            if (strip && strip.scrollWidth > strip.clientWidth) {
+                strip.scrollLeft = btn.offsetLeft - (strip.clientWidth - btn.offsetWidth) / 2;
+            }
         }
 
         // Load questions

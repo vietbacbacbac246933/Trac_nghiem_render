@@ -7,6 +7,10 @@
    - Các giá trị vùng an toàn đều viết dạng max(<giá trị đang dùng>, env(...)).
      Ở nơi env() trả 0 (Android, desktop, iPhone cầm dọc) thì kết quả giống
      hệt trước khi thêm file này.
+   - Khối thứ hai dùng `(pointer: coarse)` cho KÍCH THƯỚC VÙNG CHẠM: máy cảm
+     ứng ở mọi bề ngang (kể cả điện thoại quay ngang > 768px) đều nhận, còn
+     chuột + màn hình rộng thì không. Khối đó chỉ chứa kích thước chạm, không
+     chứa luật bố cục.
    ========================================================================== */
 
 @media (max-width: 768px) {
@@ -105,5 +109,91 @@
        còn 200px bề ngang. */
     .box {
         padding: 24px 20px;
+    }
+
+    /* --- Điều hướng câu hỏi của học sinh -----------------------------------
+       .question-navigation là 3 khối nằm ngang: Câu trước | chỉ số câu | Câu
+       tiếp. Trên máy hẹp cả 3 bị nén lại và nhãn nút xuống 2 dòng. Đưa chỉ số
+       câu lên hàng riêng, cho 2 nút chia đều bề ngang. */
+    .question-navigation {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .question-indicator {
+        flex: 1 0 100%;
+        order: -1;
+        text-align: center;
+    }
+
+    .nav-arrow-btn {
+        flex: 1 1 0;
+        justify-content: center;
+        /* Padding ngang 24px của trang làm nhãn "Câu trước" xuống 2 dòng ở 320px */
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    /* --- Dải tab trang giáo viên: 1 hàng cuộn ngang ------------------------
+       4 tab xuống dòng thành 2 hàng chiếm ~96px chiều cao. Cho cuộn ngang để
+       giữ đúng 1 hàng; tab đang chọn được cuộn vào giữa khung trong showTab(). */
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 12px 18px;
+    }
+
+    /* Khối cuộn ngang cắt viền focus của trình duyệt (viền vẽ RA NGOÀI nút, mà
+       tab đầu nằm đúng mép trái khối cuộn). Kéo viền vào trong 2px. */
+    .tab:focus-visible {
+        outline-offset: -2px;
+    }
+
+    /* Khối cuộn ngang cắt mất bóng đổ phía trên của .tab.active, nên mục đang
+       chọn được đánh dấu bằng gạch chân màu nhấn sẵn có của hệ thống. */
+    .tab.active {
+        box-shadow: inset 0 -3px 0 #667eea;
+    }
+}
+
+/* ==========================================================================
+   Kích thước vùng chạm
+   --------------------------------------------------------------------------
+   Khớp khi màn hình hẹp HOẶC thiết bị trỏ chính là cảm ứng. Nhờ vậy điện
+   thoại quay ngang (bề ngang > 768px) và máy tính bảng vẫn nhận, còn chuột +
+   màn hình rộng thì không nhận luật nào ở đây.
+   ========================================================================== */
+@media (max-width: 768px), (pointer: coarse) {
+
+    /* Tab điều hướng của trang giáo viên */
+    .tab {
+        min-height: 44px;
+    }
+
+    /* Bảng số câu của học sinh: 34x34 quá nhỏ cho ngón tay */
+    .nav-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Nút Câu trước / Câu tiếp */
+    .nav-arrow-btn {
+        min-height: 44px;
+    }
+
+    /* Nút nộp bài trên thanh tiêu đề dính */
+    .header-submit-btn {
+        min-height: 44px;
     }
 }
