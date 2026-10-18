@@ -31,11 +31,41 @@
         padding-right: max(20px, env(safe-area-inset-right));
     }
 
-    /* --- Thanh tiêu đề dính trên cùng (trang học sinh) --------------------- */
+    /* --- Thanh tiêu đề dính trên cùng (trang học sinh) ---------------------
+       Trang gốc xếp dọc thanh này ở màn hình hẹp: logo, huy hiệu tên, rồi hàng
+       trạng thái — đo được 164px ở 320px (29% màn hình 568px) và luôn dính
+       trên cùng, lấy mất chỗ của câu hỏi. Xếp lại thành 2 hàng: hàng 1 là danh
+       tính học sinh, hàng 2 là tiến độ + đồng hồ + nút nộp bài. Không bỏ thông
+       tin nào, chỉ đổi cách xếp. */
     .exam-header {
-        padding-top: max(10px, env(safe-area-inset-top));
-        padding-left: max(20px, env(safe-area-inset-left));
-        padding-right: max(20px, env(safe-area-inset-right));
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        text-align: left;
+        gap: 8px;
+        padding: max(10px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-left)) 10px max(20px, env(safe-area-inset-right));
+    }
+
+    .exam-header-left {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Giữ 3 mục của hàng trạng thái chung một hàng, và margin-left auto đẩy
+       hàng đó sang phải để nút nộp bài vẫn ở góc phải trên như bản desktop. */
+    .header-right {
+        flex-wrap: nowrap;
+        margin-left: auto;
+    }
+
+    /* Huy hiệu tên bị chật ở 320-360px nên tên học sinh xuống 2 dòng, kéo dài
+       thanh tiêu đề. Bớt đệm và khoảng cách bên trong huy hiệu (không đổi chữ,
+       không đổi ảnh đại diện) để tên vừa một dòng ở 360px. */
+    .student-badge {
+        padding: 4px 10px;
+        gap: 6px;
     }
 
     /* Không để nút nộp bài nằm dưới thanh home của iPhone */
@@ -165,6 +195,143 @@
     .tab.active {
         box-shadow: inset 0 -3px 0 #667eea;
     }
+
+    /* --- Bảng trong nội dung câu hỏi / đáp án -------------------------------
+       Bảng dán từ Word có thể rộng hơn màn hình điện thoại. Cho riêng bảng cuộn
+       ngang bên trong khối nội dung, thay vì đẩy cả trang rộng ra ngoài màn
+       hình. Không đặt overflow lên chính .question-text/.option-text: như vậy
+       khối đó thành khung cuộn theo cả chiều dọc và có thể cắt công thức .katex
+       cao (phân số, ma trận) — trong khi ảnh và chữ dài đã được xử lý riêng. */
+    .question-text table,
+    .option-text table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    /* Chuỗi dài không có chỗ ngắt (URL, ký hiệu đặc biệt) */
+    .question-text,
+    .option-text,
+    .tf-stmt {
+        overflow-wrap: break-word;
+    }
+
+    /* Ảnh trong đáp án: trang gốc cho tối đa 200px, còn vùng chữ của một đáp án
+       ở 320px chỉ khoảng 168px, nên ảnh tràn ra khỏi thẻ. height:auto sẵn có
+       giữ đúng tỷ lệ ảnh. */
+    .option-text img {
+        max-width: 100%;
+    }
+
+    /* --- Câu đúng/sai -------------------------------------------------------
+       Mỗi hàng là "phát biểu | Đúng | Sai" nằm ngang. Ở 320px phát biểu chỉ còn
+       khoảng 120px (7-8 dòng) trong khi 2 nút chỉ chiếm 128px. Cho phát biểu
+       chiếm trọn một hàng, 2 nút chia đều hàng dưới. */
+    .tf-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .tf-stmt {
+        flex: 1 1 100%;
+        padding-right: 0;
+    }
+
+    .tf-btn {
+        flex: 1 1 0;
+        width: auto;
+        margin: 0;
+    }
+
+    /* Ô "đáp án đúng" của chế độ ôn tập: bỏ bề ngang cố định 64px */
+    .tf-correct-hint {
+        width: auto;
+        min-width: 0;
+        padding: 2px 8px;
+        margin-left: 0;
+    }
+
+    /* Hàng tiêu đề "Phát biểu | Đúng | Sai" không còn khớp cột sau khi xếp lại;
+       hai nút Đúng/Sai đã tự ghi nhãn nên không mất thông tin gì. */
+    .tf-header {
+        display: none;
+    }
+
+    /* --- Trạng thái đã chọn của câu một đáp án ------------------------------
+       Hiện chỉ thể hiện bằng màu: viền, nền và ô chữ cái (A/B/C/D) đều chuyển
+       sang xanh. Thêm dấu ✓ giống ô đáp án của câu nhiều đáp án, để người khó
+       phân biệt màu vẫn nhận ra đáp án đã chọn. Dùng ::before vì ::after đã
+       dành cho nhãn "Đáp án đúng" của chế độ ôn tập.
+       right: 0 đặt dấu ✓ nằm trọn trong đệm phải 18px của .option, nên nó không
+       đè lên chữ; top: 6px cũng vừa hết phần trên của dòng đầu (đệm trên 14px
+       cộng line-height 2 làm chữ bắt đầu ở khoảng 26px). */
+    .option.selected::before {
+        content: '✓';
+        position: absolute;
+        top: 6px;
+        right: 0;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #28a745;
+        color: #fff;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    /* --- Chế độ ôn tập: nhãn "Đáp án đúng" ----------------------------------
+       Nhãn đang đặt đè lên giữa đáp án nên che mất chữ của đáp án đúng ở màn
+       hình hẹp. Cho nhãn xuống hàng riêng bên dưới nội dung đáp án. */
+    .option.practice-answer {
+        flex-wrap: wrap;
+    }
+
+    .option.practice-answer::after {
+        position: static;
+        transform: none;
+        flex: 1 0 100%;
+        text-align: center;
+        margin: 6px 0 0;
+    }
+
+    /* --- Hộp thoại (xác nhận nộp bài, báo sai tên, thông báo) ---------------
+       .modal không cuộn nên khi nội dung cao hơn màn hình thì phần dưới cùng
+       (2 nút) không với tới được. Ngoài ra height:100% là chiều cao lúc thanh
+       địa chỉ đã ẩn, nên trên iPhone phần dưới nằm sau thanh địa chỉ. Cho khung
+       nền cuộn và canh nội dung từ trên xuống; nội dung thấp hơn màn hình thì
+       margin:auto vẫn canh giữa như cũ. */
+    .modal {
+        align-items: flex-start;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        height: 100dvh;
+        padding: 12px;
+    }
+
+    .modal-content {
+        padding: 24px 18px;
+        margin: auto;
+    }
+
+    /* Hai nút "Nộp bài" và "Tiếp tục làm" nằm ngang: mỗi nút chỉ còn khoảng
+       125px cho chữ nên nhãn xuống 2-3 dòng, mà nút nộp bài lại sát nút hủy. */
+    .modal .btn-group {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* Ba chỉ số của hộp thoại nộp bài cần khoảng 216px, đúng bằng bề ngang còn
+       lại của hộp thoại ở 320px. */
+    .confirm-modal .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
 }
 
 /* ==========================================================================
@@ -195,5 +362,37 @@
     /* Nút nộp bài trên thanh tiêu đề dính */
     .header-submit-btn {
         min-height: 44px;
+    }
+
+    /* Nút Đúng/Sai của câu đúng/sai: 56x30 */
+    .tf-btn {
+        min-height: 44px;
+    }
+
+    /* Nút "Kiểm tra đáp án" của chế độ ôn tập */
+    .multi-check-btn {
+        min-height: 44px;
+    }
+
+    /* Liên kết "Sai tên?" trên thanh tiêu đề chỉ 46x18. Nới vùng chạm lên 44px
+       bằng một lớp phủ trong suốt thay vì tăng chiều cao thật: chiều cao thật
+       44px sẽ đội luôn chiều cao huy hiệu tên và thanh tiêu đề dính. */
+    .wrong-name-link {
+        position: relative;
+    }
+
+    .wrong-name-link::after {
+        content: '';
+        position: absolute;
+        top: -13px;
+        bottom: -13px;
+        left: -8px;
+        right: -8px;
+    }
+
+    /* Nút đóng băng-rôn chế độ ôn tập: 30x30 */
+    .practice-close {
+        width: 44px;
+        height: 44px;
     }
 }
