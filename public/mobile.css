@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Nền tảng responsive — Trắc Nghiệm LAN
+   --------------------------------------------------------------------------
+   File này chỉ chứa luật cho màn hình hẹp (<= 768px) và được nạp SAU khối
+   <style> của từng trang. Vì vậy:
+   - Desktop (> 768px) không nhận bất kỳ luật nào trong file này.
+   - Các giá trị vùng an toàn đều viết dạng max(<giá trị đang dùng>, env(...)).
+     Ở nơi env() trả 0 (Android, desktop, iPhone cầm dọc) thì kết quả giống
+     hệt trước khi thêm file này.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+
+    /* --- Chiều cao khung nhìn trên di động ---------------------------------
+       100vh trên iOS/Android là chiều cao khi thanh địa chỉ ĐÃ ẩn, nên khối
+       căn giữa bị lệch khỏi vùng nhìn thấy. 100dvh là chiều cao thật.
+       Trình duyệt không hiểu dvh sẽ bỏ khai báo này và giữ nguyên 100vh. */
+    body {
+        min-height: 100dvh;
+    }
+
+    .login-screen,
+    .result-screen {
+        min-height: 100dvh;
+        /* Chừa vùng an toàn hai bên khi quay ngang (tai thỏ) */
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+
+    /* --- Thanh tiêu đề dính trên cùng (trang học sinh) --------------------- */
+    .exam-header {
+        padding-top: max(10px, env(safe-area-inset-top));
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+
+    /* Không để nút nộp bài nằm dưới thanh home của iPhone */
+    .exam-screen {
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+
+    /* Nội dung không chạm mép khi quay ngang.
+       .container của trang học sinh nằm trong #examScreen, khai báo padding
+       0 15px 15px; .container của trang giáo viên là con trực tiếp của body,
+       khai báo padding 20px. Giữ đúng mức cũ làm giá trị nền. */
+    #examScreen .container {
+        padding-left: max(15px, env(safe-area-inset-left));
+        padding-right: max(15px, env(safe-area-inset-right));
+    }
+
+    body > .container {
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+
+    /* --- Bảng dữ liệu rộng (trang giáo viên) -------------------------------
+       Bảng kết quả 12 cột không thể thu vừa màn hình điện thoại: chỉ riêng
+       padding 15px mỗi bên của 12 ô đã là 360px. Cho bảng cuộn bên trong
+       khung của nó, thay vì đẩy cả trang rộng ra ngoài màn hình. */
+    .table-scroll {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    /* Giảm padding ô để bảng bớt phải cuộn */
+    .results-table th,
+    .results-table td {
+        padding: 10px 12px;
+    }
+
+    /* --- Thông báo nổi (trang giáo viên) -----------------------------------
+       .toast có min-width 300px và khung lệch phải 20px: trên máy 320px mép
+       trái của thông báo bị cắt. */
+    .toast-container {
+        left: 16px;
+        right: 16px;
+    }
+
+    .toast {
+        min-width: 0;
+        max-width: none;
+    }
+
+    /* --- Cảnh báo sidebar AI (trang học sinh) ------------------------------
+       white-space: nowrap làm chuỗi tiếng Việt dài hơn màn hình và bị cắt
+       cả hai bên. */
+    .ai-sidebar-warning {
+        white-space: normal;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+    }
+
+    /* --- Hàng flex chứa nút: cho phép xuống dòng ---------------------------
+       .question-actions (Sửa/Xóa) và hàng trong .setting-row không có
+       flex-wrap nên tràn ra ngoài thẻ ở màn hình hẹp. */
+    .question-header,
+    .question-actions,
+    .setting-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* --- Trang đăng nhập giáo viên -----------------------------------------
+       .box padding 40px cộng body padding 20px: trên máy 320px nội dung chỉ
+       còn 200px bề ngang. */
+    .box {
+        padding: 24px 20px;
+    }
+}

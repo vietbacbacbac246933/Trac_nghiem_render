@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Trắc Nghiệm LAN - Giáo viên</title>
     <link rel="icon" type="image/svg+xml" href="/logo.svg">
     <style>
@@ -895,6 +895,7 @@
     <script src="/katex/katex.min.js"></script>
     <script src="/katex/contrib/auto-render.min.js"></script>
     <link rel="stylesheet" href="/highlight.min.css">
+    <link rel="stylesheet" href="/mobile.css">
     <script src="/highlight.min.js"></script>
 </head>
 <body>
@@ -920,7 +921,7 @@
 
         <!-- ========== SESSION HIỆN TẠI: LỚP + BÀI KIỂM TRA ========== -->
         <div class="settings-card" style="margin-bottom: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 20px;">
                 
                 <!-- Lớp hiện tại -->
                 <div style="background: rgba(255,255,255,0.15); padding: 15px 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
@@ -933,7 +934,7 @@
                             <p id="currentClassInfo" style="margin: 2px 0 0 0; opacity: 0.75; font-size: 0.8em;">0 học sinh</p>
                         </div>
                     </div>
-                    <button class="btn" onclick="showClassManager()" style="background: white; color: #667eea; font-weight: bold; padding: 10px 15px; font-size: 0.9em; white-space: nowrap;">
+                    <button class="btn" onclick="showClassManager()" style="background: white; color: #667eea; font-weight: bold; padding: 10px 15px; font-size: 0.9em;">
                         Quản lý Lớp
                     </button>
                 </div>
@@ -949,7 +950,7 @@
                             <p id="currentExamInfo" style="margin: 2px 0 0 0; opacity: 0.75; font-size: 0.8em;">0 câu hỏi</p>
                         </div>
                     </div>
-                    <button class="btn" onclick="showExamManager()" style="background: white; color: #667eea; font-weight: bold; padding: 10px 15px; font-size: 0.9em; white-space: nowrap;">
+                    <button class="btn" onclick="showExamManager()" style="background: white; color: #667eea; font-weight: bold; padding: 10px 15px; font-size: 0.9em;">
                         Quản lý Đề
                     </button>
                 </div>
@@ -1262,7 +1263,8 @@
                 <button class="btn btn-secondary" onclick="loadStudents()">Làm mới</button>
             </div>
             
-            <table class="results-table" style="margin-top: 20px;">
+            <div class="table-scroll">
+                <table class="results-table" style="margin-top: 20px;">
                 <thead>
                     <tr>
                         <th>STT</th>
@@ -1272,7 +1274,8 @@
                     </tr>
                 </thead>
                 <tbody id="studentsBody"></tbody>
-            </table>
+                </table>
+            </div>
         </div>
 
         <!-- Panel Kết quả -->
@@ -1302,7 +1305,8 @@
                 <button class="btn btn-secondary" onclick="loadResults()">Làm mới</button>
             </div>
 
-            <table class="results-table">
+            <div class="table-scroll">
+                <table class="results-table">
                 <thead>
                     <tr>
                         <th>STT</th>
@@ -1320,7 +1324,8 @@
                     </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>
-            </table>
+                </table>
+            </div>
         </div>
 
         <!-- Panel Cài đặt -->
@@ -1380,7 +1385,7 @@
                     <div style="flex: 1;">
                         <strong style="color: #0d47a1;">Mật khẩu bắt đầu làm bài</strong>
                         <p style="color: #1565c0; font-size: 0.9em;">Học sinh phải nhập mật khẩu mới được làm bài (để tất cả bắt đầu cùng lúc)</p>
-                        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+                        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap;">
                             <input type="text" id="examPassword" placeholder="Nhập mật khẩu..." style="flex: 1; padding: 10px 15px; border: 2px solid #90caf9; border-radius: 8px; font-size: 1em;" oninput="markSettingsDirty()">
                             <button onclick="generateRandomPassword()" style="padding: 10px 15px; background: #1976d2; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9em;">Tạo ngẫu nhiên</button>
                             <button onclick="copyPassword()" style="padding: 10px 15px; background: #43a047; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9em;">Copy</button>
