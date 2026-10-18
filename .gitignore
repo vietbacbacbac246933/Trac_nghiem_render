@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# ---------------------------------------------------------------------------
+# Du lieu chay (KHONG commit: trang thai thay doi + chua thong tin hoc sinh)
+# ---------------------------------------------------------------------------
+# Trang thai phien/ket qua/bai lam
+data/current-session.json
+data/student-status.json
+data/student-status/
+data/results.json
+data/results/
+data/reports.json
+data/progress/
+# Cache du lieu ngon ngu OCR (tesseract.js tu tai ve, khong phai file nguoi dung)
+data/ocr-cache/
+# Danh sach hoc sinh (chua ho ten -> thong tin ca nhan)
+data/default-students.json
+data/class-students/
+danhsach/
+DanhSachLop/
+
+# Ghi chu: data/questions.json va data/exams/*.json DUOC commit lam du lieu
+# gieo (seed) ban dau; cac file nay khong duoc phep tai qua HTTP (da chan /data/*.json).

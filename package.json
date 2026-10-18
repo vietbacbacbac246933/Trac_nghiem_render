@@ -1,0 +1,51 @@
+{
+  "name": "trac-nghiem-lan",
+  "version": "1.0.0",
+  "description": "Phần mềm trắc nghiệm cho mạng LAN",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test:import": "node tests/test-import-docx.js",
+    "test:ocr": "node tests/test-ocr-import.js",
+    "build": "node build-scripts/build.js",
+    "admin": "node license/admin-tool.js",
+    "generate-license": "node license/admin-tool.js generate"
+  },
+  "pkg": {
+    "scripts": [
+      "license/**/*.js"
+    ],
+    "assets": [
+      "public/**/*",
+      "data/**/*",
+      "Noidung/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
+  },
+  "dependencies": {
+    "docx": "^9.5.1",
+    "express": "^4.18.2",
+    "jpeg-js": "^0.4.4",
+    "jszip": "^3.10.1",
+    "katex": "0.16.22",
+    "mammoth": "^1.11.0",
+    "mathml-to-latex": "1.8.0",
+    "multer": "^2.0.2",
+    "omml2mathml": "1.3.0",
+    "pg": "^8.11.5",
+    "pngjs": "^7.0.0",
+    "socket.io": "^4.7.2",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5",
+    "xml-js": "^1.6.11",
+    "xmldom": "0.6.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

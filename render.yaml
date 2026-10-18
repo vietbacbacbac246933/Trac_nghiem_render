@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+# Cau hinh deploy tren Render (https://render.com)
+# Dat file nay o thu muc goc cua repo. Render se tu doc khi tao Blueprint.
+#
+# LUU Y QUAN TRONG:
+#   - Socket.IO dang dung bo nho RAM cua 1 process -> CHI chay 1 instance
+#     (khong bat autoscaling / numInstances > 1).
+#   - Goi mien phi se "ngu" sau ~15 phut khong truy cap; lan dau vao se cham.
+#   - Goi Postgres mien phi cua Render co thoi han (het han thi phai tao lai).
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: trac-nghiem
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/ping
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "18"
+      # Mat khau dang nhap trang giao vien (/teacher). Render se hoi khi tao.
+      - key: TEACHER_PASSWORD
+        sync: false
+      # Khoa ky cookie phien. Render tu sinh ngau nhien, giu co dinh giua cac lan deploy.
+      - key: SESSION_SECRET
+        generateValue: true
+      # Ket noi toi Postgres ben duoi (tu dong dien tu database).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trac-nghiem-db
+          property: connectionString
+      - key: PG_POOL_MAX
+        value: "5"
+
+databases:
+  - name: trac-nghiem-db
+    plan: free
+    databaseName: trac_nghiem
+    user: trac_nghiem
+    region: singapore

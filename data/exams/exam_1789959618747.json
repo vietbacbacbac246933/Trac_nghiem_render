@@ -1,0 +1,747 @@
+{
+  "name": "Demo Toan 3",
+  "questions": [
+    {
+      "type": "single",
+      "question": "Hàm số  \\(x^{3}−3x\\)  nghịch biến trên khoảng nào?",
+      "options": [
+        "(−1; 1)",
+        "(−∞; −1)",
+        "(1; +∞)",
+        "(−1; 0)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàm số  \\(x^{4}−2x^{2}+3\\)  đạt cực tiểu bằng:",
+      "options": [
+        "x = ±1, giá trị cực tiểu là 2",
+        "x = 0, giá trị cực tiểu là 3",
+        "x = 0, giá trị cực tiểu là 0",
+        "x = ±1, giá trị cực tiểu là 0"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tìm m để hàm số  \\(\\frac{x+m}{x−2}\\)  đồng biến trên từng khoảng xác định?",
+      "options": [
+        "m &gt; 2",
+        "m &lt; −2",
+        "m ≠ 2",
+        "m ≠ −2"
+      ],
+      "correct": 3,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Đường tiệm cận ngang của đồ thị  \\(\\frac{3x−1}{2x+5}\\)  là:",
+      "options": [
+        "y =  \\(\\frac{3}{2}\\)",
+        "y = − \\(\\frac{1}{5}\\)",
+        "y = 3",
+        "y = 2"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giá trị lớn nhất của  \\(x^{3}−3x\\)  trên đoạn [−2; 2] là:",
+      "options": [
+        "2",
+        "4",
+        "−2",
+        "−4"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hàm số nào sau đây có đúng 3 điểm cực trị?",
+      "options": [
+        "y =  \\(x^{4}−2x^{2}\\)",
+        "y =  \\(x^{3}+3x\\)",
+        "y =  \\(\\frac{x+1}{x−1}\\)",
+        "y =  \\(x^{2}−4x+3\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tiếp tuyến của  \\(x^{3}−3x^{2}\\)  tại x = 2 là:",
+      "options": [
+        "y = −4",
+        "y = 0",
+        "y = 4",
+        "y = −8"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Số điểm cực trị của  \\(\\left(x^{2}−1\\right)^{3}\\) :",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "0"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Rút gọn  \\(a^{\\frac{2}{3}}⋅a^{\\frac{1}{6}}\\)  (a &gt; 0):",
+      "options": [
+        "\\(a^{\\frac{5}{6}}\\)",
+        "\\(a^{\\frac{1}{4}}\\)",
+        "\\(a^{\\frac{1}{2}}\\)",
+        "a"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giá trị của  \\(27^{\\frac{2}{3}}\\)  bằng:",
+      "options": [
+        "3",
+        "6",
+        "9",
+        "18"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giải phương trình  \\(4^{x}\\)  =  \\(2^{x+3}\\) :",
+      "options": [
+        "x = 1",
+        "x = 2",
+        "x = 3",
+        "x = 4"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính  \\(log_{2}\\left(8\\right)\\)  +  \\(log_{2}\\left(4\\right)\\)  −  \\(log_{2}\\left(16\\right)\\) :",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "0"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giải bất phương trình  \\(log_{3}\\left(x−1\\right)\\)  ≥ 2:",
+      "options": [
+        "x ≥ 10",
+        "x ≥ 9",
+        "x ≥ 7",
+        "x ≥ 4"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phương trình  \\(log_{2}\\left(x+1\\right)\\)  +  \\(log_{2}\\left(x−1\\right)\\)  = 3:",
+      "options": [
+        "x = 3",
+        "x =  \\(\\sqrt{10}\\)",
+        "x = 2",
+        "x =  \\(\\sqrt{7}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Bất phương trình  \\(2^{x^{2}−4}\\)  &lt;  \\(2^{2x−3}\\) :",
+      "options": [
+        "1 &lt; x &lt; 3",
+        "x &lt; 1 hoặc x &gt; 3",
+        "−3 &lt; x &lt; 1",
+        "x &lt; −3 hoặc x &gt; 1"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tập xác định của  \\(ln\\left(3x−6\\right)\\) :",
+      "options": [
+        "(2; +∞)",
+        "[−2; +∞)",
+        "(−2; +∞)",
+        "(3; +∞)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Đạo hàm của  \\(e^{x^{2}+1}\\)  là:",
+      "options": [
+        "y’ = 2x⋅ \\(e^{x^{2}+1}\\)",
+        "y’ =  \\(e^{x^{2}+1}\\)",
+        "y’ = x²+1",
+        "y’ = 2x"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Nguyên hàm của  \\(\\frac{1}{x+2}\\)  là:",
+      "options": [
+        "F(x) =  \\(ln\\left(\\left|x+2\\right|\\right)\\)  + C",
+        "F(x) = − \\(\\frac{1}{\\left(x+2\\right)^{2}}\\)  + C",
+        "F(x) = ln(x+2)",
+        "F(x) = (x+2)⋅ln(x+2) + C"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính I =  \\(\\int_{0}^{1} x^{2} dx\\) :",
+      "options": [
+        "\\(\\frac{1}{3}\\)",
+        "\\(\\frac{1}{2}\\)",
+        "1",
+        "\\(\\frac{2}{3}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính I =  \\(\\int_{0}^{1} \\left(x^{2}+2x+1\\right) dx\\) :",
+      "options": [
+        "\\(\\frac{7}{3}\\)",
+        "\\(\\frac{5}{3}\\)",
+        "\\(\\frac{4}{3}\\)",
+        "2"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính I =  \\(\\int_{0}^{\\frac{π}{2}} sin x dx\\) :",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "−1"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính I =  \\(\\int_{1}^{e} ln\\left(x\\right) dx\\) :",
+      "options": [
+        "0",
+        "1",
+        "e",
+        "e − 1"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính I =  \\(\\int_{0}^{1} xe^{x^{2}} dx\\) :",
+      "options": [
+        "\\(\\frac{e−1}{2}\\)",
+        "e − 1",
+        "\\(\\frac{e}{2}\\)",
+        "1"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Diện tích giới hạn bởi y =  \\(\\sqrt{x}\\)  và y = x:",
+      "options": [
+        "\\(\\frac{1}{6}\\)",
+        "\\(\\frac{1}{3}\\)",
+        "\\(\\frac{1}{2}\\)",
+        "1"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thể tích khi quay y =  \\(\\sqrt{x}\\)  (0 ≤ x ≤ 4) quanh Ox:",
+      "options": [
+        "4π",
+        "6π",
+        "8π",
+        "16π"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Diện tích giới hạn bởi y =  \\(x^{2}−4\\)  và trục hoành:",
+      "options": [
+        "\\(\\frac{32}{3}\\)",
+        "\\(\\frac{16}{3}\\)",
+        "8",
+        "16"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Cho z = 3 − 4i. Môđun |z| bằng:",
+      "options": [
+        "3",
+        "4",
+        "5",
+        "7"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính (2 + 3i)(1 − 2i):",
+      "options": [
+        "8 − i",
+        "2 − 6i",
+        "8 + i",
+        "2 + 6i"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Số phức liên hợp của z =  \\(\\frac{2+i}{1−i}\\)  là:",
+      "options": [
+        "\\(\\frac{1}{2}\\)  −  \\(\\frac{3}{2}\\) i",
+        "\\(\\frac{1}{2}\\)  +  \\(\\frac{3}{2}\\) i",
+        "1 + i",
+        "1 − i"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Điểm biểu diễn z = −2 + 3i trên mặt phẳng tọa độ là:",
+      "options": [
+        "M(−2; 3)",
+        "M(2; −3)",
+        "M(−2; −3)",
+        "M(3; −2)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giải  \\(z^{2}+2z+5=0\\) :",
+      "options": [
+        "z = −1 ± 2i",
+        "z = 1 ± 2i",
+        "z = −1 ± i",
+        "Vô nghiệm trong C"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thể tích khối chóp S.ABCD đáy hình vuông cạnh a, SA ⊥ đáy, SA = a:",
+      "options": [
+        "\\(\\frac{a^{3}}{3}\\)",
+        "\\(\\frac{a^{3}}{6}\\)",
+        "\\(a^{3}\\)",
+        "\\(\\frac{a^{3}}{2}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Thể tích hình cầu bán kính R:",
+      "options": [
+        "\\(\\frac{4}{3}\\) π \\(R^{3}\\)",
+        "4π \\(R^{2}\\)",
+        "\\(\\frac{2}{3}\\) π \\(R^{3}\\)",
+        "\\(\\frac{1}{3}\\) π \\(R^{3}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Khoảng cách từ M(1, 2, 3) đến gốc tọa độ:",
+      "options": [
+        "\\(\\sqrt{5}\\)",
+        "\\(\\sqrt{14}\\)",
+        "\\(\\sqrt{13}\\)",
+        "6"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Phương trình mặt phẳng qua M(1,0,−1), pháp tuyến n⃗=(2,−1,3):",
+      "options": [
+        "2x − y + 3z = 0",
+        "2x − y + 3z − 5 = 0",
+        "2x − y + 3z + 1 = 0",
+        "x − y + z = 0"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hình nón R = 3, h = 4. Thể tích:",
+      "options": [
+        "12π",
+        "36π",
+        "48π",
+        "9π"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Hình hộp chữ nhật ABCD.A'B'C'D', AB=a, AD=b, AA'=c. Đường chéo AG:",
+      "options": [
+        "\\(\\sqrt{a^{2}+b^{2}+c^{2}}\\)",
+        "\\(\\sqrt{a^{2}+b^{2}}\\)",
+        "\\(\\sqrt{b^{2}+c^{2}}\\)",
+        "a + b + c"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Mặt cầu tâm I(1,−1,2), R=3:",
+      "options": [
+        "(x−1)²+(y+1)²+(z−2)²=9",
+        "(x−1)²+(y+1)²+(z−2)²=3",
+        "x²+y²+z²=9",
+        "(x+1)²+(y−1)²+(z+2)²=9"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tính  \\(C_{5}^{2}\\) :",
+      "options": [
+        "5",
+        "10",
+        "15",
+        "20"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tung đồng xu 3 lần. Xác suất được đúng 2 mặt ngửa:",
+      "options": [
+        "\\(\\frac{1}{4}\\)",
+        "\\(\\frac{3}{8}\\)",
+        "\\(\\frac{1}{2}\\)",
+        "\\(\\frac{1}{8}\\)"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Tổ có 5 HS giỏi, 3 HS khá. Chọn 2 HS. Xác suất cả 2 giỏi:",
+      "options": [
+        "\\(\\frac{5}{14}\\)",
+        "\\(\\frac{25}{64}\\)",
+        "\\(\\frac{1}{4}\\)",
+        "\\(\\frac{10}{28}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Xác suất tung 2 xúc xắc có tổng = 7:",
+      "options": [
+        "\\(\\frac{1}{6}\\)",
+        "\\(\\frac{1}{12}\\)",
+        "\\(\\frac{1}{36}\\)",
+        "\\(\\frac{5}{36}\\)"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Hàm số y =  \\(x^{3}−3x\\)  có tính chất nào đúng?",
+      "options": [
+        "Đồng biến trên (−∞;−1) và (1;+∞)",
+        "Nghịch biến trên (−1;1)",
+        "Đạt cực đại tại x = −1",
+        "Đạt cực tiểu tại x = 1"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "Khẳng định nào đúng về tích phân?",
+      "options": [
+        "\\(\\int_{a}^{b} f(x)dx\\)  = − \\(\\int_{b}^{a} f(x)dx\\)",
+        "\\(\\int_{a}^{a} f(x)dx\\)  = 0",
+        "\\(\\int_{a}^{b} k⋅f(x)dx\\)  = k⋅ \\(\\int_{a}^{b} f(x)dx\\)",
+        "Tích phân hàm chẵn trên [-a,a] bằng 0 (sai)"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Xác định đúng/sai:",
+      "options": [
+        "\\(log_{2}\\left(8\\right)\\)  = 3.",
+        "\\(log_{3}\\left(1\\right)\\)  = 1.",
+        "\\(log_{a}\\left(1\\right)\\)  = 0 với a&gt;0, a≠1.",
+        "\\(log_{a}\\left(a^{n}\\right)\\)  = n."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "truefalse",
+      "question": "Cho y =  \\(\\frac{2x}{x−1}\\) . Xác định đúng/sai:",
+      "options": [
+        "Miền xác định D = R\\{1}.",
+        "Hàm đồng biến trên từng khoảng xác định.",
+        "Tiệm cận ngang y = 2.",
+        "Tiệm cận đứng x = 1."
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Bất phương trình  \\(2^{x^{2}−3x}\\)  &lt;  \\(2^{2x−4}\\) :",
+      "options": [
+        "1 &lt; x &lt; 4",
+        "x &lt; 1 hoặc x &gt; 4",
+        "−4 &lt; x &lt; −1",
+        "x &lt; −4 hoặc x &gt; −1"
+      ],
+      "correct": 0,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Số nghiệm của  \\(ln\\left(x^{2}−3x+3\\right)\\)  = 0:",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "correct": 2,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "multi",
+      "question": "f(x) =  \\(x^{3}−3x^{2}−9x+2\\) . Khẳng định đúng:",
+      "options": [
+        "f'(x) = 3x² − 6x − 9",
+        "Cực đại f(−1) = 7",
+        "Cực tiểu f(3) = −25",
+        "Hàm tăng trên (−∞;−1)"
+      ],
+      "correct": 0,
+      "correctList": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "correctTF": null,
+      "image": null
+    },
+    {
+      "type": "single",
+      "question": "Giới hạn  \\(lim_{x→+∞}\\frac{\\sqrt{x^{2}+1}}{x+2}\\)  bằng:",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "+∞"
+      ],
+      "correct": 1,
+      "correctList": null,
+      "correctTF": null,
+      "image": null
+    }
+  ],
+  "settings": {
+    "title": "Demo Toan 3",
+    "timeLimit": 30,
+    "isOpen": false,
+    "showScore": true,
+    "practiceMode": true,
+    "shuffleExam": true,
+    "examPassword": "",
+    "requirePassword": false,
+    "currentSession": {
+      "classId": "class_1764766952564",
+      "className": "11A4",
+      "examId": "exam_1764770257487",
+      "examName": "BaiTest_1764770257484"
+    },
+    "currentExamId": "exam_1764770257487"
+  },
+  "createdAt": "2026-09-22T03:25:13.656Z"
+}

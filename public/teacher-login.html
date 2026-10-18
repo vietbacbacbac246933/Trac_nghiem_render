@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập giáo viên - Trắc Nghiệm</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .box {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.25);
+            width: 100%;
+            max-width: 420px;
+        }
+        .header { text-align: center; margin-bottom: 28px; }
+        .header img { width: 64px; height: 64px; }
+        .header h1 { color: #333; font-size: 1.5em; margin-top: 12px; }
+        .header p { color: #777; font-size: 0.92em; margin-top: 6px; }
+        label { display: block; color: #444; font-size: 0.9em; margin-bottom: 8px; font-weight: 600; }
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 1.05em;
+            border: 2px solid #dbe2ea;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color .2s;
+        }
+        input[type="password"]:focus { border-color: #667eea; }
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-size: 1.05em;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        button:disabled { opacity: 0.6; cursor: default; }
+        .error {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #fdecea;
+            color: #c62828;
+            font-size: 0.92em;
+            display: none;
+        }
+        .hint { margin-top: 18px; color: #999; font-size: 0.82em; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="header">
+            <img src="/logo.svg" alt="Logo">
+            <h1>Đăng nhập giáo viên</h1>
+            <p>Nhập mật khẩu quản trị để vào trang giáo viên</p>
+        </div>
+
+        <form id="loginForm" autocomplete="off">
+            <label for="password">Mật khẩu</label>
+            <input type="password" id="password" placeholder="Nhập mật khẩu..." autofocus>
+            <button type="submit" id="submitBtn">Đăng nhập</button>
+        </form>
+
+        <div class="error" id="errorBox"></div>
+        <div class="hint">Học sinh vui lòng truy cập <a href="/">trang làm bài</a>.</div>
+    </div>
+
+    <script>
+        var form = document.getElementById('loginForm');
+        var btn = document.getElementById('submitBtn');
+        var errBox = document.getElementById('errorBox');
+
+        function showError(msg) {
+            errBox.textContent = msg;
+            errBox.style.display = 'block';
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            errBox.style.display = 'none';
+            var password = document.getElementById('password').value;
+            if (!password) { showError('Vui lòng nhập mật khẩu.'); return; }
+
+            btn.disabled = true;
+            btn.textContent = 'Đang kiểm tra...';
+
+            fetch('/api/teacher/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            }).then(function (res) {
+                return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
+            }).then(function (r) {
+                if (r.ok && r.data && r.data.success) {
+                    window.location.href = '/teacher';
+                } else {
+                    showError((r.data && r.data.error) || 'Đăng nhập thất bại.');
+                    btn.disabled = false;
+                    btn.textContent = 'Đăng nhập';
+                }
+            }).catch(function () {
+                showError('Không thể kết nối tới máy chủ. Vui lòng thử lại.');
+                btn.disabled = false;
+                btn.textContent = 'Đăng nhập';
+            });
+        });
+    </script>
+</body>
+</html>
