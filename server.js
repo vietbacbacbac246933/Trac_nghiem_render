@@ -35,6 +35,8 @@ var importSessions = require('./lib/import-sessions');
 var ocr = require('./lib/ocr');
 var ocrParse = require('./lib/ocr-parse');
 var underline = require('./lib/underline');
+// Chuan hoa dap an tra loi ngan (so nguyen/thap phan, khong sai so)
+var shortAnswer = require('./lib/short-answer');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -728,6 +730,8 @@ function migrateQuestion(q) {
     if (!type) {
         if (/\[MULTI\]/i.test(question)) {
             type = 'multi';
+        } else if (/\[TRẢ LỜI NGẮN\]|\[TRA LOI NGAN\]|\[SHORT\]/i.test(question)) {
+            type = 'shortanswer';
         } else if (/\[ĐÚNG\/SAI\]|\[DUNGSAI\]|\[DUNG\/SAI\]/i.test(question)) {
             type = 'truefalse';
         } else {
@@ -738,6 +742,9 @@ function migrateQuestion(q) {
     // Strip type tags khỏi question text
     question = question
         .replace(/\[MULTI\]/gi, '')
+        .replace(/\[TRẢ LỜI NGẮN\]/gi, '')
+        .replace(/\[TRA LOI NGAN\]/gi, '')
+        .replace(/\[SHORT\]/gi, '')
         .replace(/\[ĐÚNG\/SAI\]/gi, '')
         .replace(/\[DUNGSAI\]/gi, '')
         .replace(/\[DUNG\/SAI\]/gi, '')
@@ -780,10 +787,11 @@ function migrateQuestion(q) {
     return {
         type: type,
         question: question,
-        options: options,
+        options: type === 'shortanswer' ? [] : options,
         correct: correct,
         correctList: type === 'multi' ? correctList : null,
         correctTF: type === 'truefalse' ? correctTF : null,
+        correctAnswer: type === 'shortanswer' ? shortAnswer.normalize(q.correctAnswer) : null,
         image: q.image || null,
         points: normalizePoints(q.points)
     };
@@ -1255,6 +1263,7 @@ app.post('/api/check-answer', (req, res) => {
         questionScore: questionScore,
         type: q.type || 'single',
         correctAnswer: q.correct,
+        correctAnswerText: (q.type === 'shortanswer') ? (q.correctAnswer || null) : null,
         correctList: q.correctList || null,
         correctTF: q.correctTF || null,
         yourAnswer: answer
@@ -2191,6 +2200,11 @@ function scoreQuestion(q, studentAnswer) {
         return correct / total;
     }
 
+    if (type === 'shortanswer') {
+        // So khop chinh xac ve gia tri so; sai dinh dang/bo trong -> 0.
+        return shortAnswer.equals(studentAnswer, q.correctAnswer) ? 1 : 0;
+    }
+
     return 0;
 }
 
@@ -2220,7 +2234,8 @@ app.post('/api/submit', (req, res) => {
         var questionScore = scoreQuestion(q, studentAnswer); // 0.0–1.0
         var isCorrect = questionScore === 1;
         var hasAnswer = studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== -1
-            && !(Array.isArray(studentAnswer) && studentAnswer.length === 0);
+            && !(Array.isArray(studentAnswer) && studentAnswer.length === 0)
+            && !(typeof studentAnswer === 'string' && studentAnswer.trim() === '');
         var qPoints = normalizePoints(q.points);
         totalScore += questionScore * qPoints;
         totalPoints += qPoints;
@@ -2246,6 +2261,10 @@ app.post('/api/submit', (req, res) => {
                 ? studentAnswer.map(function(v, i) { return (String.fromCharCode(65+i)) + ': ' + (v === true ? 'Đúng' : v === false ? 'Sai' : '?'); }).join(', ') : null;
             correctAnswerText = Array.isArray(q.correctTF)
                 ? q.correctTF.map(function(v, i) { return (String.fromCharCode(65+i)) + ': ' + (v ? 'Đúng' : 'Sai'); }).join(', ') : '';
+        } else if (type === 'shortanswer') {
+            studentAnswerText = (typeof studentAnswer === 'string' || typeof studentAnswer === 'number')
+                ? String(studentAnswer).trim() || null : null;
+            correctAnswerText = q.correctAnswer || '';
         }
 
         return {
@@ -2253,7 +2272,7 @@ app.post('/api/submit', (req, res) => {
             type: type,
             studentAnswer: studentAnswer,
             studentAnswerText: studentAnswerText,
-            correctAnswer: q.correct,
+            correctAnswer: type === 'shortanswer' ? (q.correctAnswer || null) : q.correct,
             correctAnswerText: correctAnswerText,
             correctList: q.correctList || null,
             correctTF: q.correctTF || null,
@@ -4072,12 +4091,32 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
         errors.push('Câu ' + qNum + ': Thiếu nội dung câu hỏi');
         return null;
     }
+
+    var type = q.type || 'single';
+
+    if (type === 'shortanswer') {
+        var answer = shortAnswer.normalize(q.correctAnswer);
+        if (!answer) {
+            errors.push('Câu ' + qNum + ': Đáp án trả lời ngắn không hợp lệ hoặc để trống');
+            return null;
+        }
+        return {
+            type: 'shortanswer',
+            question: String(q.question).trim(),
+            options: [],
+            correct: 0,
+            correctList: null,
+            correctTF: null,
+            correctAnswer: answer,
+            image: q.image || null,
+            points: normalizePoints(q.points)
+        };
+    }
+
     if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
         errors.push('Câu ' + qNum + ': Thiếu hoặc không đủ đáp án (cần ít nhất 2)');
         return null;
     }
-
-    var type = q.type || 'single';
 
     if (type === 'single') {
         if (typeof q.correct !== 'number' || q.correct < 0 || q.correct >= q.options.length) {

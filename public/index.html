@@ -942,6 +942,42 @@
         }
         .multi-check-btn.visible { display: inline-block; }
 
+        /* Câu hỏi trả lời ngắn */
+        .short-answer { margin-top: 4px; }
+        .short-answer-label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        .short-answer-input {
+            width: 100%;
+            max-width: 360px;
+            padding: 13px 16px;
+            border: 2px solid #d9dbe8;
+            border-radius: 12px;
+            font-size: 1.1em;
+            line-height: 1.4;
+            color: #222;
+            background: #fafafa;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        .short-answer-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+        .short-answer.answered .short-answer-input { border-color: #28a745; background: #fff; }
+        .short-answer.invalid .short-answer-input { border-color: #dc3545; background: #fff5f5; }
+        .short-answer-hint { margin-top: 6px; font-size: 0.82em; color: #888; }
+        .short-answer-status { margin-top: 4px; font-size: 0.85em; color: #777; min-height: 1.2em; }
+        .short-answer.answered .short-answer-status { color: #2e7d32; font-weight: 600; }
+        .short-answer.invalid .short-answer-status { color: #c62828; font-weight: 600; }
+        .type-badge.type-sa { background: #e8eaf6; color: #283593; }
+
         /* TF practice feedback */
         .tf-row.tf-practice-correct .tf-btn.selected {
             background: #28a745 !important;
@@ -1551,6 +1587,12 @@
             
             .result-score {
                 font-size: 4em;
+            }
+
+            .short-answer-input {
+                max-width: none;
+                min-height: 48px;
+                font-size: 16px;
             }
         }
         
@@ -3259,6 +3301,8 @@
                     inner += '<span class="type-badge type-multi">Nhiều đáp án</span>';
                 } else if (type === 'truefalse') {
                     inner += '<span class="type-badge type-tf">Đúng/Sai</span>';
+                } else if (type === 'shortanswer') {
+                    inner += '<span class="type-badge type-sa">Trả lời ngắn</span>';
                 }
                 inner += '</div>';
                 inner += '<div class="question-text">' + renderContent(q.question) + '</div>';
@@ -3270,6 +3314,8 @@
                     inner += renderMultiOptions(idx, q);
                 } else if (type === 'truefalse') {
                     inner += renderTrueFalseOptions(idx, q);
+                } else if (type === 'shortanswer') {
+                    inner += renderShortAnswerOptions(idx, q);
                 } else {
                     inner += renderSingleOptions(idx, q);
                 }
@@ -3340,6 +3386,82 @@
             }
             html += '</div>';
             return html;
+        }
+
+        // Chuẩn hóa đáp án trả lời ngắn: trả về chuỗi số chuẩn hoặc null nếu sai.
+        function normalizeShortAnswerInput(value) {
+            var s = String(value == null ? '' : value).trim();
+            if (!s || s.length > 50) return null;
+            s = s.replace(',', '.');
+            var m = /^([+-]?)(\d*)(?:\.(\d*))?$/.exec(s);
+            if (!m) return null;
+            var intPart = m[2] || '';
+            var frac = m[3] || '';
+            if (!intPart && !frac) return null;
+            intPart = intPart.replace(/^0+/, '') || '0';
+            frac = frac.replace(/0+$/, '');
+            var sign = (m[1] === '-' && !(intPart === '0' && frac === '')) ? '-' : '';
+            return sign + intPart + (frac ? '.' + frac : '');
+        }
+
+        function renderShortAnswerOptions(qIndex, q) {
+            var html = '<div class="short-answer" id="shortAnswerWrap' + qIndex + '">';
+            html += '<label class="short-answer-label" for="shortAns' + qIndex + '">Đáp án của bạn</label>';
+            html += '<input type="text" class="short-answer-input" id="shortAns' + qIndex + '"';
+            html += ' inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false"';
+            html += ' enterkeyhint="done" placeholder="Nhập đáp án..."';
+            html += ' aria-describedby="shortAnsHint' + qIndex + ' shortAnsStatus' + qIndex + '"';
+            html += ' oninput="onShortAnswerInput(' + qIndex + ', this)"';
+            html += ' onblur="onShortAnswerBlur(' + qIndex + ', this)"';
+            html += ' onfocus="onShortAnswerFocus(this)">';
+            html += '<div class="short-answer-hint" id="shortAnsHint' + qIndex + '">Nhập số nguyên hoặc số thập phân, ví dụ: -2,5 hoặc 2.5</div>';
+            html += '<div class="short-answer-status" id="shortAnsStatus' + qIndex + '" aria-live="polite">Chưa trả lời</div>';
+            html += '</div>';
+            return html;
+        }
+
+        function updateShortAnswerState(qIndex, raw) {
+            var wrap = document.getElementById('shortAnswerWrap' + qIndex);
+            var status = document.getElementById('shortAnsStatus' + qIndex);
+            var card = document.getElementById('question' + qIndex);
+            if (!wrap || !status || !card) return;
+            var trimmed = String(raw == null ? '' : raw).trim();
+            var valid = !!normalizeShortAnswerInput(trimmed);
+            wrap.classList.toggle('invalid', !!trimmed && !valid);
+            wrap.classList.toggle('answered', valid);
+            card.classList.toggle('answered', valid);
+            if (!trimmed) {
+                status.textContent = 'Chưa trả lời';
+            } else if (!valid) {
+                status.textContent = 'Đáp án không hợp lệ. Chỉ nhập số, tối đa một dấu thập phân.';
+            } else {
+                status.textContent = 'Đã trả lời';
+            }
+        }
+
+        var _shortAnswerSaveTimer = null;
+
+        function onShortAnswerInput(qIndex, el) {
+            // Giữ nguyên chuỗi người dùng nhập (không tự sửa), chỉ đánh dấu hợp lệ/không hợp lệ.
+            answers[qIndex] = el.value;
+            updateShortAnswerState(qIndex, el.value);
+            updateProgress();
+            clearTimeout(_shortAnswerSaveTimer);
+            _shortAnswerSaveTimer = setTimeout(saveExamProgress, 400);
+        }
+
+        function onShortAnswerBlur(qIndex, el) {
+            clearTimeout(_shortAnswerSaveTimer);
+            saveExamProgress();
+        }
+
+        function onShortAnswerFocus(el) {
+            // Tránh bàn phím ảo che ô nhập trên điện thoại.
+            setTimeout(function() {
+                if (document.activeElement === el && el.scrollIntoView) {
+                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
+            }, 300);
         }
 
         // Select option
@@ -3919,6 +4041,12 @@
                         }
                         if (allDone) card.classList.add('answered');
                     }
+                } else if (type === 'shortanswer') {
+                    var shortInput = document.getElementById('shortAns' + qIndex);
+                    if (shortInput) {
+                        shortInput.value = storedAnswer == null ? '' : String(storedAnswer);
+                        updateShortAnswerState(qIndex, shortInput.value);
+                    }
                 }
             }
             updateProgress();
@@ -4190,6 +4318,9 @@
                         if (_v[_j] === null) { _hasNull = true; break; }
                     }
                     if (_v.length > 0 && !_hasNull) answered++;
+                } else if (typeof _v === 'string' && questions[_k] && questions[_k].type === 'shortanswer') {
+                    // Chỉ tính là đã trả lời khi đáp án đúng định dạng số
+                    if (normalizeShortAnswerInput(_v)) answered++;
                 } else {
                     answered++;
                 }
@@ -4366,6 +4497,9 @@
                     }
                 } else if (type === 'truefalse') {
                     // truefalse không shuffle options, copy trực tiếp
+                    answersArray[originalQIndex] = answers[shuffledIndex];
+                } else if (type === 'shortanswer') {
+                    // Trả lời ngắn không shuffle options, gửi nguyên chuỗi đã nhập
                     answersArray[originalQIndex] = answers[shuffledIndex];
                 }
             }
