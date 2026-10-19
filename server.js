@@ -37,6 +37,7 @@ var ocrParse = require('./lib/ocr-parse');
 var underline = require('./lib/underline');
 // Chuan hoa dap an tra loi ngan (so nguyen/thap phan, khong sai so)
 var shortAnswer = require('./lib/short-answer');
+var answerTables = require('./lib/answer-tables');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -2990,9 +2991,13 @@ app.post('/api/import/preview',
 
         // 2) Phân tích file Word (nếu có)
         var parsePromise = Promise.resolve([]);
+        var answerTableReport = null;
         if (docxFile) {
             parsePromise = mammothToHtml(docxFile.buffer).then(function (result) {
-                return parseQuestionsFromHtml(result.value, { trackReview: true });
+                var parseOpts = { trackReview: true };
+                var questions = parseQuestionsFromHtml(result.value, parseOpts);
+                answerTableReport = parseOpts.answerTableReport || null;
+                return questions;
             });
         }
 
@@ -3019,6 +3024,7 @@ app.post('/api/import/preview',
                 count: questions.length,
                 needsReview: needsReview,
                 warnings: errors,
+                answerTables: answerTableReport,
                 imagePool: pool,
                 source: {
                     docx: docxFile ? docxFile.originalname : null,
@@ -3039,7 +3045,13 @@ app.post('/api/import/preview',
                         points: normalizePoints(q.points),
                         needsReview: !!q.needsReview,
                         reviewReasons: q.reviewReasons || [],
-                        answerDetected: detected
+                        answerDetected: detected,
+                        // Thong tin phan/cau de giao vien doi chieu bang dap an da ghep.
+                        importSection: q.importMeta ? q.importMeta.sectionLabel : null,
+                        importNumber: q.importMeta ? q.importMeta.number : null,
+                        answerSource: q.answerSource || null,
+                        answerTableNotes: q.answerTableNotes || null,
+                        answerWarnings: q.answerWarnings || null
                     };
                 })
             });
@@ -3879,6 +3891,11 @@ function buildQuestionObj(type, question, options, correctAnswer, correctList, c
 function parseQuestionsFromHtml(html, opts) {
     opts = opts || {};
     var parsedQuestions = [];
+
+    // Bang dap an o cuoi file: tach khoi HTML de khong thanh cau hoi, va
+    // giu lai cau truc bang de ghep dap an sau khi phan tich xong cau hoi.
+    var tableResult = answerTables.extract(html);
+    html = tableResult.cleanedHtml;
     var paragraphs = [];
 
     // Merge <pre> blocks into the preceding <p> so code stays attached to its question/option
@@ -3972,17 +3989,21 @@ function parseQuestionsFromHtml(html, opts) {
     var currentShortAnswer = '';
     // Loai cau mac dinh theo "Phần" dang mo (de 2025: Phần II = câu đúng/sai)
     var sectionType = null;
+    var sectionIndex = -1;
+    var currentSection = { key: null, label: '', index: -1 };
+    var currentQuestionNumber = null;
 
     // "Phần II. Câu trắc nghiệm đúng sai. ..." la TIÊU ĐỀ PHẦN, khong phai noi
     // dung cau hoi. Truoc day dong nay bi coi la "đoạn chưa nhận dạng được" =>
     // tao ly do "cần kiểm tra" gia cho cau dung ngay truoc no.
-    var SECTION_RE = /^\s*(?:Phần|PHẦN|Phan)\s+[IVX0-9]+\s*[\.:]/i;
+    var SECTION_RE = /^\s*(?:Phần|PHẦN|Phan)\s+[IVXLC0-9]+\s*(?:[\.:\-–—]|\s|$)/i;
     // Tieu de phan khong co "Phần": "CÁC CÂU HỎI TRẢ LỜI NGẮN", "TRẮC NGHIỆM TRẢ LỜI NGẮN"
     var SHORT_SECTION_RE = /^\s*(?:CÁC\s+)?(?:CÂU\s+HỎI\s+|TRẮC\s+NGHIỆM\s+)*TRẢ\s+LỜI\s+NGẮN\s*[\.:]?\s*$/i;
 
     function sectionTypeOf(text) {
         if (/trả\s+lời\s+ngắn/i.test(text)) return 'shortanswer';
         if (/trắc nghiệm\s+đúng\s*[-\/–—]?\s*sai/i.test(text)) return 'truefalse';
+        if (/^\s*PHẦN\s+[IVXLC0-9]+\s*[\.:\-–—]?\s*(?:CÂU\s+)?(?:HỎI\s+)?ĐÚNG\s*[-\/–—]?\s*SAI/i.test(text)) return 'truefalse';
         if (/trắc nghiệm\s+nhiều phương án/i.test(text)) return 'single';
         return null;
     }
@@ -4011,6 +4032,13 @@ function parseQuestionsFromHtml(html, opts) {
         if (!opts.trackReview && !enoughOptions) return;
 
         var obj = buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF, opts, currentShortAnswer);
+        obj.importMeta = {
+            sectionKey: currentSection.key,
+            sectionLabel: currentSection.label,
+            sectionIndex: currentSection.index,
+            sectionType: sectionType || currentType,
+            number: currentQuestionNumber
+        };
 
         if (opts.trackReview) {
             var reasons = currentReasons.slice();
@@ -4087,12 +4115,23 @@ function parseQuestionsFromHtml(html, opts) {
             currentType = 'single';
             sectionType = sectionTypeOf(plainText);
             if (sectionType) currentType = sectionType;
+
+            sectionIndex++;
+            var secMatch = plainText.match(/(?:Phần|PHAN|Phan)\s+([IVXLC]+|\d+)/i);
+            currentSection = {
+                key: secMatch ? answerTables.sectionKey(secMatch[1]) : null,
+                label: secMatch ? 'Phần ' + String(secMatch[1]).toUpperCase() : plainText.trim().slice(0, 40),
+                index: sectionIndex
+            };
+            currentQuestionNumber = null;
             continue;
         }
 
         var questionMatch = plainText.match(/^(Câu\s*\d+[\.:]\s*|\d+[\.:]\s*)(.*)/i);
         if (questionMatch) {
             pushCurrent();
+            var numMatch = questionMatch[1].match(/\d+/);
+            currentQuestionNumber = numMatch ? parseInt(numMatch[0], 10) : null;
             currentType = sectionType || 'single';
             correctAnswer = -1;
             correctList = [];
@@ -4160,6 +4199,15 @@ function parseQuestionsFromHtml(html, opts) {
     }
 
     pushCurrent();
+
+    // Ghep dap an tu bang cuoi file vao cau hoi da phan tich.
+    var tableReport = answerTables.apply(parsedQuestions, tableResult.tables);
+    if (opts) {
+        opts.answerTableReport = {
+            tables: tableReport.tables,
+            warnings: tableResult.warnings.concat(tableReport.warnings)
+        };
+    }
 
     return parsedQuestions;
 }

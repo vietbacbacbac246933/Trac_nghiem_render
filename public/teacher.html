@@ -4048,6 +4048,23 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 }
             }
 
+            const at = result.answerTables;
+            if (at && Array.isArray(at.tables) && at.tables.length) {
+                const lines = at.tables.map(t => {
+                    const n = (t.entries != null) ? ` — ghép ${t.applied}/${t.entries} đáp án` : '';
+                    return `<div>• <b>${escapeHtml(t.title || 'Bảng đáp án')}</b>${t.typeLabel ? ' (' + escapeHtml(t.typeLabel) + ')' : ''}${n}</div>`;
+                }).join('');
+                html += `<div style="margin-top:8px; background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px; padding:8px 12px; color:#1b5e20; font-size:0.88em;">
+                    📋 Đã đọc ${at.tables.length} bảng đáp án ở cuối file. Hãy kiểm tra lại từng câu bên dưới.
+                    ${lines}
+                </div>`;
+            }
+            if (at && Array.isArray(at.warnings) && at.warnings.length) {
+                html += `<div style="margin-top:6px; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:8px 12px; color:#8d6e00; font-size:0.88em;">
+                    ${at.warnings.map(w => '⚠ ' + escapeHtml(w)).join('<br>')}
+                </div>`;
+            }
+
             // Luôn tạo sẵn dòng cảnh báo (có id) để updateImportSummaryCounts cập nhật/ẩn được
             html += `<div id="importNeedsReviewLine" style="margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;${result.needsReview > 0 ? '' : 'display:none;'}">⚠ ${result.needsReview} câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).</div>`;
             if (result.warnings && result.warnings.length) {
@@ -4250,9 +4267,16 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     </div>`;
                 }
 
+                const sectionInfo = q.importSection
+                    ? `<span style="font-size:0.78em; color:#5c6bc0; background:#e8eaf6; border-radius:4px; padding:1px 7px;">${escapeHtml(q.importSection)}${q.importNumber != null ? ' · câu ' + q.importNumber : ''}</span>`
+                    : '';
+                const sourceInfo = q.answerSource === 'table'
+                    ? '<span style="font-size:0.76em; color:#2e7d32; background:#e8f5e9; border-radius:4px; padding:1px 7px;">đáp án từ bảng</span>'
+                    : '';
+
                 return `<div id="impCard${i}" style="border:1px solid #e0e0e0; border-radius:10px; padding:14px; margin-bottom:14px; background:${q.needsReview ? '#fffdf7' : '#fff'};">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
-                        <div style="font-weight:600; color:#333;">Câu ${i + 1} <span id="impBadge${i}">${importBadgeHtml(q)}</span></div>
+                        <div style="font-weight:600; color:#333; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">Câu ${i + 1} <span id="impBadge${i}">${importBadgeHtml(q)}</span> ${sectionInfo} ${sourceInfo}</div>
                         <div style="display:flex; align-items:center; gap:10px;">
                             <select data-role="qtype" data-qi="${i}" onchange="onImportTypeChange(this)" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:0.88em;">
                                 <option value="single" ${q.type === 'single' ? 'selected' : ''}>Một đáp án</option>
@@ -4274,6 +4298,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
                         <div id="impPreview${i}">${importRenderedPreviewHtml(q, pool)}</div>
                     </div>
                     <div id="impReasons${i}">${importReasonsHtml(q)}</div>
+                    ${(q.answerWarnings && q.answerWarnings.length)
+                        ? `<div style="margin-top:8px; color:#ad1457; font-size:0.85em;">${q.answerWarnings.map(r => '📋 ' + escapeHtml(r)).join('<br>')}</div>`
+                        : ''}
                 </div>`;
             }).join('');
             renderKatex(list);
