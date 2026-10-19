@@ -2082,10 +2082,11 @@ app.post('/api/exams/:examId/import-word', upload.single('file'), (req, res) => 
     
     mammothToHtml(req.file.buffer).then(function(data) {
             var html = data.value;
-            var parsedQuestions = parseQuestionsFromHtml(html);
+            var warnings = [];
+            var parsedQuestions = dropUnansweredShortAnswers(parseQuestionsFromHtml(html), warnings);
 
             if (parsedQuestions.length === 0) {
-                return res.json({ success: false, error: 'Không tìm thấy câu hỏi hợp lệ trong file' });
+                return res.json({ success: false, error: 'Không tìm thấy câu hỏi hợp lệ trong file', warnings: warnings });
             }
 
             // Đọc và cập nhật bài kiểm tra
@@ -2103,6 +2104,7 @@ app.post('/api/exams/:examId/import-word', upload.single('file'), (req, res) => 
             res.json({
                 success: true,
                 count: parsedQuestions.length,
+                warnings: warnings,
                 message: `Đã import ${parsedQuestions.length} câu hỏi vào bài "${examData.name}"`
             });
         }).catch(function(err) {
@@ -2758,7 +2760,7 @@ app.post('/api/preview-word', upload.single('file'), function(req, res) {
             if (!q.question || q.question.trim() === '') {
                 warnings.push({ index: i, msg: 'Câu ' + num + ': Thiếu nội dung câu hỏi' });
             }
-            if (!q.options || q.options.length < 2) {
+            if (type !== 'shortanswer' && (!q.options || q.options.length < 2)) {
                 warnings.push({ index: i, msg: 'Câu ' + num + ': Chỉ có ' + (q.options ? q.options.length : 0) + ' đáp án (cần ít nhất 2)' });
             }
             if (type === 'single' && (q.correct === undefined || q.correct < 0)) {
@@ -2772,6 +2774,9 @@ app.post('/api/preview-word', upload.single('file'), function(req, res) {
                 if (undecided > 0) {
                     warnings.push({ index: i, msg: 'Câu ' + num + ': ' + undecided + ' phát biểu chưa có (đúng)/(sai)/(Đ)/(S)' });
                 }
+            }
+            if (type === 'shortanswer' && !q.correctAnswer) {
+                warnings.push({ index: i, msg: 'Câu ' + num + ': Câu trả lời ngắn chưa có đáp án — cần nhập trước khi lưu' });
             }
         });
         // Preview: rút gọn options (bỏ base64 dài để giảm payload)
@@ -2808,20 +2813,20 @@ app.post('/api/import-word', upload.single('file'), async (req, res) => {
     mammothToHtml(req.file.buffer).then(function(result) {
         var html = result.value;
         console.log('[INFO] Mammoth HTML (200 chars): ' + html.substring(0, 200));
-        var parsedQuestions = parseQuestionsFromHtml(html);
+        var warnings = [];
+        var parsedQuestions = dropUnansweredShortAnswers(parseQuestionsFromHtml(html), warnings);
 
         if (parsedQuestions.length === 0) {
-            return res.json({ success: false, error: 'Không tìm thấy câu hỏi nào. Kiểm tra lại định dạng file.' });
+            return res.json({ success: false, error: 'Không tìm thấy câu hỏi nào. Kiểm tra lại định dạng file.', warnings: warnings });
         }
 
-        var warnings = [];
         parsedQuestions.forEach(function(q, i) {
             var num = i + 1;
             var type = q.type || 'single';
             if (!q.question || q.question.trim() === '') {
                 warnings.push('Câu ' + num + ': Thiếu nội dung câu hỏi');
             }
-            if (!q.options || q.options.length < 2) {
+            if (type !== 'shortanswer' && (!q.options || q.options.length < 2)) {
                 warnings.push('Câu ' + num + ': Chỉ có ' + (q.options ? q.options.length : 0) + ' đáp án (cần ít nhất 2)');
             }
             if (type === 'multi' && (!q.correctList || q.correctList.length < 2)) {
@@ -2910,7 +2915,7 @@ function placeholderQuestionFromImage(dataUri) {
 function normalizeEditedQuestion(raw, qNum) {
     if (!raw || typeof raw !== 'object') return { error: 'Câu ' + qNum + ': dữ liệu không hợp lệ' };
     var type = raw.type;
-    if (type !== 'single' && type !== 'multi' && type !== 'truefalse') {
+    if (type !== 'single' && type !== 'multi' && type !== 'truefalse' && type !== 'shortanswer') {
         return { error: 'Câu ' + qNum + ': loại câu hỏi không hợp lệ' };
     }
     var out = {
@@ -2920,6 +2925,7 @@ function normalizeEditedQuestion(raw, qNum) {
         correct: 0,
         correctList: null,
         correctTF: null,
+        correctAnswer: null,
         image: null,
         points: normalizePoints(raw.points)
     };
@@ -2930,10 +2936,13 @@ function normalizeEditedQuestion(raw, qNum) {
             ? raw.correctList.filter(function (v) { return typeof v === 'number'; })
             : [];
         out.correct = out.correctList.length ? out.correctList[0] : -1;
-    } else {
+    } else if (type === 'truefalse') {
         out.correctTF = Array.isArray(raw.correctTF)
             ? raw.correctTF.map(function (v) { return v === true ? true : (v === false ? false : null); })
             : [];
+    } else {
+        out.options = [];
+        out.correctAnswer = shortAnswer.normalize(raw.correctAnswer);
     }
     return { question: out };
 }
@@ -3026,6 +3035,7 @@ app.post('/api/import/preview',
                         correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
                         correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
                         correctTF: q.correctTF || null,
+                        correctAnswer: q.type === 'shortanswer' ? (q.correctAnswer || null) : null,
                         points: normalizePoints(q.points),
                         needsReview: !!q.needsReview,
                         reviewReasons: q.reviewReasons || [],
@@ -3398,6 +3408,30 @@ function sanitizeHtml(html) {
 }
 
 // ========== OMML -> LATEX CONVERTER ==========
+// Escape ky tu dac biet cua LaTeX trong phan van ban cua cong thuc.
+// Chu co dau (vi du "nghiem") phai nam trong \text{} de KaTeX hien dung dau.
+function ommlTextToLatex(text) {
+    var s = String(text == null ? '' : text);
+    if (!s) return '';
+    var hasNonAscii = /[^\x00-\x7F]/.test(s);
+    // Chu co dau (Latin mo rong / tieng Viet) phai vao \text{}; ky hieu Hy Lap
+    // va toan hoc (α, β, Δ, ±, ∑...) thi giu nguyen trong math mode.
+    var hasTextLetters = /[\u00C0-\u024F\u1E00-\u1EFF]/.test(s);
+    if (hasNonAscii && hasTextLetters) {
+        return '\\text{' + s.replace(/[\\{}%#$&_]/g, '\\$&') + '}';
+    }
+    return s
+        .replace(/\\/g, '\\backslash ')
+        .replace(/([{}%#$&_])/g, '\\$1')
+        .replace(/\^/g, '\\^{}')
+        .replace(/~/g, '\\~{}');
+}
+
+function ommlDelimiterToLatex(chr) {
+    var map = { '{': '\\{', '}': '\\}', '<': '\\langle', '>': '\\rangle' };
+    return map[chr] || chr;
+}
+
 function ommlNodeToLatex(node) {
     if (!node) return '';
     if (node.type === 'text') return node.text || '';
@@ -3415,7 +3449,9 @@ function ommlNodeToLatex(node) {
         case 'sSubSup': return latexChild('e') + '_{' + latexChild('sub') + '}^{' + latexChild('sup') + '}';
         case 'rad': {
             var pr = child('radPr');
-            var hide = pr && (pr.elements||[]).find(function(c){ return (c.name||'').replace('m:','') === 'degHide'; });
+            var hideEl = pr && (pr.elements||[]).find(function(c){ return (c.name||'').replace('m:','') === 'degHide'; });
+            var hideAttr = hideEl && hideEl.attributes ? (hideEl.attributes['m:val'] || hideEl.attributes.val) : '';
+            var hide = hideEl && hideAttr !== '0' && hideAttr !== 'false';
             var deg = latexChild('deg'); var e = latexChild('e');
             if (hide || !deg.trim()) return '\\sqrt{' + e + '}';
             return '\\sqrt[' + deg + ']{' + e + '}';
@@ -3424,7 +3460,11 @@ function ommlNodeToLatex(node) {
             var nPr = child('naryPr');
             var chrEl = nPr && (nPr.elements||[]).find(function(c){ return (c.name||'').replace('m:','') === 'chr'; });
             var chr = chrEl && chrEl.attributes && (chrEl.attributes['m:val'] || chrEl.attributes.val);
-            var symMap = {'\u222B':'\\int','\u222C':'\\iint','\u222D':'\\iiint','\u2211':'\\sum','\u220F':'\\prod','\u222E':'\\oint'};
+            var symMap = {
+                '\u222B': '\\int', '\u222C': '\\iint', '\u222D': '\\iiint',
+                '\u2211': '\\sum', '\u220F': '\\prod', '\u2210': '\\coprod',
+                '\u222E': '\\oint', '\u22C3': '\\bigcup', '\u22C2': '\\bigcap'
+            };
             var sym = symMap[chr] || '\\int';
             var sub2 = latexChild('sub'); var sup2 = latexChild('sup'); var e2 = latexChild('e');
             return sym + (sub2 ? '_{'+sub2+'}' : '') + (sup2 ? '^{'+sup2+'}' : '') + ' ' + e2;
@@ -3439,7 +3479,9 @@ function ommlNodeToLatex(node) {
             var inner = children.filter(function(c){ return (c.name||'').replace('m:','') === 'e'; })
                 .map(function(c){ return latex(c.elements||[]); }).join(', ');
             if (!beg && !end) return inner;
-            return '\\left' + beg + inner + '\\right' + end;
+            // \left/\right can '.' khi mot ben khong co dau ngoac.
+            return '\\left' + (beg ? ommlDelimiterToLatex(beg) : '.') +
+                inner + '\\right' + (end ? ommlDelimiterToLatex(end) : '.');
         }
         case 'limLow': return latexChild('e') + '_{' + latexChild('lim') + '}';
         case 'limUpp': return latexChild('e') + '^{' + latexChild('lim') + '}';
@@ -3468,8 +3510,9 @@ function ommlNodeToLatex(node) {
             var eqs = children.filter(function(c){ return (c.name||'').replace('m:','') === 'e'; });
             return '\\begin{aligned}' + eqs.map(function(c){ return latex(c.elements||[]); }).join(' \\\\ ') + '\\end{aligned}';
         }
-        case 'r': case 't': case 'e': case 'num': case 'den': case 'sup': case 'sub':
+        case 'r': case 'e': case 'num': case 'den': case 'sup': case 'sub':
         case 'deg': case 'lim': case 'fName': return latex(children);
+        case 't': return ommlTextToLatex(children.map(function(c){ return c.text || ''; }).join(''));
         case 'rPr': case 'fPr': case 'sSupPr': case 'sSubPr': case 'sSubSupPr':
         case 'radPr': case 'naryPr': case 'dPr': case 'mPr': case 'mrPr':
         case 'limLowPr': case 'limUppPr': case 'funcPr': case 'accPr':
@@ -3515,8 +3558,12 @@ function preprocessDocxMath(buffer) {
                 var ommlStr = xml.slice(startTag, pos);
                 var latexStr = ommlStringToLatex(ommlStr);
                 if (latexStr !== null) {
+                    // oMathPara = cong thuc doc lap; oMath = cong thuc noi dong.
+                    var wrapped = (tagName === 'm:oMathPara')
+                        ? '\\[' + latexStr + '\\]'
+                        : '\\(' + latexStr + '\\)';
                     var placeholder = 'MATHPLACEHOLDER' + counter + 'END';
-                    mathMap[placeholder] = latexStr;
+                    mathMap[placeholder] = wrapped;
                     result += '<w:r><w:t xml:space="preserve"> ' + placeholder + ' </w:t></w:r>';
                     counter++;
                 } else {
@@ -3554,7 +3601,10 @@ function mammothToHtml(buffer) {
         ).then(function(result) {
             var html = result.value;
             Object.keys(data.mathMap).forEach(function(placeholder) {
-                html = html.split(placeholder).join('\\(' + data.mathMap[placeholder] + '\\)');
+                // Escape HTML truoc khi chen: LaTeX co the chua "<", ">" hoac "&".
+                var latex = data.mathMap[placeholder]
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                html = html.split(placeholder).join(latex);
             });
             // Escape HTML inside <pre> so code is displayed as text, not rendered as HTML
             html = html.replace(/<pre>([\s\S]*?)<\/pre>/gi, function(match, inner) {
@@ -3780,20 +3830,26 @@ function splitInlineOptions(paraHtml) {
 
 function stripTypeTags(html) {
     return html.replace(/\[MULTI\]/gi, '')
+               .replace(/\[TRẢ LỜI NGẮN\]/gi, '')
+               .replace(/\[TRA LOI NGAN\]/gi, '')
+               .replace(/\[SHORT\]/gi, '')
                .replace(/\[ĐÚNG\/SAI\]/gi, '')
                .replace(/\[DUNGSAI\]/gi, '')
                .replace(/\[DUNG\/SAI\]/gi, '')
                .trim();
 }
 
-function buildQuestionObj(type, question, options, correctAnswer, correctList, correctTF, opts) {
+function buildQuestionObj(type, question, options, correctAnswer, correctList, correctTF, opts, correctAnswerText) {
     opts = opts || {};
     var answerDetected;
+    var shortAnswerText = type === 'shortanswer' ? shortAnswer.normalize(correctAnswerText) : null;
     if (type === 'multi') {
         answerDetected = !!(correctList && correctList.length > 0);
     } else if (type === 'truefalse') {
         answerDetected = !!(correctTF && correctTF.length > 0) &&
             correctTF.every(function (v) { return v === true || v === false; });
+    } else if (type === 'shortanswer') {
+        answerDetected = !!shortAnswerText;
     } else {
         answerDetected = correctAnswer >= 0;
     }
@@ -3801,10 +3857,11 @@ function buildQuestionObj(type, question, options, correctAnswer, correctList, c
     var obj = {
         type: type,
         question: sanitizeHtml(stripInlineFormatting(question)),
-        options: options.map(function(o) { return sanitizeHtml(stripInlineFormatting(o)); }),
+        options: type === 'shortanswer' ? [] : options.map(function(o) { return sanitizeHtml(stripInlineFormatting(o)); }),
         correct: correctAnswer >= 0 ? correctAnswer : 0,
         correctList: type === 'multi' ? correctList : null,
         correctTF: type === 'truefalse' ? correctTF : null,
+        correctAnswer: shortAnswerText,
         image: null
     };
 
@@ -3912,6 +3969,7 @@ function parseQuestionsFromHtml(html, opts) {
     var correctTF = [];
     var tfMarkerSeen = false;
     var currentReasons = [];
+    var currentShortAnswer = '';
     // Loai cau mac dinh theo "Phần" dang mo (de 2025: Phần II = câu đúng/sai)
     var sectionType = null;
 
@@ -3919,8 +3977,11 @@ function parseQuestionsFromHtml(html, opts) {
     // dung cau hoi. Truoc day dong nay bi coi la "đoạn chưa nhận dạng được" =>
     // tao ly do "cần kiểm tra" gia cho cau dung ngay truoc no.
     var SECTION_RE = /^\s*(?:Phần|PHẦN|Phan)\s+[IVX0-9]+\s*[\.:]/i;
+    // Tieu de phan khong co "Phần": "CÁC CÂU HỎI TRẢ LỜI NGẮN", "TRẮC NGHIỆM TRẢ LỜI NGẮN"
+    var SHORT_SECTION_RE = /^\s*(?:CÁC\s+)?(?:CÂU\s+HỎI\s+|TRẮC\s+NGHIỆM\s+)*TRẢ\s+LỜI\s+NGẮN\s*[\.:]?\s*$/i;
 
     function sectionTypeOf(text) {
+        if (/trả\s+lời\s+ngắn/i.test(text)) return 'shortanswer';
         if (/trắc nghiệm\s+đúng\s*[-\/–—]?\s*sai/i.test(text)) return 'truefalse';
         if (/trắc nghiệm\s+nhiều phương án/i.test(text)) return 'single';
         return null;
@@ -3945,10 +4006,11 @@ function parseQuestionsFromHtml(html, opts) {
             }
         }
 
-        var enoughOptions = currentOptions.length >= 2;
+        var isShortAnswer = currentType === 'shortanswer';
+        var enoughOptions = isShortAnswer || currentOptions.length >= 2;
         if (!opts.trackReview && !enoughOptions) return;
 
-        var obj = buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF, opts);
+        var obj = buildQuestionObj(currentType, currentQuestion, currentOptions, correctAnswer, correctList, correctTF, opts, currentShortAnswer);
 
         if (opts.trackReview) {
             var reasons = currentReasons.slice();
@@ -3959,10 +4021,12 @@ function parseQuestionsFromHtml(html, opts) {
             } else if (qPlain === '') {
                 reasons.push('Thiếu nội dung câu hỏi.');
             }
-            if (!enoughOptions) {
+            if (!isShortAnswer && !enoughOptions) {
                 reasons.push('Chỉ có ' + currentOptions.length + ' đáp án (cần ít nhất 2).');
             }
-            if (!obj.answerDetected) {
+            if (isShortAnswer) {
+                if (!obj.correctAnswer) reasons.push('Chưa có đáp án trả lời ngắn — giáo viên cần nhập.');
+            } else if (!obj.answerDetected) {
                 reasons.push('Chưa xác định được đáp án đúng — giáo viên cần chọn.');
             }
             obj.reviewReasons = reasons;
@@ -4006,8 +4070,11 @@ function parseQuestionsFromHtml(html, opts) {
         var paraHtml = paragraphs[i];
         var plainText = stripHtmlTags(paraHtml);
 
+        // Dong ket thuc de thi, khong phai noi dung cau hoi
+        if (/^(?:[-–—]+\s*)?HẾT\s*[\.\!\:]?\s*(?:[-–—]+)?$/i.test(plainText.trim())) continue;
+
         // Tieu de phan -> chot cau dang dung, doi loai cau mac dinh cho phan sau
-        if (SECTION_RE.test(plainText)) {
+        if (SECTION_RE.test(plainText) || SHORT_SECTION_RE.test(plainText)) {
             pushCurrent();
             currentQuestion = null;
             currentOptions = [];
@@ -4016,6 +4083,7 @@ function parseQuestionsFromHtml(html, opts) {
             correctTF = [];
             tfMarkerSeen = false;
             currentReasons = [];
+            currentShortAnswer = '';
             currentType = 'single';
             sectionType = sectionTypeOf(plainText);
             if (sectionType) currentType = sectionType;
@@ -4032,9 +4100,12 @@ function parseQuestionsFromHtml(html, opts) {
             tfMarkerSeen = false;
             currentOptions = [];
             currentReasons = [];
+            currentShortAnswer = '';
 
             if (/\[MULTI\]/i.test(plainText)) {
                 currentType = 'multi';
+            } else if (/\[TRẢ LỜI NGẮN\]|\[TRA LOI NGAN\]|\[SHORT\]/i.test(plainText)) {
+                currentType = 'shortanswer';
             } else if (/\[ĐÚNG\/SAI\]|\[DUNGSAI\]|\[DUNG\/SAI\]/i.test(plainText)) {
                 currentType = 'truefalse';
             }
@@ -4042,6 +4113,23 @@ function parseQuestionsFromHtml(html, opts) {
             // Lấy inner HTML của câu hỏi, bỏ prefix "Câu N:" và type tags
             currentQuestion = stripQuestionPrefix(stripTypeTags(paraHtml)).trim();
             continue;
+        }
+
+        // Dap an cua cau tra loi ngan: "Đáp án: 3", "Đáp án đúng: 2,5", "Kết quả: 4"
+        if (currentType === 'shortanswer' && currentQuestion !== null) {
+            var ansMatch = plainText.match(/^\s*\(?\s*(?:Đáp\s*án(?:\s*đúng)?|ĐA|Kết\s*quả|Answer)\s*[:：]\s*(.+?)\s*\)?\s*$/i);
+            if (ansMatch) {
+                var detected = shortAnswer.normalize(ansMatch[1]);
+                if (detected) {
+                    currentShortAnswer = detected;
+                } else {
+                    currentShortAnswer = '';
+                    if (opts.trackReview) {
+                        currentReasons.push('Đáp án trong file không hợp lệ: "' + String(ansMatch[1]).slice(0, 40) + '" — giáo viên cần nhập lại.');
+                    }
+                }
+                continue;
+            }
         }
 
         var optionMatch = plainText.match(/^([A-Za-z])[\.\)]\s*(.*)/);
@@ -4074,6 +4162,18 @@ function parseQuestionsFromHtml(html, opts) {
     pushCurrent();
 
     return parsedQuestions;
+}
+
+// Câu trả lời ngắn do file Word không kèm đáp án thì KHÔNG lưu thẳng:
+// giáo viên phải nhập đáp án ở bước xem trước (tránh câu chấm sai âm thầm).
+function dropUnansweredShortAnswers(list, warnings) {
+    return list.filter(function (q, i) {
+        if ((q.type || 'single') === 'shortanswer' && !q.correctAnswer) {
+            if (warnings) warnings.push('Câu ' + (i + 1) + ': Câu trả lời ngắn chưa có đáp án — đã bỏ qua (dùng "Nhập Word/Ảnh" để nhập đáp án trước khi lưu).');
+            return false;
+        }
+        return true;
+    });
 }
 
 // ========== VALIDATE CÂU HỎI (dùng chung) ==========

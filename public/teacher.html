@@ -4112,7 +4112,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             else if (!plain && hasImg) reasons.push('Câu hỏi chỉ có hình ảnh — cần bổ sung nội dung chữ.');
 
             const opts = q.options || [];
-            if (opts.length < 2) reasons.push('Chỉ có ' + opts.length + ' đáp án (cần ít nhất 2).');
+            const isShort = q.type === 'shortanswer';
+            if (!isShort && opts.length < 2) reasons.push('Chỉ có ' + opts.length + ' đáp án (cần ít nhất 2).');
 
             if (q.type === 'single') {
                 if (!(typeof q.correct === 'number' && q.correct >= 0 && q.correct < opts.length)) {
@@ -4125,6 +4126,10 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 let undecided = 0;
                 for (let k = 0; k < opts.length; k++) { if (tf[k] !== true && tf[k] !== false) undecided++; }
                 if (undecided > 0) reasons.push('Còn ' + undecided + ' phát biểu chưa chọn Đúng/Sai.');
+            } else if (isShort) {
+                if (!normalizeShortAnswerInput(q.correctAnswer)) {
+                    reasons.push('Chưa có đáp án trả lời ngắn — nhập đáp án đúng.');
+                }
             }
 
             q.reviewReasons = reasons;
@@ -4165,6 +4170,21 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
+        function importRenderedPreviewHtml(q, pool) {
+            const parts = [imgTokenToThumb(q.question || '', pool)];
+            (q.options || []).forEach((o, oi) => {
+                parts.push(`<div style="margin-top:4px;"><b>${String.fromCharCode(65 + oi)}.</b> ${imgTokenToThumb(o, pool)}</div>`);
+            });
+            return parts.join('');
+        }
+
+        function refreshImportRenderedPreview(i) {
+            const box = document.getElementById('impPreview' + i);
+            if (!box || !_importPreview) return;
+            box.innerHTML = importRenderedPreviewHtml(_importPreview.questions[i], _importPreview.imagePool || {});
+            renderKatex(box);
+        }
+
         function renderImportPreviewList() {
             const data = _importPreview;
             const list = document.getElementById('importPreviewList');
@@ -4185,30 +4205,50 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
             list.innerHTML = visible.map(({ q, i }) => {
                 const qThumb = imgTokenToThumb(q.question, pool);
+                const isShort = q.type === 'shortanswer';
 
-                const optionsHtml = (q.options || []).map((o, oi) => {
-                    const letter = String.fromCharCode(65 + oi);
-                    let control = '';
-                    if (q.type === 'single') {
-                        control = `<input type="radio" name="imp_correct_${i}" data-role="correct-single" data-qi="${i}" data-oi="${oi}" ${q.correct === oi ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
-                    } else if (q.type === 'multi') {
-                        const on = Array.isArray(q.correctList) && q.correctList.indexOf(oi) >= 0;
-                        control = `<input type="checkbox" data-role="correct-multi" data-qi="${i}" data-oi="${oi}" ${on ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
-                    } else {
-                        const tf = Array.isArray(q.correctTF) ? q.correctTF : [];
-                        const v = tf[oi];
-                        control = `<select data-role="tf" data-qi="${i}" data-oi="${oi}" onchange="onImportAnswerChange(this)" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:0.85em;">
-                            <option value="" ${(v !== true && v !== false) ? 'selected' : ''}>--</option>
-                            <option value="true" ${v === true ? 'selected' : ''}>Đúng</option>
-                            <option value="false" ${v === false ? 'selected' : ''}>Sai</option>
-                        </select>`;
-                    }
-                    return `<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">
-                        <div style="min-width:86px; padding-top:7px; font-size:0.9em;">${control} <b>${letter}.</b></div>
-                        <textarea data-role="otext" data-qi="${i}" data-oi="${oi}" oninput="onImportOptionInput(this)" style="flex:1; min-height:38px; padding:6px 8px; border:1px solid #ddd; border-radius:6px; font-size:0.9em; box-sizing:border-box; font-family:inherit;">${o}</textarea>
-                        <button type="button" onclick="removeImportOption(${i}, ${oi})" title="Xóa đáp án" style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:7px 10px;cursor:pointer;">✕</button>
+                let optionsHtml = '';
+                if (isShort) {
+                    const hasAns = !!normalizeShortAnswerInput(q.correctAnswer);
+                    optionsHtml = `<div style="margin-top:10px;">
+                        <label style="display:block;font-size:0.86em;color:#666;margin-bottom:6px;">Đáp án đúng:</label>
+                        <input type="text" inputmode="decimal" autocomplete="off" value="${escapeHtml(q.correctAnswer || '')}"
+                            data-role="short-answer" data-qi="${i}" oninput="onImportShortAnswerInput(this)"
+                            placeholder="Ví dụ: -2,5 hoặc 2.5"
+                            style="width:100%;max-width:320px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.92em;box-sizing:border-box;">
+                        <div id="impShortStatus${i}" style="margin-top:6px;font-size:0.85em;color:${hasAns ? '#2e7d32' : '#e65100'};">
+                            ${hasAns ? 'Đã có đáp án' : 'Chưa có đáp án — cần nhập trước khi lưu'}
+                        </div>
                     </div>`;
-                }).join('');
+                } else {
+                    optionsHtml = `<div style="margin-top:10px;">
+                        <div style="font-size:0.86em; color:#666; margin-bottom:6px;">Đáp án (chọn đáp án đúng):</div>
+                        ${(q.options || []).map((o, oi) => {
+                            const letter = String.fromCharCode(65 + oi);
+                            let control = '';
+                            if (q.type === 'single') {
+                                control = `<input type="radio" name="imp_correct_${i}" data-role="correct-single" data-qi="${i}" data-oi="${oi}" ${q.correct === oi ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
+                            } else if (q.type === 'multi') {
+                                const on = Array.isArray(q.correctList) && q.correctList.indexOf(oi) >= 0;
+                                control = `<input type="checkbox" data-role="correct-multi" data-qi="${i}" data-oi="${oi}" ${on ? 'checked' : ''} onchange="onImportAnswerChange(this)">`;
+                            } else {
+                                const tf = Array.isArray(q.correctTF) ? q.correctTF : [];
+                                const v = tf[oi];
+                                control = `<select data-role="tf" data-qi="${i}" data-oi="${oi}" onchange="onImportAnswerChange(this)" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:0.85em;">
+                                    <option value="" ${(v !== true && v !== false) ? 'selected' : ''}>--</option>
+                                    <option value="true" ${v === true ? 'selected' : ''}>Đúng</option>
+                                    <option value="false" ${v === false ? 'selected' : ''}>Sai</option>
+                                </select>`;
+                            }
+                            return `<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">
+                                <div style="min-width:86px; padding-top:7px; font-size:0.9em;">${control} <b>${letter}.</b></div>
+                                <textarea data-role="otext" data-qi="${i}" data-oi="${oi}" oninput="onImportOptionInput(this)" style="flex:1; min-height:38px; padding:6px 8px; border:1px solid #ddd; border-radius:6px; font-size:0.9em; box-sizing:border-box; font-family:inherit;">${o}</textarea>
+                                <button type="button" onclick="removeImportOption(${i}, ${oi})" title="Xóa đáp án" style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:7px 10px;cursor:pointer;">✕</button>
+                            </div>`;
+                        }).join('')}
+                        <button type="button" onclick="addImportOption(${i})" style="background:#eef; color:#444; border:1px solid #ccd; border-radius:6px; padding:5px 12px; cursor:pointer; font-size:0.85em;">+ Thêm đáp án</button>
+                    </div>`;
+                }
 
                 return `<div id="impCard${i}" style="border:1px solid #e0e0e0; border-radius:10px; padding:14px; margin-bottom:14px; background:${q.needsReview ? '#fffdf7' : '#fff'};">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
@@ -4218,6 +4258,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                                 <option value="single" ${q.type === 'single' ? 'selected' : ''}>Một đáp án</option>
                                 <option value="multi" ${q.type === 'multi' ? 'selected' : ''}>Nhiều đáp án</option>
                                 <option value="truefalse" ${q.type === 'truefalse' ? 'selected' : ''}>Đúng/Sai</option>
+                                <option value="shortanswer" ${q.type === 'shortanswer' ? 'selected' : ''}>Trả lời ngắn</option>
                             </select>
                             <label style="font-size:0.86em; color:#555; white-space:nowrap;">Điểm
                                 <input type="number" min="1" max="100" step="0.5" value="${(Number(q.points) > 0) ? q.points : 1}" data-role="points" data-qi="${i}" onchange="onImportPointsChange(this)" style="width:66px; padding:4px 6px; border:1px solid #ddd; border-radius:6px; font-size:0.88em;">
@@ -4227,22 +4268,26 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     </div>
                     <textarea data-role="qtext" data-qi="${i}" oninput="onImportQuestionInput(this)" style="width:100%; min-height:52px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.92em; box-sizing:border-box; font-family:inherit;">${q.question || ''}</textarea>
                     ${qThumb ? `<div style="margin-top:8px;">${qThumb}</div>` : ''}
-                    <div style="margin-top:10px;">
-                        <div style="font-size:0.86em; color:#666; margin-bottom:6px;">Đáp án (chọn đáp án đúng):</div>
-                        ${optionsHtml}
-                        <button type="button" onclick="addImportOption(${i})" style="background:#eef; color:#444; border:1px solid #ccd; border-radius:6px; padding:5px 12px; cursor:pointer; font-size:0.85em;">+ Thêm đáp án</button>
+                    ${optionsHtml}
+                    <div style="margin-top:10px; padding:8px 10px; background:#fafafa; border-left:3px solid #90a4ae; border-radius:6px; font-size:0.92em;">
+                        <div style="font-size:0.78em; color:#777; margin-bottom:4px;">Xem trước</div>
+                        <div id="impPreview${i}">${importRenderedPreviewHtml(q, pool)}</div>
                     </div>
                     <div id="impReasons${i}">${importReasonsHtml(q)}</div>
                 </div>`;
             }).join('');
+            renderKatex(list);
         }
 
         function onImportQuestionInput(el) {
-            _importPreview.questions[+el.getAttribute('data-qi')].question = el.value;
+            const i = +el.getAttribute('data-qi');
+            _importPreview.questions[i].question = el.value;
+            refreshImportRenderedPreview(i);
         }
         function onImportOptionInput(el) {
             const i = +el.getAttribute('data-qi'), oi = +el.getAttribute('data-oi');
             _importPreview.questions[i].options[oi] = el.value;
+            refreshImportRenderedPreview(i);
         }
         function onImportIncludeChange(el) {
             _importPreview.questions[+el.getAttribute('data-qi')].include = el.checked;
@@ -4284,9 +4329,23 @@ C. Công thức nước là H₂O. (Đ)</pre>
             q.correct = null;
             q.correctList = [];
             q.correctTF = (q.options || []).map(() => null);
+            if (q.type === 'shortanswer') q.correctAnswer = normalizeShortAnswerInput(q.correctAnswer);
             computeImportReview(q);
             renderImportPreviewList();
             updateImportSummaryCounts();
+        }
+
+        function onImportShortAnswerInput(el) {
+            const i = +el.getAttribute('data-qi');
+            const q = _importPreview.questions[i];
+            q.correctAnswer = normalizeShortAnswerInput(el.value);
+            const status = document.getElementById('impShortStatus' + i);
+            if (status) {
+                const ok = !!q.correctAnswer;
+                status.textContent = ok ? 'Đã có đáp án' : 'Chưa có đáp án — cần nhập trước khi lưu';
+                status.style.color = ok ? '#2e7d32' : '#e65100';
+            }
+            refreshImportCardStatus(i);
         }
 
         function addImportOption(i) {
@@ -4362,6 +4421,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                             correct: q.correct,
                             correctList: q.correctList,
                             correctTF: q.correctTF,
+                            correctAnswer: q.correctAnswer,
                             points: (Number(q.points) > 0) ? Number(q.points) : 1
                         }))
                     })

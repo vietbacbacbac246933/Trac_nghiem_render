@@ -8,6 +8,7 @@
     "test:import": "node tests/test-import-docx.js",
     "test:ocr": "node tests/test-ocr-import.js",
     "test:shortanswer": "node tests/test-shortanswer.js",
+    "test:import-shortanswer": "node tests/test-import-shortanswer.js",
     "build": "node build-scripts/build.js",
     "admin": "node license/admin-tool.js",
     "generate-license": "node license/admin-tool.js generate"
