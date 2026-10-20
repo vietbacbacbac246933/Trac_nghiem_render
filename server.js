@@ -3761,6 +3761,7 @@ app.post('/api/import/preview',
                 needsReview: needsReview,
                 warnings: errors,
                 answerTables: answerTableReport,
+                completeness: completeness,
                 imagePool: pool,
                 source: {
                     docx: docxFile ? docxFile.originalname : null,
@@ -3819,10 +3820,11 @@ app.post('/api/import/confirm', function (req, res) {
 
     var saved = [];
     var skipped = [];
+    var excluded = 0;
 
     incoming.forEach(function (raw, i) {
         var num = i + 1;
-        if (raw && raw.include === false) return;
+        if (raw && raw.include === false) { excluded++; return; }
 
         var norm = normalizeEditedQuestion(raw, num);
         if (norm.error) { skipped.push({ index: i, reason: norm.error }); return; }
@@ -3861,15 +3863,30 @@ app.post('/api/import/confirm', function (req, res) {
 
     var destination = (body.destination === 'current') ? 'current' : 'new';
 
+    // Đối chiếu số câu nhận được với số câu thực sự lưu + bỏ qua (kèm lý do).
+    var saveCounts = {
+        received: incoming.length,
+        savedCount: saved.length,
+        skippedCount: skipped.length,
+        excludedCount: excluded,
+        complete: false
+    };
+    saveCounts.complete = (saveCounts.received ===
+        saveCounts.savedCount + saveCounts.skippedCount + saveCounts.excludedCount);
+    if (!saveCounts.complete) {
+        console.warn('[IMPORT] Số câu nhận được (' + saveCounts.received + ') khác số câu đã xử lý (' +
+            (saveCounts.savedCount + saveCounts.skippedCount + saveCounts.excludedCount) + ').');
+    }
+
     if (destination === 'current') {
         questions = questions.concat(saved);
         saveQuestions();
         io.emit('questionsUpdated', questions.length);
         importSessions.remove(body.sessionId);
-        return res.json({
+        return res.json(Object.assign({
             success: true, destination: 'current',
             saved: saved.length, skipped: skipped, total: questions.length
-        });
+        }, saveCounts));
     }
 
     var name = String(body.examName == null ? '' : body.examName).replace(/[<>]/g, '').trim();
@@ -3887,11 +3904,11 @@ app.post('/api/import/confirm', function (req, res) {
     DATA.writeJson(path.join(__dirname, 'data', 'exams', newExamId + '.json'), examData);
     importSessions.remove(body.sessionId);
 
-    res.json({
+    res.json(Object.assign({
         success: true, destination: 'new',
         examId: newExamId, examName: examData.name,
         saved: saved.length, skipped: skipped, total: saved.length
-    });
+    }, saveCounts));
 });
 
 // ===========================================================================

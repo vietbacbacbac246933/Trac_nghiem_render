@@ -15,7 +15,7 @@
 
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-const { Document, Packer, Paragraph, TextRun } = require(path.join(ROOT, 'node_modules', 'docx'));
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun } = require(path.join(ROOT, 'node_modules', 'docx'));
 
 const BASE = process.env.TEST_BASE || 'http://127.0.0.1:3999';
 const PASSWORD = process.env.TEST_PASSWORD || 'test123';
@@ -187,6 +187,76 @@ async function confirm(cookie, payload) {
 async function getExams(cookie) {
     const res = await fetch(BASE + '/api/exams', { headers: { Cookie: cookie } });
     return res.json();
+}
+
+// .docx co cau hoi nam trong Heading (Mammoth -> <h1>..<h6>) — dung kieu file
+// "Sử-Trắc nghiệm.docx" tung lam mat 33/120 cau khi parser chi doc <p>.
+async function buildHeadingDocx(total) {
+    const children = [];
+    for (let n = 1; n <= total; n++) {
+        const level = n % 9 === 0 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
+        const title = `Câu ${n}: Nội dung câu hỏi số ${n}?`;
+        children.push(n % 3 === 0 ? new Paragraph({ text: title, heading: level }) : new Paragraph(title));
+        for (let k = 0; k < 4; k++) {
+            const letter = 'ABCD'[k];
+            const star = (k === n % 4) ? ' *' : '';
+            children.push(new Paragraph(`${letter}. Phương án ${letter} của câu ${n}${star}`));
+        }
+    }
+    return Packer.toBuffer(new Document({ sections: [{ children }] }));
+}
+
+// Cac truong hop bien: nhieu doan van, khoang trang, thieu/trung so thu tu,
+// anh nhung, cau tra loi ngan, cau rong.
+async function buildEdgeCaseDocx() {
+    const children = [
+        new Paragraph({ text: 'Câu 1: Câu hỏi trải trên', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph('nhiều đoạn văn (phần tiếp theo).'),
+        new Paragraph('A. Một'),
+        new Paragraph('B. Hai *'),
+        new Paragraph('C. Ba'),
+        new Paragraph('D. Bốn'),
+        new Paragraph('   '),
+
+        new Paragraph({ text: 'Câu 2:   Câu có khoảng trắng lớn   và bị ngắt trang.   ', heading: HeadingLevel.HEADING_3 }),
+        new Paragraph('A. Một'),
+        new Paragraph('B. Hai'),
+        new Paragraph('C. Ba *'),
+        new Paragraph('D. Bốn'),
+
+        // Số 3 bị thiếu, số 4 bị trùng
+        new Paragraph({ text: 'Câu 4: Câu trùng số thứ tự lần một?', heading: HeadingLevel.HEADING_2 }),
+        new Paragraph('A. Một'),
+        new Paragraph('B. Hai *'),
+        new Paragraph('C. Ba'),
+        new Paragraph('D. Bốn'),
+
+        new Paragraph({ text: 'Câu 4: Câu trùng số thứ tự lần hai?', heading: HeadingLevel.HEADING_3 }),
+        new Paragraph('A. Một *'),
+        new Paragraph('B. Hai'),
+        new Paragraph('C. Ba'),
+        new Paragraph('D. Bốn'),
+
+        new Paragraph({
+            children: [
+                new TextRun('Câu 6: Hình minh họa: '),
+                new ImageRun({ type: 'png', data: PNG_1x1, transformation: { width: 10, height: 10 } })
+            ]
+        }),
+        new Paragraph('A. Một'),
+        new Paragraph('B. Hai'),
+        new Paragraph('C. Ba *'),
+        new Paragraph('D. Bốn'),
+
+        new Paragraph('HẾT'),
+        new Paragraph({ text: 'Phần III. Trắc nghiệm trả lời ngắn', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph('Câu 7: Số cần điền là bao nhiêu?'),
+        new Paragraph('Đáp án: 42'),
+        new Paragraph({ text: 'Câu 8:', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph('A. Một'),
+        new Paragraph('B. Hai')
+    ];
+    return Packer.toBuffer(new Document({ sections: [{ children }] }));
 }
 
 const createdExams = [];
@@ -514,7 +584,102 @@ const createdExams = [];
     }
 
     // ------------------------------------------------------------------
-    console.log('\n=== 14. Dọn dẹp: xoá các bài test đã tạo ===');
+    console.log('\n=== 14. Word: câu hỏi nằm trong Heading 1/2 + đánh số 1..120 ===');
+    // File thật "Sử-Trắc nghiệm.docx" đặt nhiều câu trong Heading 1. Parser cũ
+    // chỉ đọc <p> nên bỏ qua đúng 33 câu (3, 8-10, 12, ... 119).
+    const headingDocx = await buildHeadingDocx(120);
+    const ph = await preview(cookie, [{
+        name: 'de-heading-120.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: headingDocx
+    }]);
+    check('đề Heading -> preview success', ph.json && ph.json.success === true, JSON.stringify(ph.json).slice(0, 200));
+    check('nhận diện đủ 120 câu (không mất câu trong heading)',
+        ph.json && ph.json.count === 120, 'count=' + (ph.json && ph.json.count));
+
+    const hq = (ph.json && ph.json.questions) || [];
+    check('đủ và đúng thứ tự số câu 1..120',
+        hq.length === 120 && hq.every((q, i) => q.importNumber === i + 1),
+        JSON.stringify(hq.map(q => q.importNumber).filter((n, i) => n !== i + 1)));
+
+    const hc = (ph.json && ph.json.completeness) || {};
+    check('completeness: detected = 120', hc.detected === 120, 'detected=' + hc.detected);
+    check('completeness: không thiếu số thứ tự', (hc.missingNumbers || []).length === 0, JSON.stringify(hc.missingNumbers));
+    check('completeness: không trùng số thứ tự', (hc.duplicateNumbers || []).length === 0, JSON.stringify(hc.duplicateNumbers));
+    check('completeness: không câu rỗng', (hc.emptyQuestions || []).length === 0, JSON.stringify(hc.emptyQuestions));
+    check('completeness: không câu thiếu phương án', (hc.missingOptions || []).length === 0, JSON.stringify(hc.missingOptions));
+
+    check('câu 3 (heading): bỏ tiền tố "Câu 3:"',
+        hq[2] && !/^Câu\s*\d/i.test(String(hq[2].question)), JSON.stringify(hq[2] && hq[2].question));
+    check('câu 3 (heading): có 4 phương án + đáp án D',
+        hq[2] && hq[2].options.length === 4 && hq[2].correct === 3,
+        JSON.stringify(hq[2] && { opts: hq[2].options.length, correct: hq[2].correct }));
+    check('câu 100 đánh số 3 chữ số vẫn nhận đúng',
+        hq[99] && hq[99].importNumber === 100 && /Nội dung câu hỏi số 100/.test(hq[99].question),
+        JSON.stringify(hq[99] && hq[99].question));
+
+    const hcSave = await confirm(cookie, {
+        sessionId: ph.json.sessionId,
+        destination: 'new',
+        examName: 'TEST-IMPORT-HEADING-120',
+        questions: hq.map(q => ({
+            include: true, type: q.type, question: q.question, options: q.options,
+            correct: q.correct, correctList: q.correctList, correctTF: q.correctTF
+        }))
+    });
+    check('lưu đủ 120 câu', hcSave.json && hcSave.json.success === true && hcSave.json.saved === 120,
+        JSON.stringify(hcSave.json).slice(0, 200));
+    check('confirm báo đối chiếu đầy đủ (received = saved + skipped)',
+        hcSave.json && hcSave.json.complete === true && hcSave.json.received === 120,
+        JSON.stringify(hcSave.json && { received: hcSave.json.received, complete: hcSave.json.complete }));
+    if (hcSave.json && hcSave.json.examId) createdExams.push(hcSave.json.examId);
+    if (hcSave.json && hcSave.json.examId) {
+        const hRe = await fetch(BASE + '/api/exams/' + hcSave.json.examId, { headers: { Cookie: cookie } });
+        const hJson = await hRe.json();
+        const savedH = (hJson && hJson.exam && hJson.exam.questions) || [];
+        check('đọc lại từ file lưu: đúng 120 câu', savedH.length === 120, 'len=' + savedH.length);
+        check('câu 120 lưu đúng nội dung',
+            savedH[119] && /Nội dung câu hỏi số 120/.test(savedH[119].question),
+            JSON.stringify(savedH[119] && savedH[119].question));
+    }
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 15. Word: nhiều đoạn văn, thiếu/trùng số, ảnh, trả lời ngắn ===');
+    const edgeDocx = await buildEdgeCaseDocx();
+    const pe = await preview(cookie, [{
+        name: 'de-bien.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: edgeDocx
+    }]);
+    check('đề biên -> preview success', pe.json && pe.json.success === true, JSON.stringify(pe.json).slice(0, 200));
+    const eq = (pe.json && pe.json.questions) || [];
+    const ec = (pe.json && pe.json.completeness) || {};
+    check('nhận diện 7 câu (gồm câu trả lời ngắn + câu rỗng)', eq.length === 7, 'len=' + eq.length);
+
+    const eqText = (s) => String(s == null ? '' : s).replace(/<[^>]*>/g, '').trim();
+    check('câu hỏi nối được đoạn văn tiếp theo',
+        /nhiều đoạn văn \(phần tiếp theo\)/i.test(eqText(eq[0] && eq[0].question)),
+        JSON.stringify(eqText(eq[0] && eq[0].question)));
+    check('câu có khoảng trắng lớn / ngắt trang vẫn nhận đúng số 2',
+        eq[1] && eq[1].importNumber === 2, JSON.stringify(eq[1] && eq[1].importNumber));
+    check('completeness: báo thiếu số 3 và 5',
+        (ec.missingNumbers || []).indexOf(3) >= 0 && (ec.missingNumbers || []).indexOf(5) >= 0,
+        JSON.stringify(ec.missingNumbers));
+    check('completeness: báo trùng số 4', (ec.duplicateNumbers || []).indexOf(4) >= 0,
+        JSON.stringify(ec.duplicateNumbers));
+    check('completeness: báo câu rỗng "Câu 8"',
+        (ec.emptyQuestions || []).indexOf('Câu 8') >= 0, JSON.stringify(ec.emptyQuestions));
+    check('completeness: đếm được ảnh nhúng (1) và không có ảnh lỗi',
+        ec.imageCount === 1 && (ec.unresolvedImages || []).length === 0,
+        JSON.stringify({ count: ec.imageCount, bad: ec.unresolvedImages }));
+    const imgQ = eq.find(q => q.importNumber === 6) || {};
+    check('câu có hình ảnh giữ được token ảnh', /\[\[IMG:\d+\]\]/.test(imgQ.question || ''), JSON.stringify(imgQ.question));
+    check('câu trả lời ngắn nhận đúng loại + đáp án',
+        eq.some(q => q.type === 'shortanswer' && q.correctAnswer === '42'),
+        JSON.stringify(eq.filter(q => q.type === 'shortanswer').map(q => q.correctAnswer)));
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 16. Dọn dẹp: xoá các bài test đã tạo ===');
     let cleaned = 0;
     for (const id of createdExams) {
         const r = await fetch(BASE + '/api/exams/' + id, { method: 'DELETE', headers: { Cookie: cookie } });

@@ -5273,6 +5273,17 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 </div>`;
             }
 
+            // Kiểm tra tính đầy đủ: số câu, số thứ tự thiếu/trùng, câu rỗng,
+            // thiếu phương án, đoạn chưa phân tích, ảnh lỗi.
+            const cp = result.completeness;
+            if (cp) {
+                const issues = (cp.warnings || []).slice(1);
+                html += `<div style="margin-top:6px; background:${issues.length ? '#fff8e1' : '#e8f5e9'}; border:1px solid ${issues.length ? '#ffe082' : '#a5d6a7'}; border-radius:8px; padding:8px 12px; color:${issues.length ? '#8d6e00' : '#1b5e20'}; font-size:0.88em;">
+                    📊 Nhận diện <b>${cp.detected}</b> câu hỏi${cp.imageCount ? ', ' + cp.imageCount + ' hình ảnh' : ''}.
+                    ${issues.length ? issues.map(w => '⚠ ' + escapeHtml(w)).join('<br>') : ' Không phát hiện câu thiếu/trùng số thứ tự.'}
+                </div>`;
+            }
+
             // Luôn tạo sẵn dòng cảnh báo (có id) để updateImportSummaryCounts cập nhật/ẩn được
             html += `<div id="importNeedsReviewLine" style="margin-top:6px; background:#fff3e0; border:1px solid #ffb300; border-radius:8px; padding:8px 12px; color:#e65100; font-size:0.9em;${result.needsReview > 0 ? '' : 'display:none;'}">⚠ ${result.needsReview} câu cần bạn kiểm tra (thiếu đáp án / thiếu nội dung / từ ảnh).</div>`;
             if (result.warnings && result.warnings.length) {

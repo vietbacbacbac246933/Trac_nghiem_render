@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "tests/test-import-docx.js"
+        ],
+        "createdAt": "2026-10-20T12:26:59.531Z",
+        "reason": "False positive: line 409 is a regex assertion checking data-URI images in a test, not rendered markup (agent decision)"
+      }
+    ]
+  }
+}
