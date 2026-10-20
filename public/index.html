@@ -4399,7 +4399,6 @@
                     startTime = new Date(Date.now() - (totalSecs - timeRemaining) * 1000);
                 }
 
-                _prevQuestionIndex = -1;
                 renderNavigation();
                 renderQuestions(function() {
                     applyRestoredAnswers();
@@ -5005,20 +5004,26 @@
         var tabLeaveCount = 0;
         
         // Show current question (always single question mode)
-        var _prevQuestionIndex = -1;
         function showCurrentQuestion() {
-            // Chỉ toggle 2 element thay vì loop toàn bộ
-            if (_prevQuestionIndex !== -1 && _prevQuestionIndex !== currentQuestionIndex) {
-                var prevCard = document.getElementById('question' + _prevQuestionIndex);
-                if (prevCard) prevCard.classList.remove('active');
-                var prevNav = document.getElementById('nav' + _prevQuestionIndex);
-                if (prevNav) prevNav.classList.remove('current');
+            // Chỉ giữ đúng một câu hiển thị. Quét toàn bộ để trạng thái không lệch
+            // khi mới render xong (lần chuyển câu đầu tiên) hoặc sau khi khôi phục.
+            var activeCards = document.querySelectorAll('#questionsContainer .question-card.active');
+            for (var i = 0; i < activeCards.length; i++) {
+                if (activeCards[i].id !== 'question' + currentQuestionIndex) {
+                    activeCards[i].classList.remove('active');
+                }
             }
+            var currentNavs = document.querySelectorAll('.nav-buttons .nav-btn.current');
+            for (var j = 0; j < currentNavs.length; j++) {
+                if (currentNavs[j].id !== 'nav' + currentQuestionIndex) {
+                    currentNavs[j].classList.remove('current');
+                }
+            }
+
             var curCard = document.getElementById('question' + currentQuestionIndex);
             if (curCard) curCard.classList.add('active');
             var curNav = document.getElementById('nav' + currentQuestionIndex);
             if (curNav) curNav.classList.add('current');
-            _prevQuestionIndex = currentQuestionIndex;
 
             updateQuestionNavigation();
 
@@ -5215,7 +5220,6 @@
             setupFullscreen();
             setupAISidebarDetection();
             currentQuestionIndex = 0;
-            _prevQuestionIndex = -1;
         }
 
         // ==================== FULLSCREEN ====================
