@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ôn tập - Trắc Nghiệm</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/katex/katex.min.css">
+<script src="/katex/katex.min.js"></script>
+<script src="/katex/contrib/auto-render.min.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        background: #f4f6fb;
+        color: #24303f;
+    }
+    a { color: #4f61d6; }
+    .review-header {
+        background: linear-gradient(135deg, #4c56c4 0%, #5e3a86 100%);
+        color: #fff;
+        padding: 18px 20px;
+    }
+    .review-header-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .review-header img { width: 42px; height: 42px; }
+    .review-header h1 { margin: 0; font-size: 1.25em; }
+    .review-header p { margin: 3px 0 0; font-size: 0.85em; opacity: 0.85; }
+    .header-spacer { flex: 1; }
+    .header-link {
+        color: #fff;
+        text-decoration: none;
+        background: rgba(255,255,255,0.18);
+        padding: 9px 14px;
+        border-radius: 8px;
+        font-size: 0.9em;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 22px 16px 50px; }
+    .panel {
+        background: #fff;
+        border: 1px solid #e3e7f1;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 18px;
+    }
+    .panel h2 { margin: 0 0 6px; font-size: 1.2em; }
+    .muted { color: #667085; font-size: 0.92em; }
+    .student-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .student-row label { font-weight: 600; }
+    select, input[type="text"] {
+        padding: 10px 12px;
+        border: 1px solid #cbd2e1;
+        border-radius: 8px;
+        font-size: 0.95em;
+        background: #fff;
+        color: #24303f;
+    }
+    .student-row select { min-width: 230px; }
+    .list-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+    }
+    .list-card {
+        display: block;
+        background: #fff;
+        border: 1px solid #e3e7f1;
+        border-radius: 12px;
+        padding: 16px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .list-card:hover { border-color: #667eea; box-shadow: 0 6px 18px rgba(102,126,234,0.15); }
+    .list-card h3 { margin: 0 0 6px; font-size: 1.05em; color: #3c4cc0; }
+    .badge {
+        display: inline-block;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 0.76em;
+        font-weight: 600;
+        background: #eef1ff;
+        color: #4353b8;
+    }
+    .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 16px 0;
+    }
+    .toolbar input[type="text"] { flex: 1; min-width: 200px; }
+    .exam-list { display: grid; gap: 12px; }
+    .exam-card {
+        background: #fff;
+        border: 1px solid #e3e7f1;
+        border-radius: 12px;
+        padding: 16px;
+    }
+    .exam-card-head {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+    .exam-card h3 { margin: 0 0 5px; font-size: 1.05em; }
+    .exam-meta { color: #667085; font-size: 0.88em; line-height: 1.5; }
+    .exam-status { font-weight: 600; color: #3f51b5; }
+    .exam-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+    .btn {
+        display: inline-block;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 16px;
+        font-size: 0.92em;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+    }
+    .btn-primary { background: #5c6bc0; color: #fff; }
+    .btn-primary:hover { background: #4a5ab0; }
+    .btn-secondary { background: #eef1ff; color: #3f51b5; }
+    .btn-secondary:hover { background: #e0e5ff; }
+    .btn:disabled { background: #eceff4; color: #98a2b3; cursor: not-allowed; }
+    .empty {
+        text-align: center;
+        color: #667085;
+        padding: 36px 16px;
+    }
+    .error-box {
+        background: #fdecea;
+        border: 1px solid #f5c2c0;
+        color: #b3261e;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        z-index: 1000;
+        padding: 18px;
+        overflow-y: auto;
+    }
+    .modal.show { display: block; }
+    .modal-box {
+        background: #fff;
+        border-radius: 14px;
+        max-width: 820px;
+        margin: 30px auto;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+    }
+    .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 20px;
+        border-bottom: 1px solid #edf0f7;
+    }
+    .modal-head h3 { margin: 0; font-size: 1.08em; }
+    .modal-close {
+        background: #f1f3f9;
+        border: none;
+        border-radius: 8px;
+        width: 34px;
+        height: 34px;
+        font-size: 1.2em;
+        cursor: pointer;
+    }
+    .modal-body { padding: 18px 20px 24px; }
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .summary-item { background: #f7f8fd; border-radius: 10px; padding: 12px; }
+    .summary-item strong { display: block; font-size: 1.2em; color: #3f51b5; }
+    .summary-item span { font-size: 0.82em; color: #667085; }
+    .attempt {
+        border: 1px solid #e3e7f1;
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 10px;
+    }
+    .attempt-head { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+    .attempt-head strong { font-size: 1em; }
+    .attempt-meta { color: #667085; font-size: 0.85em; margin-top: 4px; }
+    .detail-q {
+        border-top: 1px dashed #e3e7f1;
+        padding-top: 10px;
+        margin-top: 10px;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+    .detail-q .correct { color: #1b7f3b; }
+    .result-tag { font-weight: 700; font-size: 0.82em; padding: 2px 8px; border-radius: 999px; }
+    .tag-correct { background: #e7f6ec; color: #1b7f3b; }
+    .tag-partial { background: #fff4e5; color: #a15c00; }
+    .tag-wrong { background: #fdecea; color: #b3261e; }
+    .tag-neutral { background: #eef1ff; color: #4353b8; }
+    .filter-btn {
+        background: #f1f3f9;
+        color: #4353b8;
+        border: 1px solid #dde2f0;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.85em;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .filter-btn.active { background: #5c6bc0; color: #fff; border-color: #5c6bc0; }
+    .detail-q img { max-width: 100%; max-height: 180px; border-radius: 8px; margin-top: 6px; }
+    @media (max-width: 640px) {
+        .review-header h1 { font-size: 1.05em; }
+        .wrap { padding: 16px 12px 40px; }
+        .panel { padding: 16px; }
+        .student-row select { width: 100%; }
+        .exam-actions .btn { flex: 1; }
+    }
+</style>
+</head>
+<body>
+<header class="review-header">
+    <div class="review-header-inner">
+        <img src="/logo.svg" alt="Logo">
+        <div>
+            <h1>Ôn tập</h1>
+            <p>Chọn đề phù hợp với nhu cầu của bạn</p>
+        </div>
+        <div class="header-spacer"></div>
+        <a class="header-link" href="/">← Về trang thi</a>
+    </div>
+</header>
+
+<div class="wrap">
+    <div id="errorBox" class="error-box" style="display:none;"></div>
+
+    <div class="panel">
+        <div class="student-row">
+            <label for="studentPicker">Học sinh:</label>
+            <select id="studentPicker">
+                <option value="">-- Chọn tên của bạn --</option>
+            </select>
+            <span id="classHint" class="muted"></span>
+        </div>
+        <p class="muted" style="margin:10px 0 0;">Kết quả và lịch sử bên dưới được tính riêng theo tên bạn chọn.</p>
+    </div>
+
+    <div id="listBrowser" style="display:none;">
+        <div class="panel" style="padding-bottom:14px;">
+            <h2>Danh sách ôn tập</h2>
+            <p class="muted" style="margin:0;">Mỗi danh sách gồm nhiều đề. Bạn tự chọn đề, không cần làm theo thứ tự.</p>
+        </div>
+        <div id="listsGrid" class="list-grid"></div>
+    </div>
+
+    <div id="listDetail" style="display:none;">
+        <div class="panel">
+            <div id="listTitleBlock"></div>
+            <div class="toolbar">
+                <input type="text" id="examSearch" placeholder="Tìm đề theo tên..." oninput="renderExams()">
+                <select id="examFilter" onchange="renderExams()">
+                    <option value="all">Tất cả đề</option>
+                    <option value="not-done">Chưa làm</option>
+                    <option value="done">Đã làm</option>
+                    <option value="completed">Đã hoàn thành</option>
+                    <option value="retryable">Có thể làm lại</option>
+                    <option value="exhausted">Đã hết lượt</option>
+                </select>
+            </div>
+        </div>
+        <div id="examList" class="exam-list"></div>
+    </div>
+</div>
+
+<div class="modal" id="historyModal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h3 id="historyTitle">Lịch sử làm bài</h3>
+            <button class="modal-close" onclick="closeHistory()" aria-label="Đóng">×</button>
+        </div>
+        <div class="modal-body" id="historyBody"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var listId = getParam('list');
+    var currentList = null;
+    var currentStudent = null;
+    var studentList = [];
+
+    function getParam(name) {
+        var m = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    function esc(value) {
+        var d = document.createElement('div');
+        d.textContent = value === undefined || value === null ? '' : String(value);
+        return d.innerHTML;
+    }
+
+    // Hien thi noi dung cau hoi/dap an dang HTML nhung chi giu the dinh dang an toan.
+    function rich(html) {
+        if (!html) return '';
+        var doc = new DOMParser().parseFromString(String(html), 'text/html');
+        var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, P: 1, DIV: 1, BR: 1, SPAN: 1, SUB: 1, SUP: 1, IMG: 1 };
+        Array.prototype.slice.call(doc.body.querySelectorAll('*')).forEach(function (el) {
+            var tag = el.tagName;
+            if (!allowed[tag]) {
+                el.replaceWith(document.createTextNode(el.textContent || ''));
+                return;
+            }
+            Array.prototype.slice.call(el.attributes).forEach(function (attr) {
+                var keep = tag === 'IMG' && (
+                    attr.name === 'alt' || attr.name === 'width' || attr.name === 'height' ||
+                    (attr.name === 'src' && (
+                        attr.value.indexOf('data:image/') === 0 ||
+                        /^\/api\/assets\/[a-f0-9]{32}\.(png|jpe?g|gif|bmp|webp)$/.test(attr.value)
+                    ))
+                );
+                if (!keep) el.removeAttribute(attr.name);
+            });
+        });
+        return doc.body.innerHTML;
+    }
+
+    function renderMath(node) {
+        if (window.renderMathInElement) {
+            try {
+                window.renderMathInElement(node, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '\\(', right: '\\)', display: false },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            } catch (e) {}
+        }
+    }
+
+    function showError(message) {
+        var box = document.getElementById('errorBox');
+        box.textContent = message;
+        box.style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('errorBox').style.display = 'none';
+    }
+
+    function fetchJson(url, options) {
+        return fetch(url, options || {}).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) {
+                    var err = new Error(data.error || ('HTTP ' + res.status));
+                    err.data = data;
+                    throw err;
+                }
+                return data;
+            });
+        });
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '--';
+        try { return new Date(iso).toLocaleString('vi-VN'); } catch (e) { return iso; }
+    }
+
+    function formatScore(score) {
+        var n = Number(score);
+        if (isNaN(n)) return '--';
+        return n.toFixed(1).replace('.', ',');
+    }
+
+    function loadStudents() {
+        fetchJson('/api/review/students').then(function (data) {
+            studentList = data.students || [];
+            var picker = document.getElementById('studentPicker');
+            var saved = '';
+            try { saved = localStorage.getItem('quiz_review_student') || ''; } catch (e) {}
+            var html = '<option value="">-- Chọn tên của bạn --</option>';
+            for (var i = 0; i < studentList.length; i++) {
+                var s = studentList[i];
+                html += '<option value="' + esc(s.stt) + '"' + (String(s.stt) === String(saved) ? ' selected' : '') + '>' +
+                    esc(s.stt) + '. ' + esc(s.fullName) + '</option>';
+            }
+            picker.innerHTML = html;
+            document.getElementById('classHint').textContent = data.className ? ('Lớp ' + data.className) : '';
+            if (saved) {
+                for (var j = 0; j < studentList.length; j++) {
+                    if (String(studentList[j].stt) === String(saved)) {
+                        currentStudent = studentList[j];
+                        break;
+                    }
+                }
+            }
+            picker.addEventListener('change', function () {
+                var value = picker.value;
+                currentStudent = null;
+                for (var k = 0; k < studentList.length; k++) {
+                    if (String(studentList[k].stt) === String(value)) {
+                        currentStudent = studentList[k];
+                        break;
+                    }
+                }
+                try {
+                    if (value) localStorage.setItem('quiz_review_student', value);
+                    else localStorage.removeItem('quiz_review_student');
+                } catch (e) {}
+                if (listId) loadListDetail();
+            });
+            if (listId) loadListDetail();
+        }).catch(function (err) {
+            showError('Không tải được danh sách học sinh: ' + err.message);
+            if (listId) loadListDetail();
+        });
+    }
+
+    function loadListBrowser() {
+        document.getElementById('listBrowser').style.display = 'block';
+        document.getElementById('listDetail').style.display = 'none';
+        fetchJson('/api/review/lists').then(function (data) {
+            var grid = document.getElementById('listsGrid');
+            var lists = data.lists || [];
+            if (!lists.length) {
+                grid.innerHTML = '<div class="empty">Chưa có danh sách ôn tập nào được công khai.</div>';
+                return;
+            }
+            grid.innerHTML = lists.map(function (list) {
+                return '<a class="list-card" href="/on-tap?list=' + encodeURIComponent(list.id) + '">' +
+                    '<h3>' + esc(list.name) + '</h3>' +
+                    (list.subject ? '<div class="badge">' + esc(list.subject) + '</div>' : '') +
+                    '<p class="muted" style="margin:8px 0 0;">' + esc(list.description || 'Không có mô tả') + '</p>' +
+                    '<p class="muted" style="margin:10px 0 0;"><strong>' + list.itemCount + '</strong> đề</p>' +
+                    '</a>';
+            }).join('');
+        }).catch(function (err) {
+            showError('Không tải được danh sách ôn tập: ' + err.message);
+        });
+    }
+
+    function loadListDetail() {
+        if (!listId) return;
+        document.getElementById('listBrowser').style.display = 'none';
+        document.getElementById('listDetail').style.display = 'block';
+        document.getElementById('listTitleBlock').innerHTML = '<h2>Đang tải...</h2>';
+        var url = '/api/review/lists/' + encodeURIComponent(listId) +
+            (currentStudent ? ('?stt=' + encodeURIComponent(currentStudent.stt)) : '');
+        fetchJson(url).then(function (data) {
+            currentList = data.list;
+            hideError();
+            var title = '<h2>' + esc(currentList.name) + '</h2>';
+            if (currentList.subject) title += '<div class="badge" style="margin-top:6px;">' + esc(currentList.subject) + '</div>';
+            if (currentList.description) title += '<p class="muted" style="margin:8px 0 0;">' + esc(currentList.description) + '</p>';
+            document.getElementById('listTitleBlock').innerHTML = title;
+            renderExams();
+        }).catch(function (err) {
+            showError(err.message || 'Không tìm thấy danh sách ôn tập.');
+            document.getElementById('listTitleBlock').innerHTML = '<h2>Không thể mở danh sách</h2>';
+            document.getElementById('examList').innerHTML = '';
+        });
+    }
+
+    function matchesFilter(item, filter) {
+        var h = item.history || {};
+        if (filter === 'not-done') return !h.done;
+        if (filter === 'done') return !!h.done;
+        if (filter === 'completed') return !!h.completed;
+        if (filter === 'retryable') return !!h.done && !!h.canAttempt;
+        if (filter === 'exhausted') return !!h.exhausted;
+        return true;
+    }
+
+    function statusText(h) {
+        if (h.hasActive) return 'Đang làm dở (lượt chưa nộp)';
+        if (h.exhausted) return 'Đã hết lượt';
+        if (h.attemptCount > 0) return 'Đã làm ' + h.attemptCount + ' lần';
+        return 'Chưa làm';
+    }
+
+    function settingsText(settings, history) {
+        var parts = [];
+        parts.push(settings.timeLimit > 0 ? (settings.timeLimit + ' phút') : 'Không giới hạn thời gian');
+        if (settings.maxAttempts > 0) {
+            var used = (history && history.attemptsUsed) || 0;
+            parts.push('Còn ' + Math.max(0, settings.maxAttempts - used) + '/' + settings.maxAttempts + ' lượt');
+        } else {
+            parts.push('Không giới hạn số lần');
+        }
+        return parts.join(' • ');
+    }
+
+    function renderExams() {
+        if (!currentList) return;
+        var search = (document.getElementById('examSearch').value || '').trim().toLowerCase();
+        var filter = document.getElementById('examFilter').value;
+        var items = (currentList.items || []).filter(function (item) {
+            if (search && String(item.examName).toLowerCase().indexOf(search) === -1) return false;
+            return matchesFilter(item, filter);
+        });
+
+        var container = document.getElementById('examList');
+        if (!items.length) {
+            container.innerHTML = '<div class="empty">Không có đề phù hợp với bộ lọc.</div>';
+            return;
+        }
+
+        container.innerHTML = items.map(function (item) {
+            var h = item.history || {};
+            var scoreLine = '';
+            if (h.attemptCount > 0) {
+                scoreLine = 'Điểm gần nhất: <strong>' + formatScore(h.latestScore) + '</strong>' +
+                    ' • Điểm cao nhất: <strong>' + formatScore(h.bestScore) + '</strong>';
+            } else {
+                scoreLine = 'Chưa nộp lần nào';
+            }
+
+            var startHtml;
+            if (!item.available) {
+                startHtml = '<button class="btn" disabled>Đề không còn khả dụng</button>';
+            } else if (!currentStudent) {
+                startHtml = '<button class="btn" disabled>Chọn tên để làm bài</button>';
+            } else if (h.hasActive) {
+                var resumeUrl = '/?reviewList=' + encodeURIComponent(currentList.id) +
+                    '&reviewExam=' + encodeURIComponent(item.examId) +
+                    '&reviewStt=' + encodeURIComponent(currentStudent.stt);
+                startHtml = '<a class="btn btn-primary" href="' + resumeUrl + '">Tiếp tục lượt đang làm</a>';
+            } else if (!h.canAttempt) {
+                startHtml = '<button class="btn" disabled>Đã hết lượt</button>';
+            } else {
+                var startUrl = '/?reviewList=' + encodeURIComponent(currentList.id) +
+                    '&reviewExam=' + encodeURIComponent(item.examId) +
+                    '&reviewStt=' + encodeURIComponent(currentStudent.stt);
+                startHtml = '<a class="btn btn-primary" href="' + startUrl + '">' +
+                    (h.attemptCount > 0 ? 'Làm lại' : 'Bắt đầu') + '</a>';
+            }
+
+            var historyHtml = '';
+            if (currentStudent && h.attemptCount > 0) {
+                historyHtml = '<button class="btn btn-secondary" onclick="openHistory(\'' +
+                    esc(item.examId).replace(/'/g, "\\'") + '\', \'' +
+                    esc(item.examName).replace(/'/g, "\\'") + '\')">Xem lịch sử</button>';
+            }
+
+            return '<div class="exam-card">' +
+                '<div class="exam-card-head">' +
+                    '<div>' +
+                        '<h3>' + esc(item.examName) + '</h3>' +
+                        '<div class="exam-meta">' + item.questionCount + ' câu • ' + esc(settingsText(item.settings, h)) + '</div>' +
+                        '<div class="exam-meta exam-status" style="margin-top:6px;">' + esc(statusText(h)) + '</div>' +
+                        '<div class="exam-meta">' + scoreLine + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="exam-actions">' + startHtml + historyHtml + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    var historyData = null;
+    var historyFilter = 'all';
+    var HISTORY_FILTERS = [
+        { key: 'all', label: 'Tất cả' },
+        { key: 'correct', label: 'Đúng' },
+        { key: 'wrong', label: 'Sai' },
+        { key: 'unanswered', label: 'Chưa trả lời' }
+    ];
+
+    function detailStatus(d) {
+        if (d.status) return d.status;
+        if (d.isCorrect === true) return 'correct';
+        if (d.hasAnswer === false) return 'unanswered';
+        return 'wrong';
+    }
+
+    function detailTag(d) {
+        var status = detailStatus(d);
+        if (status === 'correct') return '<span class="result-tag tag-correct">Đúng</span>';
+        if (status === 'partial') return '<span class="result-tag tag-partial">Đúng một phần</span>';
+        if (status === 'unanswered') return '<span class="result-tag tag-neutral">Chưa trả lời</span>';
+        return '<span class="result-tag tag-wrong">Sai</span>';
+    }
+
+    function matchesHistoryFilter(d, filter) {
+        if (filter === 'all') return true;
+        var status = detailStatus(d);
+        if (filter === 'correct') return status === 'correct' || status === 'partial';
+        if (filter === 'wrong') return status === 'wrong';
+        return status === 'unanswered';
+    }
+
+    function renderHistory() {
+        if (!historyData) return;
+        var summary = historyData.summary || {};
+        var body = '<div class="summary-grid">' +
+            '<div class="summary-item"><strong>' + (summary.attemptCount || 0) + '</strong><span>Số lần đã nộp</span></div>' +
+            '<div class="summary-item"><strong>' + (summary.bestScore === null || summary.bestScore === undefined ? '--' : formatScore(summary.bestScore)) + '</strong><span>Điểm cao nhất</span></div>' +
+            '<div class="summary-item"><strong>' + (summary.latestScore === null || summary.latestScore === undefined ? '--' : formatScore(summary.latestScore)) + '</strong><span>Điểm gần nhất</span></div>' +
+            '</div>';
+
+        var attempts = historyData.attempts || [];
+        if (!attempts.length) {
+            document.getElementById('historyBody').innerHTML = body + '<div class="empty">Chưa có lần làm bài nào.</div>';
+            return;
+        }
+
+        var hasDetails = attempts.some(function (a) {
+            return a.canViewDetails && a.details && a.details.length;
+        });
+        if (hasDetails) {
+            body += '<div class="toolbar" style="margin:0 0 12px;">' + HISTORY_FILTERS.map(function (f) {
+                return '<button type="button" class="filter-btn' + (historyFilter === f.key ? ' active' : '') +
+                    '" data-filter="' + f.key + '">' + f.label + '</button>';
+            }).join('') + '</div>';
+        }
+
+        body += attempts.map(function (a) {
+            var detailHtml = '';
+            if (a.canViewDetails && a.details && a.details.length) {
+                var shown = a.details.filter(function (d) { return matchesHistoryFilter(d, historyFilter); });
+                if (!shown.length) {
+                    detailHtml = '<div class="detail-q muted">Không có câu phù hợp với bộ lọc.</div>';
+                } else {
+                    detailHtml = shown.map(function (d) {
+                        var qNo = ((d.index === undefined || d.index === null) ? 0 : d.index) + 1;
+                        var html = '<div class="detail-q">' +
+                            '<div><strong>Câu ' + qNo + '.</strong> ' + rich(d.question) + ' ' + detailTag(d) + '</div>' +
+                            '<div>Bạn trả lời: ' + rich(d.studentAnswerText === null || d.studentAnswerText === undefined || d.studentAnswerText === '' ? 'Chưa trả lời' : d.studentAnswerText) + '</div>';
+                        if (d.image) {
+                            html += '<div><img src="' + esc(d.image) + '" alt="Hình minh họa câu ' + qNo + '"></div>';
+                        }
+                        if (d.correctAnswerText !== undefined && d.correctAnswerText !== null) {
+                            html += '<div class="correct">Đáp án đúng: ' + rich(d.correctAnswerText) + '</div>';
+                        }
+                        return html + '</div>';
+                    }).join('');
+                }
+            } else if (a.canViewDetails) {
+                detailHtml = '<div class="detail-q muted">Không có chi tiết cho lần làm này.</div>';
+            } else {
+                detailHtml = '<div class="detail-q muted">Giáo viên không cho xem chi tiết bài làm.</div>';
+            }
+
+            var ratio = a.totalQuestions ? Math.round((a.correctCount || 0) / a.totalQuestions * 100) : 0;
+            return '<div class="attempt">' +
+                '<div class="attempt-head">' +
+                    '<strong>Lần ' + esc(a.attemptNo || '--') + ' • ' + formatScore(a.score) + ' điểm</strong>' +
+                    '<span class="badge">' + esc(a.timeSpent || '--') + '</span>' +
+                '</div>' +
+                '<div class="attempt-meta">Nộp lúc: ' + esc(formatDate(a.submittedAt)) +
+                    ' • Đúng ' + (a.correctCount || 0) + '/' + (a.totalQuestions || 0) +
+                    ' (' + ratio + '%)' +
+                    ' • Đúng một phần ' + (a.partialCount || 0) +
+                    ' • Sai ' + (a.wrongCount || 0) +
+                    ' • Chưa trả lời ' + (a.unansweredCount || 0) + '</div>' +
+                (a.expired ? '<div class="attempt-meta">Lượt này quá thời gian, hệ thống tự đóng.</div>' : '') +
+                detailHtml +
+            '</div>';
+        }).join('');
+
+        document.getElementById('historyBody').innerHTML = body;
+        renderMath(document.getElementById('historyBody'));
+    }
+
+    window.setHistoryFilter = function (filter) {
+        historyFilter = filter;
+        renderHistory();
+    };
+
+    window.openHistory = function (examId, examName) {
+        if (!currentStudent) return;
+        var modal = document.getElementById('historyModal');
+        document.getElementById('historyTitle').textContent = 'Lịch sử: ' + examName;
+        document.getElementById('historyBody').innerHTML = '<p class="muted">Đang tải...</p>';
+        modal.classList.add('show');
+        historyData = null;
+        historyFilter = 'all';
+        var url = '/api/review/history?listId=' + encodeURIComponent(currentList.id) +
+            '&examId=' + encodeURIComponent(examId) +
+            '&stt=' + encodeURIComponent(currentStudent.stt);
+        fetchJson(url).then(function (data) {
+            historyData = data;
+            renderHistory();
+        }).catch(function (err) {
+            document.getElementById('historyBody').innerHTML = '<div class="error-box">' + esc(err.message) + '</div>';
+        });
+    };
+
+    window.closeHistory = function () {
+        document.getElementById('historyModal').classList.remove('show');
+    };
+
+    document.getElementById('historyBody').addEventListener('click', function (e) {
+        var el = e.target;
+        while (el && el !== this) {
+            if (el.className && String(el.className).indexOf('filter-btn') !== -1) {
+                window.setHistoryFilter(el.getAttribute('data-filter'));
+                return;
+            }
+            el = el.parentNode;
+        }
+    });
+
+    document.getElementById('historyModal').addEventListener('click', function (e) {
+        if (e.target === this) window.closeHistory();
+    });
+
+    if (listId) {
+        loadListDetail();
+    } else {
+        loadListBrowser();
+    }
+    loadStudents();
+})();
+</script>
+</body>
+</html>

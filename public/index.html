@@ -2159,11 +2159,11 @@
                 </div>
             </div>
             
-            <div class="result-message">
+            <div class="result-message" id="resultMessage">
                 Kết quả đã được gửi về giáo viên!
             </div>
             
-            <button class="btn btn-primary" onclick="backToLogin()" style="margin-top: 20px;">
+            <button class="btn btn-primary" id="resultBackBtn" onclick="backToLogin()" style="margin-top: 20px;">
                 ↩️ Quay lại (cho học sinh khác làm bài)
             </button>
             
@@ -2243,7 +2243,7 @@
             if (!html) return '';
             var ALLOWED = {
                 'B': [], 'STRONG': [], 'I': [], 'EM': [], 'U': [],
-                'P': [], 'BR': [], 'SPAN': ['style'], 'SUB': [], 'SUP': [],
+                'P': [], 'DIV': [], 'BR': [], 'SPAN': ['style'], 'SUB': [], 'SUP': [],
                 'IMG': ['src', 'alt', 'width', 'height', 'style'],
                 'PRE': [], 'CODE': []
             };
@@ -2276,7 +2276,10 @@
                     }
                     if (tag === 'IMG') {
                         var src = child.getAttribute('src') || '';
-                        if (src.indexOf('data:image/') !== 0) child.removeAttribute('src');
+                        if (src.indexOf('data:image/') !== 0 &&
+                            !/^\/api\/assets\/[a-f0-9]{32}\.(png|jpe?g|gif|bmp|webp)$/.test(src)) {
+                            child.removeAttribute('src');
+                        }
                     }
                     cleanNode(child);
                 }
@@ -2297,6 +2300,16 @@
         }
         
         var mySocketId = null;
+        // Che do on tap: vao tu danh sach /on-tap, khong dung phien thi chinh thuc.
+        var reviewContext = (function () {
+            var p = new URLSearchParams(window.location.search);
+            var listId = p.get('reviewList');
+            var examId = p.get('reviewExam');
+            var stt = p.get('reviewStt');
+            if (!listId || !examId || !stt) return null;
+            return { listId: listId, examId: examId, stt: stt, settings: null };
+        })();
+        var reviewAttemptId = null;
         var studentInfo = { name: '', class: '', stt: '' };
         var selectedStudent = null;
         var nameConfirmed = false;
@@ -2399,6 +2412,10 @@
         // ==================== SOCKET EVENTS ====================
         socket.on('connected', function(data) {
             mySocketId = data.socketId;
+            if (reviewContext) {
+                initReviewMode();
+                return;
+            }
             loadStudents();
             checkExam();
             
@@ -2415,6 +2432,7 @@
         });
 
         socket.on('settingsChanged', function(data) {
+            if (reviewContext) return; // cấu hình ôn tập áp dụng riêng cho từng đề
             if (typeof data.practiceMode === 'undefined') return;
             var newMode = data.practiceMode;
             if (newMode === practiceMode) return; // không đổi
@@ -2454,6 +2472,7 @@
         });
         
         socket.on('allStudentsReset', function() {
+            if (reviewContext) return;
             showMessage('info', 'Danh sách đã được reset!');
             goBackToStep1();
             loadStudents();
@@ -2461,6 +2480,7 @@
         
         // Lắng nghe khi giáo viên đổi bài thi
         socket.on('examSwitched', function(data) {
+            if (reviewContext) return; // đang làm đề ôn tập độc lập với phiên thi
             
             // Nếu đang ở màn hình kết quả hoặc màn hình chọn tên
             if (document.getElementById('resultScreen').style.display !== 'none' ||
@@ -2870,6 +2890,111 @@
                 el.innerHTML = text;
                 el.className = 'message ' + type + ' show';
                 setTimeout(function() { el.classList.remove('show'); }, 4000);
+            }
+        }
+
+        // ==================== CHẾ ĐỘ ÔN TẬP ====================
+        function initReviewMode() {
+            var url = '/api/review/play?listId=' + encodeURIComponent(reviewContext.listId) +
+                '&examId=' + encodeURIComponent(reviewContext.examId) +
+                '&stt=' + encodeURIComponent(reviewContext.stt);
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status !== 200) {
+                    var message = 'Không thể mở đề ôn tập.';
+                    try { message = JSON.parse(xhr.responseText).error || message; } catch (e) {}
+                    document.getElementById('examTitleDisplay').textContent = 'Ôn tập';
+                    document.getElementById('step1Content').innerHTML =
+                        '<div style="background:#fdecea;color:#b3261e;border-radius:10px;padding:14px;margin-bottom:14px;">' +
+                        escapeHtml(message) + '</div>' +
+                        '<a class="btn btn-primary" href="/on-tap" style="display:block;text-align:center;text-decoration:none;">' +
+                        'Quay lại danh sách ôn tập</a>';
+                    document.getElementById('step2Content').style.display = 'none';
+                    document.getElementById('step3Content').style.display = 'none';
+                    return;
+                }
+                var data;
+                try { data = JSON.parse(xhr.responseText); } catch (e) {
+                    showError('Lỗi dữ liệu đề ôn tập.');
+                    return;
+                }
+
+                reviewAttemptId = data.attempt.id;
+                reviewContext.settings = data.settings;
+                selectedStudent = { stt: String(data.student.stt), ho: '', ten: data.student.name };
+                nameConfirmed = true;
+                studentInfo = {
+                    name: data.student.name,
+                    class: data.student.className || data.list.name,
+                    stt: String(data.student.stt)
+                };
+                currentExamId = 'review_' + data.list.id + '_' + data.exam.id;
+                practiceMode = data.settings.practiceMode === true;
+                timeLimit = Number(data.settings.timeLimit) || 0;
+                originalQuestions = data.exam.questions || [];
+                _progressQuestionsCache = null;
+                document.getElementById('examTitle').textContent = data.exam.name;
+
+                if (data.settings.shuffleExam) {
+                    questionOrder = generateQuestionOrder(studentInfo.stt, originalQuestions.length);
+                    optionOrders = generateOptionOrders(studentInfo.stt, originalQuestions.length, originalQuestions);
+                } else {
+                    questionOrder = [];
+                    optionOrders = [];
+                    for (var i = 0; i < originalQuestions.length; i++) {
+                        questionOrder.push(i);
+                        var opts = [];
+                        for (var j = 0; j < originalQuestions[i].options.length; j++) opts.push(j);
+                        optionOrders.push(opts);
+                    }
+                }
+                questions = shuffleQuestionsAndOptions(originalQuestions, questionOrder, optionOrders);
+                startReviewExam(data);
+            };
+            xhr.send();
+        }
+
+        function startReviewExam(data) {
+            startTime = new Date(data.attempt.startedAt);
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('examScreen').style.display = 'block';
+            document.getElementById('displayName').textContent = studentInfo.name;
+            document.getElementById('displayClass').textContent = 'Ôn tập - STT ' + studentInfo.stt;
+
+            if (practiceMode) {
+                showPracticeModeNotice();
+                document.getElementById('timer').style.display = 'none';
+                showPracticeModeBadge();
+            } else if (timeLimit > 0) {
+                document.getElementById('timer').style.display = '';
+                hidePracticeModeBadge();
+            } else {
+                document.getElementById('timer').style.display = 'none';
+                showPracticeModeBadge();
+            }
+
+            var hasProgress = restoreExamProgress();
+            renderNavigation();
+            renderQuestions(function() {
+                if (hasProgress && Object.keys(answers).length > 0) {
+                    applyRestoredAnswers();
+                    showMessage('success', 'Đã khôi phục ' + Object.keys(answers).length + ' câu trả lời đang làm dở.');
+                }
+            });
+
+            if (!practiceMode && timeLimit > 0) {
+                var serverNow = Number(data.serverNow) || Date.now();
+                serverTimeOffset = serverNow - Date.now();
+                var startedAt = new Date(data.attempt.startedAt).getTime();
+                timeRemaining = Math.max(0, Math.ceil((startedAt + timeLimit * 60000 - serverNow) / 1000));
+                examEndServerMs = startedAt + timeLimit * 60000;
+                if (timeRemaining <= 0) {
+                    submitExam(true);
+                } else {
+                    startTimer();
+                }
             }
         }
 
@@ -3620,7 +3745,7 @@
             }
 
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/check-answer', true);
+            xhr.open('POST', reviewContext ? '/api/review/check-answer' : '/api/check-answer', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4 && xhr.status === 200) {
@@ -3716,7 +3841,13 @@
                     } catch(e) {}
                 }
             };
-            xhr.send(JSON.stringify({
+            xhr.send(JSON.stringify(reviewContext ? {
+                listId: reviewContext.listId,
+                examId: reviewContext.examId,
+                stt: studentInfo.stt,
+                questionIndex: originalIndex,
+                answer: originalAnswer
+            } : {
                 questionIndex: originalIndex,
                 answer: originalAnswer
             }));
@@ -3867,6 +3998,7 @@
 
         function startProgressSync() {
             stopProgressSync();
+            if (reviewContext) return; // ôn tập chỉ lưu tiến độ trên máy, không ghi đè phiên thi
             progressSyncInterval = setInterval(function() {
                 syncProgressToServer();
             }, 30000); // mỗi 30 giây
@@ -4508,7 +4640,8 @@
             window._submitTimeSpent = timeSpent;
             
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/submit', true);
+            var submitUrl = reviewContext ? '/api/review/submit' : '/api/submit';
+            xhr.open('POST', submitUrl, true);
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
@@ -4525,11 +4658,22 @@
                             showSubmitErrorModal('Lỗi dữ liệu phản hồi.');
                         }
                     } else {
-                        showSubmitErrorModal('Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và thử lại.');
+                        var errorMessage = 'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và thử lại.';
+                        try {
+                            var err = JSON.parse(xhr.responseText);
+                            if (err && err.error) errorMessage = err.error;
+                        } catch (e2) {}
+                        showSubmitErrorModal(errorMessage);
                     }
                 }
             };
-            xhr.send(JSON.stringify({
+            xhr.send(JSON.stringify(reviewContext ? {
+                listId: reviewContext.listId,
+                examId: reviewContext.examId,
+                stt: studentInfo.stt,
+                attemptId: reviewAttemptId,
+                answers: answersArray
+            } : {
                 studentSTT: studentInfo.stt,
                 studentName: studentInfo.name,
                 studentClass: studentInfo.class,
@@ -4632,7 +4776,21 @@
             
             document.getElementById('timeSpent').textContent = timeSpent;
             document.getElementById('resultName').textContent = studentInfo.name;
-            
+
+            if (reviewContext) {
+                document.getElementById('resultMessage').textContent = result.expired
+                    ? 'Lượt làm đã quá thời gian nên hệ thống tự đóng bài. Lượt này vẫn được tính.'
+                    : (result.showAnswers
+                        ? 'Đã lưu kết quả. Bạn có thể xem lại bài làm trong lịch sử của đề.'
+                        : 'Đã lưu kết quả ôn tập.');
+                var backBtn = document.getElementById('resultBackBtn');
+                backBtn.textContent = 'Quay lại danh sách ôn tập';
+                backBtn.onclick = function () {
+                    window.location.href = '/on-tap?list=' + encodeURIComponent(reviewContext.listId);
+                };
+                return; // không trộn với kết quả thi chính thức trên máy
+            }
+
             // Save result to localStorage
             saveResultToLocal({
                 stt: studentInfo.stt,
@@ -4867,7 +5025,10 @@
                         { left: '$$', right: '$$', display: true },
                         { left: '$', right: '$', display: false }
                     ],
-                    throwOnError: false
+                    ignoredClasses: ['katex', 'katex-display', 'hljs'],
+                    throwOnError: false,
+                    trust: false,
+                    maxExpand: 1000
                 });
             }
             if (typeof hljs !== 'undefined') {

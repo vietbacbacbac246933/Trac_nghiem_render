@@ -890,6 +890,163 @@
         .toast-close:hover {
             color: #333;
         }
+
+        /* ===== Trình soạn câu hỏi: ảnh + công thức + điểm ===== */
+        .rich-editor {
+            min-height: 96px;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            line-height: 1.7;
+            background: #fff;
+            overflow-wrap: anywhere;
+        }
+        .rich-editor:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .rich-editor:empty::before {
+            content: attr(data-placeholder);
+            color: #999;
+            pointer-events: none;
+        }
+        .rich-editor img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        .rich-editor .katex { font-size: 1em; }
+        .editor-toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .editor-tool-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #f0f0ff;
+            color: #4a54b8;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 0.88em;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .editor-tool-btn:hover { background: #e6e6ff; }
+        .editor-size-select {
+            padding: 7px 8px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #555;
+            background: #fff;
+        }
+        .editor-status {
+            font-size: 0.82em;
+            color: #666;
+        }
+        .editor-preview {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border: 1px dashed #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+        }
+        .editor-preview:empty { display: none; }
+        .editor-preview img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        .editor-hint {
+            margin-top: 6px;
+            font-size: 0.82em;
+            color: #777;
+        }
+        .points-summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #f0f0ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            font-size: 0.9em;
+            color: #444;
+        }
+        .points-bulk {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .points-bulk input {
+            width: 74px;
+            padding: 5px 7px;
+            border: 1px solid #c7d2fe;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+        .points-bulk button {
+            background: #667eea;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .q-points {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #fff;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            padding: 3px 8px;
+            font-size: 0.85em;
+            color: #555;
+        }
+        .q-points input {
+            width: 62px;
+            padding: 3px 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95em;
+            text-align: right;
+        }
+        .formula-preview {
+            min-height: 48px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            background: #f7f8ff;
+            border: 1px solid #dde3ff;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .formula-preview .katex-display {
+            margin: 0;
+        }
+        @media (max-width: 640px) {
+            .points-bulk { margin-left: 0; width: 100%; }
+            .question-header { flex-direction: column; gap: 10px; }
+            .question-actions { width: 100%; }
+            .q-points input { width: 70px; }
+        }
     </style>
     <link rel="stylesheet" href="/katex/katex.min.css">
     <script src="/katex/katex.min.js"></script>
@@ -968,6 +1125,7 @@
             <button class="tab active" id="tabBtn-questions" role="tab" aria-selected="true" aria-controls="questions" onclick="showTab('questions')">Câu hỏi</button>
             <button class="tab" id="tabBtn-students" role="tab" aria-selected="false" aria-controls="students" onclick="showTab('students')">Học sinh</button>
             <button class="tab" id="tabBtn-results" role="tab" aria-selected="false" aria-controls="results" onclick="showTab('results')">Kết quả</button>
+            <button class="tab" id="tabBtn-review" role="tab" aria-selected="false" aria-controls="review" onclick="showTab('review')">Ôn tập</button>
             <button class="tab" id="tabBtn-settings" role="tab" aria-selected="false" aria-controls="settings" onclick="showTab('settings')">Cài đặt</button>
         </div>
 
@@ -1198,7 +1356,31 @@
 
                 <div class="form-group">
                     <label>Nội dung câu hỏi:</label>
-                    <textarea id="questionText" placeholder="Nhập nội dung câu hỏi..." required></textarea>
+                    <div class="editor-toolbar">
+                        <label class="editor-tool-btn">
+                            🖼 Chèn ảnh
+                            <input type="file" accept="image/*" multiple style="display:none;" onchange="insertImages(this, 'questionText')">
+                        </label>
+                        <button type="button" class="editor-tool-btn" onclick="openFormulaModal('questionText')">∑ Chèn công thức</button>
+                        <select class="editor-size-select" onchange="resizeSelectedImage(this, 'questionText')" title="Chỉnh cỡ ảnh đang chọn">
+                            <option value="">Cỡ ảnh…</option>
+                            <option value="25">25%</option>
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                        </select>
+                        <span class="editor-status" id="questionTextStatus"></span>
+                    </div>
+                    <div id="questionText" class="rich-editor" contenteditable="true" data-placeholder="Nhập nội dung câu hỏi..." oninput="scheduleEditorPreview('questionText')" onkeyup="rememberEditorRange(this)" onmouseup="rememberEditorRange(this)" onfocus="rememberEditorRange(this)"></div>
+                    <div class="editor-hint">Công thức: <b>\( ... \)</b> nội dòng, <b>\[ ... \]</b> riêng dòng. Ảnh chèn tại vị trí con trỏ; chọn ảnh rồi nhấn Delete để xóa.</div>
+                    <div id="questionTextPreview" class="editor-preview" aria-live="polite"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Điểm / trọng số câu này:</label>
+                    <input type="number" id="newQuestionPoints" min="0.01" max="100" step="any" inputmode="decimal" value="1"
+                        style="width:120px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.95em;">
+                    <div class="editor-hint">Điểm bài thi luôn quy về thang 10 theo tỉ lệ trọng số các câu.</div>
                 </div>
 
                 <div class="form-group" id="newOptionsGroup">
@@ -1219,6 +1401,16 @@
 
             <div class="question-list">
                 <h2 style="margin-top: 40px; margin-bottom: 20px;">Danh sách câu hỏi</h2>
+                <div class="points-summary">
+                    <span>Tổng trọng số: <strong id="pointsTotal">0</strong></span>
+                    <span style="color:#666;">Điểm bài thi quy về thang 10</span>
+                    <span class="points-bulk">
+                        Áp dụng
+                        <input type="number" id="bulkPointsInput" min="0.01" max="100" step="any" inputmode="decimal" value="1" aria-label="Điểm áp dụng cho tất cả câu">
+                        cho tất cả
+                        <button type="button" onclick="applyPointsToAll()">Áp dụng</button>
+                    </span>
+                </div>
                 <div id="questionsList"></div>
             </div>
         </div>
@@ -1336,6 +1528,87 @@
             </div>
         </div>
 
+        <!-- Panel Ôn tập -->
+        <div id="review" class="panel" role="tabpanel" aria-labelledby="tabBtn-review">
+            <h2>Danh sách Ôn tập</h2>
+            <p style="color:#666;margin-top:0;">Mỗi danh sách gồm nhiều đề đã lưu. Học sinh tự chọn đề và làm lại theo cấu hình của từng đề.</p>
+
+            <div class="settings-card" style="margin-bottom:20px;">
+                <h3>Tạo danh sách mới</h3>
+                <div class="form-group">
+                    <label>Tên danh sách <span style="color:#e53935;">*</span></label>
+                    <input type="text" id="newReviewName" maxlength="160" placeholder="VD: Ôn tập chương 1 - Hàm số">
+                </div>
+                <div class="form-group">
+                    <label>Môn / chủ đề</label>
+                    <input type="text" id="newReviewSubject" maxlength="120" placeholder="VD: Toán 10">
+                </div>
+                <div class="form-group">
+                    <label>Mô tả</label>
+                    <textarea id="newReviewDescription" maxlength="2000" rows="2" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="createReviewList()">Tạo danh sách</button>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                <h3 style="margin:0;">Danh sách đã tạo</h3>
+                <button class="btn btn-secondary" onclick="loadReviewLists()">Làm mới</button>
+            </div>
+            <div id="reviewListsBox"><p style="color:#666;">Đang tải...</p></div>
+        </div>
+
+        <!-- Modal sửa danh sách ôn tập -->
+        <div id="reviewEditorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px;box-sizing:border-box;">
+            <div style="background:white;border-radius:14px;max-width:900px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="background:#667eea;color:white;padding:16px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="margin:0;font-size:1.15em;">Sửa danh sách ôn tập</h3>
+                    <button onclick="closeReviewEditor()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:1.2em;cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1;">&times;</button>
+                </div>
+                <div style="padding:20px 22px;max-height:calc(100vh - 180px);overflow-y:auto;">
+                    <div class="form-group">
+                        <label>Tên danh sách <span style="color:#e53935;">*</span></label>
+                        <input type="text" id="editReviewName" maxlength="160">
+                    </div>
+                    <div class="form-group">
+                        <label>Môn / chủ đề</label>
+                        <input type="text" id="editReviewSubject" maxlength="120">
+                    </div>
+                    <div class="form-group">
+                        <label>Mô tả</label>
+                        <textarea id="editReviewDescription" maxlength="2000" rows="2" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;"></textarea>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:8px;margin-bottom:18px;cursor:pointer;">
+                        <input type="checkbox" id="editReviewActive" style="width:18px;height:18px;">
+                        <span>Cho học sinh truy cập danh sách này</span>
+                    </label>
+
+                    <div style="border-top:1px solid #eee;padding-top:16px;">
+                        <h4 style="margin:0 0 10px 0;">Các đề trong danh sách</h4>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+                            <select id="reviewExamSelect" style="flex:1;min-width:220px;padding:9px 10px;border:1px solid #ddd;border-radius:8px;"></select>
+                            <button class="btn btn-primary" onclick="addReviewExam()" style="white-space:nowrap;">+ Thêm đề</button>
+                        </div>
+                        <div id="reviewItemsBox"></div>
+                    </div>
+                </div>
+                <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:10px;">
+                    <button onclick="closeReviewEditor()" style="background:#eee;color:#333;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">Hủy</button>
+                    <button class="btn btn-primary" onclick="saveReviewList()">Lưu danh sách</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal kết quả ôn tập -->
+        <div id="reviewResultsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px;box-sizing:border-box;">
+            <div style="background:white;border-radius:14px;max-width:950px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="background:#2e7d32;color:white;padding:16px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                    <h3 id="reviewResultsTitle" style="margin:0;font-size:1.15em;">Kết quả ôn tập</h3>
+                    <button onclick="closeReviewResults()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:1.2em;cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1;">&times;</button>
+                </div>
+                <div id="reviewResultsBody" style="padding:20px 22px;max-height:calc(100vh - 180px);overflow-y:auto;"></div>
+            </div>
+        </div>
+
         <!-- Panel Cài đặt -->
         <div id="settings" class="panel" role="tabpanel" aria-labelledby="tabBtn-settings">
             <!-- Card Mở/Đóng bài thi - tách riêng, hiệu lực ngay -->
@@ -1433,6 +1706,36 @@
         </div>
     </div>
 
+    <!-- Modal chèn công thức LaTeX -->
+    <div id="formulaModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:3500; justify-content:center; align-items:flex-start; overflow-y:auto; padding:20px; box-sizing:border-box;">
+        <div style="background:#fff; border-radius:14px; width:95%; max-width:560px; margin:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);" role="dialog" aria-modal="true" aria-labelledby="formulaModalTitle">
+            <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; padding:16px 22px; border-radius:14px 14px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="formulaModalTitle" style="margin:0; font-size:1.05em;">∑ Chèn công thức LaTeX</h3>
+                <button onclick="closeFormulaModal()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.3em; width:34px; height:34px; border-radius:50%; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div style="padding:18px 22px;">
+                <label for="formulaInput" style="display:block; font-weight:600; color:#333; margin-bottom:6px;">Mã LaTeX</label>
+                <textarea id="formulaInput" rows="4" spellcheck="false" oninput="updateFormulaPreview()"
+                    style="width:100%; padding:10px 12px; border:2px solid #e0e0e0; border-radius:9px; font-family:Consolas,monospace; font-size:0.95em; box-sizing:border-box; resize:vertical;"
+                    placeholder="Ví dụ: \frac{a+b}{c}  •  \sqrt{x^2+1}  •  \begin{cases} x+y=3 \\ x-y=1 \end{cases}"></textarea>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin:10px 0;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.92em;">
+                        <input type="radio" name="formulaMode" value="inline" checked onchange="updateFormulaPreview()"> Nội dòng
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.92em;">
+                        <input type="radio" name="formulaMode" value="display" onchange="updateFormulaPreview()"> Riêng một dòng
+                    </label>
+                </div>
+                <div id="formulaPreview" class="formula-preview" aria-live="polite"></div>
+                <div id="formulaError" style="display:none; color:#c62828; font-size:0.86em; margin-top:6px;"></div>
+            </div>
+            <div style="padding:0 22px 18px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="closeFormulaModal()" style="padding:9px 18px; background:#eee; color:#333; border:none; border-radius:8px; cursor:pointer; font-size:0.95em;">Hủy</button>
+                <button onclick="confirmFormula()" style="padding:9px 20px; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.95em;">Chèn công thức</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal sửa câu hỏi -->
     <div id="editQuestionModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 20px; box-sizing: border-box;">
         <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
@@ -1455,7 +1758,30 @@
 
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Nội dung câu hỏi:</label>
-                    <textarea id="editQuestionText" rows="3" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; resize: vertical; box-sizing: border-box;" placeholder="Nhập nội dung câu hỏi (hỗ trợ HTML)..."></textarea>
+                    <div class="editor-toolbar">
+                        <label class="editor-tool-btn">
+                            🖼 Chèn ảnh
+                            <input type="file" accept="image/*" multiple style="display:none;" onchange="insertImages(this, 'editQuestionText')">
+                        </label>
+                        <button type="button" class="editor-tool-btn" onclick="openFormulaModal('editQuestionText')">∑ Chèn công thức</button>
+                        <select class="editor-size-select" onchange="resizeSelectedImage(this, 'editQuestionText')" title="Chỉnh cỡ ảnh đang chọn">
+                            <option value="">Cỡ ảnh…</option>
+                            <option value="25">25%</option>
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                        </select>
+                        <span class="editor-status" id="editQuestionTextStatus"></span>
+                    </div>
+                    <div id="editQuestionText" class="rich-editor" contenteditable="true" data-placeholder="Nhập nội dung câu hỏi (hỗ trợ ảnh và công thức)..." oninput="scheduleEditorPreview('editQuestionText')" onkeyup="rememberEditorRange(this)" onmouseup="rememberEditorRange(this)" onfocus="rememberEditorRange(this)"></div>
+                    <div class="editor-hint">Công thức: <b>\( ... \)</b> nội dòng, <b>\[ ... \]</b> riêng dòng. Chọn công thức đã chèn rồi bấm “Chèn công thức” để sửa.</div>
+                    <div id="editQuestionTextPreview" class="editor-preview" aria-live="polite"></div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label for="editQuestionPoints" style="display: block; margin-bottom: 6px; font-weight: 600; color: #333;">Điểm / trọng số câu này:</label>
+                    <input type="number" id="editQuestionPoints" min="0.01" max="100" step="any" inputmode="decimal" value="1"
+                        style="width:120px;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;box-sizing:border-box;">
                 </div>
 
                 <!-- Options cho single/multi -->
@@ -1679,7 +2005,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
         // Sanitize HTML — allowlist tags để giữ formatting hợp lệ, loại bỏ script/XSS
         function sanitizeHtmlClient(html) {
             if (!html) return '';
-            const ALLOWED_TAGS = ['B','STRONG','I','EM','U','P','BR','SPAN','SUB','SUP','IMG','PRE','CODE'];
+            const ALLOWED_TAGS = ['B','STRONG','I','EM','U','P','DIV','BR','SPAN','SUB','SUP','IMG','PRE','CODE'];
             function walk(node, out) {
                 for (let child of Array.from(node.childNodes)) {
                     if (child.nodeType === 3) { // text node
@@ -1690,13 +2016,15 @@ C. Công thức nước là H₂O. (Đ)</pre>
                             const el = document.createElement(tag);
                             if (tag === 'IMG') {
                                 const src = child.getAttribute('src') || '';
-                                if (src.startsWith('data:image/')) el.src = src;
+                                if (src.startsWith('data:image/') || /^\/api\/assets\/[a-f0-9]{32}\.(png|jpe?g|gif|bmp|webp)$/.test(src)) el.src = src;
                                 const alt = child.getAttribute('alt');
                                 if (alt) el.alt = alt;
                                 const w = child.getAttribute('width');
                                 if (w) el.width = w;
                                 const h = child.getAttribute('height');
                                 if (h) el.height = h;
+                                const imgStyle = child.getAttribute('style') || '';
+                                if (imgStyle && !/url\(|expression\(|javascript:/i.test(imgStyle)) el.style.cssText = imgStyle;
                             }
                             if (tag === 'SPAN') {
                                 const style = child.getAttribute('style') || '';
@@ -1773,6 +2101,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
             document.getElementById(tabName).classList.add('active');
+            if (tabName === 'review') loadReviewLists();
 
             // Màn hẹp: dải tab cuộn ngang, đưa tab vừa chọn vào giữa khung nhìn.
             // Dùng scrollLeft thay vì scrollIntoView để không cuộn cả trang.
@@ -1816,6 +2145,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             const container = document.getElementById('questionsList');
             if (questions.length === 0) {
                 container.innerHTML = '<p style="color: #666; text-align: center;">Chưa có câu hỏi nào. Hãy thêm câu hỏi mới!</p>';
+                updatePointsSummary();
                 return;
             }
 
@@ -1831,6 +2161,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 const type = q.type || 'single';
                 const label = typeLabel[type] || type;
                 const badgeStyle = typeBadgeColor[type] || typeBadgeColor.single;
+                const points = normalizePointsClient(q.points);
 
                 let optionsHtml = '';
                 if (type === 'single') {
@@ -1870,8 +2201,16 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 return `
                 <div class="question-item">
                     <div class="question-header">
-                        <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span class="question-number">Câu ${i + 1}</span>
+                            <label class="q-points" title="Điểm / trọng số của câu này">
+                                Điểm
+                                <input type="number" min="0.01" max="100" step="any" inputmode="decimal"
+                                    value="${formatPointsClient(points)}" data-qi="${i}"
+                                    aria-label="Điểm câu ${i + 1}"
+                                    onchange="updateQuestionPoints(this)"
+                                    onkeydown="if(event.key==='Enter'){this.blur();}">
+                            </label>
                             <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.78em;font-weight:600;${badgeStyle}">${label}</span>
                         </div>
                         <div class="question-actions">
@@ -1884,6 +2223,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     <div class="question-options${type === 'truefalse' ? ' options-single-col' : ''}">${optionsHtml}</div>
                 </div>`;
             }).join('');
+            updatePointsSummary();
             renderKatex(container);
         }
 
@@ -1892,9 +2232,14 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 renderMathInElement(el || document.body, {
                     delimiters: [
                         { left: '\\(', right: '\\)', display: false },
-                        { left: '\\[', right: '\\]', display: true }
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
                     ],
-                    throwOnError: false
+                    ignoredClasses: ['katex', 'katex-display', 'hljs'],
+                    throwOnError: false,
+                    trust: false,
+                    maxExpand: 1000
                 });
             }
             if (typeof hljs !== 'undefined') {
@@ -1902,6 +2247,317 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 blocks.forEach(block => hljs.highlightElement(block));
             }
         }
+
+        // ========== ĐIỂM CÂU HỎI ==========
+        function normalizePointsClient(v) {
+            const n = Number(v);
+            if (!isFinite(n) || n <= 0) return 1;
+            if (n > 100) return 100;
+            return Math.round(n * 100) / 100;
+        }
+
+        function formatPointsClient(v) {
+            return String(normalizePointsClient(v));
+        }
+
+        function parsePointsClient(v) {
+            if (v === null || v === undefined) return null;
+            const s = String(v).trim();
+            if (!s) return null;
+            const n = Number(s);
+            if (!isFinite(n) || n <= 0 || n > 100) return null;
+            return Math.round(n * 100) / 100;
+        }
+
+        function updatePointsSummary() {
+            const totalEl = document.getElementById('pointsTotal');
+            if (!totalEl) return;
+            const total = questions.reduce((sum, q) => sum + normalizePointsClient(q.points), 0);
+            totalEl.textContent = String(Math.round(total * 100) / 100);
+        }
+
+        async function updateQuestionPoints(input) {
+            const id = +input.getAttribute('data-qi');
+            const q = questions[id];
+            if (!q) return;
+
+            const value = parsePointsClient(input.value);
+            if (value === null) {
+                showNotification('Điểm phải là số lớn hơn 0 và không quá 100.', 'error');
+                input.value = formatPointsClient(q.points);
+                return;
+            }
+
+            const oldValue = normalizePointsClient(q.points);
+            input.value = formatPointsClient(value);
+            if (value === oldValue) return;
+
+            q.points = value;
+            updatePointsSummary();
+
+            try {
+                const res = await fetch(`/api/questions/${id}/points`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ points: value })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                q.points = normalizePointsClient(data.points);
+                input.value = formatPointsClient(q.points);
+                updatePointsSummary();
+            } catch (err) {
+                q.points = oldValue;
+                input.value = formatPointsClient(oldValue);
+                updatePointsSummary();
+                showNotification('Lỗi lưu điểm: ' + err.message, 'error');
+            }
+        }
+
+        async function applyPointsToAll() {
+            if (questions.length === 0) return;
+            const bulkInput = document.getElementById('bulkPointsInput');
+            const value = parsePointsClient(bulkInput.value);
+            if (value === null) {
+                showNotification('Điểm phải là số lớn hơn 0 và không quá 100.', 'error');
+                return;
+            }
+            if (!confirm(`Áp dụng ${value} điểm cho tất cả ${questions.length} câu?`)) return;
+
+            try {
+                const saved = await Promise.all(questions.map((q, i) => {
+                    return fetch(`/api/questions/${i}/points`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ points: value })
+                    }).then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                        return data.points;
+                    });
+                }));
+                questions.forEach((q, i) => {
+                    q.points = normalizePointsClient(saved[i]);
+                    const input = document.querySelector(`input[data-qi="${i}"]`);
+                    if (input) input.value = formatPointsClient(q.points);
+                });
+                updatePointsSummary();
+                showNotification('Đã áp dụng điểm cho tất cả câu!');
+            } catch (err) {
+                showNotification('Lỗi khi áp dụng điểm: ' + err.message, 'error');
+                loadQuestions();
+            }
+        }
+
+        // ========== TRÌNH SOẠN: ẢNH + CÔNG THỨC ==========
+        const _editorRanges = {};
+        const _previewTimers = {};
+        let _selectedEditorImage = null;
+        let _formulaTarget = null;
+
+        function rememberEditorRange(editor) {
+            if (!editor) return;
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+                _editorRanges[editor.id] = sel.getRangeAt(0).cloneRange();
+            }
+        }
+
+        function editorRange(editor) {
+            const saved = _editorRanges[editor.id];
+            if (saved && editor.contains(saved.commonAncestorContainer)) return saved;
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            return range;
+        }
+
+        function insertEditorContent(editorId, html, text) {
+            const editor = document.getElementById(editorId);
+            if (!editor) return;
+
+            editor.focus();
+            const sel = window.getSelection();
+            const range = editorRange(editor);
+            sel.removeAllRanges();
+            sel.addRange(range);
+
+            let inserted = false;
+            try {
+                inserted = (text !== undefined)
+                    ? document.execCommand('insertText', false, text)
+                    : document.execCommand('insertHTML', false, html);
+            } catch (e) {
+                inserted = false;
+            }
+
+            if (!inserted) {
+                range.deleteContents();
+                if (text !== undefined) {
+                    range.insertNode(document.createTextNode(text));
+                } else {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    const frag = document.createDocumentFragment();
+                    while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+                    range.insertNode(frag);
+                }
+                const after = document.createRange();
+                after.selectNodeContents(editor);
+                after.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(after);
+            }
+
+            rememberEditorRange(editor);
+            scheduleEditorPreview(editorId);
+        }
+
+        function scheduleEditorPreview(editorId) {
+            clearTimeout(_previewTimers[editorId]);
+            _previewTimers[editorId] = setTimeout(() => renderEditorPreview(editorId), 200);
+        }
+
+        function renderEditorPreview(editorId) {
+            const editor = document.getElementById(editorId);
+            const preview = document.getElementById(editorId + 'Preview');
+            if (!editor || !preview) return;
+            preview.innerHTML = sanitizeHtmlClient(editor.innerHTML);
+            renderKatex(preview);
+        }
+
+        async function insertImages(input, editorId) {
+            const files = Array.from(input.files || []);
+            input.value = '';
+            if (!files.length) return;
+
+            const status = document.getElementById(editorId + 'Status');
+            const setStatus = txt => { if (status) status.textContent = txt || ''; };
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!/^image\//.test(file.type || '')) {
+                    setStatus('Bỏ qua file không phải ảnh: ' + file.name);
+                    continue;
+                }
+                if (file.size > 8 * 1024 * 1024) {
+                    setStatus('Ảnh quá lớn (tối đa 8 MB): ' + file.name);
+                    continue;
+                }
+
+                setStatus(`Đang tải ảnh ${i + 1}/${files.length}...`);
+                try {
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await fetch('/api/assets', { method: 'POST', body: fd });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                    insertEditorContent(editorId,
+                        `<img src="${data.url}" alt="${escapeHtml(file.name)}" style="max-width:100%;height:auto;">`);
+                } catch (err) {
+                    setStatus('Lỗi tải ảnh: ' + err.message);
+                    return;
+                }
+            }
+            setStatus('');
+        }
+
+        function resizeSelectedImage(select, editorId) {
+            const editor = document.getElementById(editorId);
+            const img = _selectedEditorImage;
+            if (!select.value) return;
+            if (!img || !editor || !editor.contains(img)) {
+                showNotification('Hãy bấm vào ảnh cần chỉnh cỡ trước.', 'warning');
+                select.value = '';
+                return;
+            }
+            img.style.width = select.value + '%';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            select.value = '';
+            scheduleEditorPreview(editorId);
+        }
+
+        function openFormulaModal(editorId) {
+            _formulaTarget = editorId;
+            const editor = document.getElementById(editorId);
+            let value = '';
+            let display = false;
+
+            const sel = window.getSelection();
+            if (editor && sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+                const selected = sel.toString();
+                let m = /^\\\(([\s\S]*)\\\)$/.exec(selected);
+                if (m) {
+                    value = m[1];
+                } else {
+                    m = /^\\\[([\s\S]*)\\\]$/.exec(selected);
+                    if (m) { value = m[1]; display = true; }
+                }
+            }
+
+            document.getElementById('formulaInput').value = value;
+            const mode = document.querySelector('input[name="formulaMode"][value="' + (display ? 'display' : 'inline') + '"]');
+            if (mode) mode.checked = true;
+            document.getElementById('formulaModal').style.display = 'flex';
+            updateFormulaPreview();
+            setTimeout(() => document.getElementById('formulaInput').focus(), 50);
+        }
+
+        function closeFormulaModal() {
+            document.getElementById('formulaModal').style.display = 'none';
+            _formulaTarget = null;
+        }
+
+        function updateFormulaPreview() {
+            const raw = document.getElementById('formulaInput').value.trim();
+            const display = document.querySelector('input[name="formulaMode"]:checked').value === 'display';
+            const preview = document.getElementById('formulaPreview');
+            const error = document.getElementById('formulaError');
+            preview.innerHTML = '';
+            error.style.display = 'none';
+
+            if (!raw) {
+                preview.innerHTML = '<span style="color:#999;font-size:0.9em;">Xem trước công thức…</span>';
+                return false;
+            }
+            if (typeof katex === 'undefined') {
+                error.textContent = 'Chưa tải được thư viện hiển thị công thức.';
+                error.style.display = 'block';
+                return false;
+            }
+            try {
+                katex.render(raw, preview, {
+                    displayMode: display,
+                    throwOnError: true,
+                    trust: false,
+                    maxExpand: 1000
+                });
+                return true;
+            } catch (err) {
+                error.textContent = 'Công thức sai cú pháp: ' + (err.message || 'không hợp lệ');
+                error.style.display = 'block';
+                return false;
+            }
+        }
+
+        function confirmFormula() {
+            const raw = document.getElementById('formulaInput').value.trim();
+            if (!raw) return;
+            if (!updateFormulaPreview()) return;
+            const display = document.querySelector('input[name="formulaMode"]:checked').value === 'display';
+            const text = display ? '\\[' + raw + '\\]' : '\\(' + raw + '\\)';
+            const target = _formulaTarget;
+            closeFormulaModal();
+            if (target) insertEditorContent(target, undefined, text);
+        }
+
+        // Bấm vào ảnh trong editor để nhớ ảnh đang chọn (cho nút chỉnh cỡ)
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.tagName === 'IMG' && e.target.closest('.rich-editor')) {
+                _selectedEditorImage = e.target;
+            }
+        });
 
         // ========== FORM THÊM CÂU HỎI MỚI ==========
         // Layout 1 cột: [control] [badge] [input text] [select TF?] [Xóa?]
@@ -2023,10 +2679,22 @@ C. Công thức nước là H₂O. (Đ)</pre>
         document.getElementById('questionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const type = document.getElementById('newQuestionType').value;
-            const question = document.getElementById('questionText').value.trim();
-            if (!question) { showNotification('Vui lòng nhập nội dung câu hỏi'); return; }
+            const editor = document.getElementById('questionText');
+            const question = editor.innerHTML.trim();
+            if (!question || (!stripHtmlTags(question).trim() && !/<img\b/i.test(question))) {
+                showNotification('Vui lòng nhập nội dung câu hỏi');
+                return;
+            }
 
-            let payload = { type, question, options: [] };
+            const pointsInput = document.getElementById('newQuestionPoints');
+            const points = parsePointsClient(pointsInput.value);
+            if (points === null) {
+                showNotification('Điểm phải là số lớn hơn 0 và không quá 100.');
+                pointsInput.focus();
+                return;
+            }
+
+            let payload = { type, question, options: [], points };
 
             if (type === 'shortanswer') {
                 const correctAnswer = normalizeShortAnswerInput(document.getElementById('newShortAnswer').value);
@@ -2084,6 +2752,10 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 showNotification('Đã thêm câu hỏi!');
                 e.target.reset();
                 document.getElementById('newQuestionType').value = 'single';
+                document.getElementById('questionText').innerHTML = '';
+                document.getElementById('questionTextPreview').innerHTML = '';
+                document.getElementById('questionTextStatus').textContent = '';
+                document.getElementById('newQuestionPoints').value = '1';
                 updateNewFormForType();
                 loadQuestions();
             } else {
@@ -2120,7 +2792,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             return `<div style="display:flex;align-items:flex-start;gap:10px;" id="optEditRow${j}">
                 <span style="margin-top:10px;">${ctrlHtml}</span>
                 <span style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;flex-shrink:0;margin-top:6px;">${letter}</span>
-                <textarea id="optEditText${j}" rows="2" style="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;resize:vertical;" placeholder="Đáp án ${letter}">${text}</textarea>
+                <div id="optEditText${j}" class="rich-input" contenteditable="true" data-placeholder="Đáp án ${letter}" style="flex:1;min-height:44px;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;line-height:1.6;overflow-wrap:anywhere;">${text}</div>
                 ${canRemove ? `<button onclick="removeOptionRow(${j})" style="padding:6px 10px;background:#dc3545;color:white;border:none;border-radius:8px;cursor:pointer;flex-shrink:0;margin-top:6px;">✕</button>` : ''}
             </div>`;
         }
@@ -2132,8 +2804,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 const letter = String.fromCharCode(65 + idx);
                 const badge = row.querySelector('span[style*="border-radius:50%"]');
                 if (badge) badge.textContent = letter;
-                const ta = row.querySelector('textarea');
-                if (ta) { ta.id = 'optEditText' + idx; ta.placeholder = 'Đáp án ' + letter; }
+                const ta = row.querySelector('.rich-input');
+                if (ta) { ta.id = 'optEditText' + idx; ta.setAttribute('data-placeholder', 'Đáp án ' + letter); }
                 // update radio/checkbox value and id
                 if (type === 'single') {
                     const inp = row.querySelector('input[type=radio]');
@@ -2186,7 +2858,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
             if (!q) return;
 
             document.getElementById('editQuestionId').value = id;
-            document.getElementById('editQuestionText').value = stripHtmlTags(q.question || '');
+            document.getElementById('editQuestionText').innerHTML = q.question || '';
+            document.getElementById('editQuestionPoints').value = formatPointsClient(q.points);
+            document.getElementById('editQuestionTextStatus').textContent = '';
 
             const type = q.type || 'single';
             document.getElementById('editQuestionType').value = type;
@@ -2204,7 +2878,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 grid.innerHTML = '';
                 for (let j = 0; j < q.options.length; j++) {
                     const tfVal = Array.isArray(q.correctTF) ? q.correctTF[j] : true;
-                    grid.insertAdjacentHTML('beforeend', buildTFRow(j, stripHtmlTags(q.options[j] || ''), tfVal));
+                    grid.insertAdjacentHTML('beforeend', buildTFRow(j, q.options[j] || '', tfVal));
                 }
             } else {
                 document.getElementById('editOptionsSingleMulti').style.display = 'block';
@@ -2214,7 +2888,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 grid.innerHTML = '';
                 const opts = q.options || ['', ''];
                 for (let j = 0; j < opts.length; j++) {
-                    grid.insertAdjacentHTML('beforeend', buildOptionRow(j, stripHtmlTags(opts[j] || ''), type, q));
+                    grid.insertAdjacentHTML('beforeend', buildOptionRow(j, opts[j] || '', type, q));
                 }
                 if (opts.length < 2) {
                     for (let j = opts.length; j < 2; j++) {
@@ -2224,13 +2898,14 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
 
             document.getElementById('editQuestionModal').style.display = 'flex';
+            renderEditorPreview('editQuestionText');
         }
 
         function buildTFRow(j, text, isTrue) {
             const letter = String.fromCharCode(65 + j);
             return `<div style="display:flex;align-items:flex-start;gap:10px;" id="tfEditRow${j}">
                 <span style="background:#667eea;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;flex-shrink:0;margin-top:4px;">${letter}</span>
-                <textarea rows="2" style="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;resize:vertical;" placeholder="Phát biểu ${letter}" id="tfEditOpt${j}">${text}</textarea>
+                <div class="rich-input" contenteditable="true" data-placeholder="Phát biểu ${letter}" style="flex:1;min-height:42px;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;line-height:1.6;overflow-wrap:anywhere;" id="tfEditOpt${j}">${text}</div>
                 <select id="tfEditCorrect${j}" style="padding:8px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;cursor:pointer;">
                     <option value="true" ${isTrue ? 'selected' : ''}>Đúng</option>
                     <option value="false" ${!isTrue ? 'selected' : ''}>Sai</option>
@@ -2265,8 +2940,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     grid.innerHTML = buildOptionRow(0, '', type, null) + buildOptionRow(1, '', type, null);
                 } else {
                     rows.forEach((row, idx) => {
-                        const ta = row.querySelector('textarea');
-                        const text = ta ? ta.value : '';
+                        const ta = row.querySelector('.rich-input');
+                        const text = ta ? ta.innerHTML : '';
                         const newRow = document.createElement('div');
                         newRow.innerHTML = buildOptionRow(idx, text, type, null);
                         grid.replaceChild(newRow.firstElementChild, row);
@@ -2293,8 +2968,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 const letter = String.fromCharCode(65 + idx);
                 const badge = row.querySelector('span');
                 if (badge) badge.textContent = letter;
-                const ta = row.querySelector('textarea');
-                if (ta) { ta.id = 'tfEditOpt' + idx; ta.placeholder = 'Phát biểu ' + letter; }
+                const ta = row.querySelector('.rich-input');
+                if (ta) { ta.id = 'tfEditOpt' + idx; ta.setAttribute('data-placeholder', 'Phát biểu ' + letter); }
                 const sel = row.querySelector('select');
                 if (sel) sel.id = 'tfEditCorrect' + idx;
                 const btn = row.querySelector('button');
@@ -2309,11 +2984,23 @@ C. Công thức nước là H₂O. (Đ)</pre>
         async function saveEditQuestion() {
             const id = document.getElementById('editQuestionId').value;
             const type = document.getElementById('editQuestionType').value;
-            const question = document.getElementById('editQuestionText').value.trim();
+            const question = document.getElementById('editQuestionText').innerHTML.trim();
 
-            if (!question) { showAlert('Vui lòng nhập nội dung câu hỏi!'); return; }
+            if (!question || (!stripHtmlTags(question).trim() && !/<img\b/i.test(question))) {
+                showAlert('Vui lòng nhập nội dung câu hỏi!');
+                return;
+            }
 
-            let updatedQuestion = { type, question, image: null };
+            const pointsInput = document.getElementById('editQuestionPoints');
+            const points = parsePointsClient(pointsInput.value);
+            if (points === null) {
+                showAlert('Điểm phải là số lớn hơn 0 và không quá 100.');
+                pointsInput.focus();
+                return;
+            }
+
+            const original = questions[parseInt(id)] || {};
+            let updatedQuestion = { type, question, image: original.image || null, points };
 
             if (type === 'shortanswer') {
                 const correctAnswer = normalizeShortAnswerInput(document.getElementById('editShortAnswer').value);
@@ -2332,7 +3019,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 let emptyIdx = -1;
                 Array.from(grid.children).forEach((row, j) => {
                     const ta = document.getElementById('optEditText' + j);
-                    const val = ta ? ta.value.trim() : '';
+                    const val = ta ? ta.innerHTML.trim() : '';
                     options.push(val);
                     if (!val && emptyIdx < 0) emptyIdx = j;
                 });
@@ -2352,7 +3039,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 let emptyIdx = -1;
                 Array.from(grid.children).forEach((row, j) => {
                     const ta = document.getElementById('optEditText' + j);
-                    const val = ta ? ta.value.trim() : '';
+                    const val = ta ? ta.innerHTML.trim() : '';
                     options.push(val);
                     if (!val && emptyIdx < 0) emptyIdx = j;
                 });
@@ -2379,7 +3066,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     const ta = document.getElementById('tfEditOpt' + j);
                     const sel = document.getElementById('tfEditCorrect' + j);
                     if (!ta || !sel) continue;
-                    const text = ta.value.trim();
+                    const text = ta.innerHTML.trim();
                     if (!text) { showAlert('Phát biểu ' + String.fromCharCode(65+j) + ' không được để trống!'); return; }
                     options.push(text);
                     correctTF.push(sel.value === 'true');
@@ -2561,20 +3248,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
             // Render công thức toán và syntax highlight
             const detailContent = document.getElementById('detailContent');
-            if (typeof renderMathInElement !== 'undefined') {
-                renderMathInElement(detailContent, {
-                    delimiters: [
-                        {left: '\\(', right: '\\)', display: false},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '$$', right: '$$', display: true}
-                    ],
-                    throwOnError: false
-                });
-            }
-            if (typeof hljs !== 'undefined') {
-                detailContent.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-            }
+            renderKatex(detailContent);
         }
 
         function closeModal() {
@@ -3569,6 +4243,321 @@ C. Công thức nước là H₂O. (Đ)</pre>
         });
         
         // ========== END QUẢN LÝ BÀI KIỂM TRA ==========
+
+        // ========== QUẢN LÝ DANH SÁCH ÔN TẬP ==========
+        let reviewListsCache = [];
+        let editingReview = null;
+        let reviewExamMeta = {};
+
+        async function reviewFetch(url, options) {
+            const res = await fetch(url, options || {});
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            return data;
+        }
+
+        async function loadReviewLists() {
+            const box = document.getElementById('reviewListsBox');
+            if (!box) return;
+            try {
+                const data = await reviewFetch('/api/review-lists');
+                reviewListsCache = data.lists || [];
+                if (!reviewListsCache.length) {
+                    box.innerHTML = '<p style="color:#666;text-align:center;padding:24px;background:#fafafa;border:1px dashed #ddd;border-radius:10px;">Chưa có danh sách ôn tập nào.</p>';
+                    return;
+                }
+                box.innerHTML = reviewListsCache.map((list) => `
+                    <div class="settings-card" style="margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:220px;">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                    <strong style="font-size:1.05em;">${escapeHtml(list.name)}</strong>
+                                    <span style="background:${list.active ? '#e8f5e9' : '#eee'};color:${list.active ? '#2e7d32' : '#666'};padding:2px 9px;border-radius:10px;font-size:0.75em;">${list.active ? 'Đang mở' : 'Đã tắt'}</span>
+                                    ${list.subject ? `<span style="background:#eef0ff;color:#4a54b8;padding:2px 9px;border-radius:10px;font-size:0.75em;">${escapeHtml(list.subject)}</span>` : ''}
+                                </div>
+                                ${list.description ? `<p style="margin:6px 0 0;color:#666;font-size:0.9em;">${escapeHtml(list.description)}</p>` : ''}
+                                <p style="margin:6px 0 0;color:#888;font-size:0.85em;">${list.itemCount} đề • ${list.attemptCount} lượt đã nộp</p>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+                                <button onclick="copyReviewLink('${list.id}')" style="background:#eef0ff;color:#4a54b8;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85em;">Copy link</button>
+                                <button onclick="openReviewEditor('${list.id}')" style="background:#fff3e0;color:#e65100;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85em;">Sửa</button>
+                                <button onclick="showReviewResults('${list.id}')" style="background:#e8f5e9;color:#2e7d32;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85em;">Kết quả</button>
+                                <button onclick="toggleReviewList('${list.id}', ${!list.active})" style="background:#f5f5f5;color:#444;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85em;">${list.active ? 'Tắt' : 'Bật'}</button>
+                                <button onclick="deleteReviewList('${list.id}')" style="background:#ffebee;color:#c62828;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85em;">Xóa</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                box.innerHTML = `<p style="color:#c62828;">Lỗi tải danh sách: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        async function createReviewList() {
+            const name = document.getElementById('newReviewName').value.trim();
+            if (!name) {
+                showNotification('Vui lòng nhập tên danh sách', 'warning');
+                return;
+            }
+            try {
+                await reviewFetch('/api/review-lists', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        subject: document.getElementById('newReviewSubject').value,
+                        description: document.getElementById('newReviewDescription').value
+                    })
+                });
+                document.getElementById('newReviewName').value = '';
+                document.getElementById('newReviewSubject').value = '';
+                document.getElementById('newReviewDescription').value = '';
+                showNotification('Đã tạo danh sách ôn tập');
+                loadReviewLists();
+            } catch (err) {
+                showNotification('Lỗi: ' + err.message, 'error');
+            }
+        }
+
+        async function copyReviewLink(listId) {
+            const url = location.origin + '/on-tap?list=' + encodeURIComponent(listId);
+            try {
+                await navigator.clipboard.writeText(url);
+                showNotification('Đã copy link: ' + url);
+            } catch (err) {
+                prompt('Copy link này cho học sinh:', url);
+            }
+        }
+
+        async function toggleReviewList(listId, active) {
+            try {
+                await reviewFetch('/api/review-lists/' + encodeURIComponent(listId), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: active })
+                });
+                showNotification(active ? 'Đã bật danh sách' : 'Đã tắt danh sách');
+                loadReviewLists();
+            } catch (err) {
+                showNotification('Lỗi: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteReviewList(listId) {
+            if (!confirm('Xóa danh sách này? Lịch sử làm bài vẫn được giữ lại.')) return;
+            try {
+                await reviewFetch('/api/review-lists/' + encodeURIComponent(listId), { method: 'DELETE' });
+                showNotification('Đã xóa danh sách');
+                loadReviewLists();
+            } catch (err) {
+                showNotification('Lỗi: ' + err.message, 'error');
+            }
+        }
+
+        async function openReviewEditor(listId) {
+            try {
+                const [listData, examsData] = await Promise.all([
+                    reviewFetch('/api/review-lists/' + encodeURIComponent(listId)),
+                    reviewFetch('/api/exams')
+                ]);
+                editingReview = JSON.parse(JSON.stringify(listData.list));
+                reviewExamMeta = {};
+                (examsData.exams || []).forEach((exam) => { reviewExamMeta[exam.id] = exam; });
+
+                document.getElementById('editReviewName').value = editingReview.name || '';
+                document.getElementById('editReviewSubject').value = editingReview.subject || '';
+                document.getElementById('editReviewDescription').value = editingReview.description || '';
+                document.getElementById('editReviewActive').checked = editingReview.active !== false;
+
+                const select = document.getElementById('reviewExamSelect');
+                select.innerHTML = '<option value="">-- Chọn đề để thêm --</option>' + (examsData.exams || []).map((exam) =>
+                    `<option value="${exam.id}">${escapeHtml(exam.name)} (${exam.questionCount} câu)</option>`
+                ).join('');
+
+                renderReviewItems();
+                document.getElementById('reviewEditorModal').style.display = 'flex';
+            } catch (err) {
+                showNotification('Lỗi: ' + err.message, 'error');
+            }
+        }
+
+        function closeReviewEditor() {
+            document.getElementById('reviewEditorModal').style.display = 'none';
+            editingReview = null;
+        }
+
+        function reviewExamName(examId) {
+            const meta = reviewExamMeta[examId];
+            return meta ? meta.name : '[Đề đã bị xóa]';
+        }
+
+        function renderReviewItems() {
+            const box = document.getElementById('reviewItemsBox');
+            if (!editingReview || !editingReview.items || !editingReview.items.length) {
+                box.innerHTML = '<p style="color:#666;padding:14px;background:#fafafa;border:1px dashed #ddd;border-radius:8px;">Chưa có đề. Chọn đề ở trên rồi bấm “Thêm đề”.</p>';
+                return;
+            }
+            box.innerHTML = editingReview.items.map((item, idx) => {
+                const s = item.settings || {};
+                const meta = reviewExamMeta[item.examId];
+                const deleted = !meta;
+                return `
+                    <div style="border:1px solid ${deleted ? '#ffcdd2' : '#e0e0e0'};border-radius:10px;padding:12px 14px;margin-bottom:10px;background:${deleted ? '#fff8f8' : '#fafafa'};">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <strong>${idx + 1}. ${escapeHtml(reviewExamName(item.examId))}${meta ? ` <span style="color:#888;font-weight:normal;font-size:0.85em;">(${meta.questionCount} câu)</span>` : ''}</strong>
+                            <div style="display:flex;gap:6px;">
+                                <button onclick="moveReviewItem(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} style="background:#eee;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;" title="Lên">↑</button>
+                                <button onclick="moveReviewItem(${idx}, 1)" ${idx === editingReview.items.length - 1 ? 'disabled' : ''} style="background:#eee;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;" title="Xuống">↓</button>
+                                <button onclick="removeReviewItem(${idx})" style="background:#ffebee;color:#c62828;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;">Xóa</button>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;">
+                            <label style="font-size:0.85em;color:#555;">Số lần làm tối đa
+                                <input type="number" min="0" id="reviewItemMax-${idx}" value="${Number(s.maxAttempts) || 0}" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+                                <span style="color:#999;font-size:0.9em;">0 = không giới hạn</span>
+                            </label>
+                            <label style="font-size:0.85em;color:#555;">Thời gian (phút)
+                                <input type="number" min="0" id="reviewItemTime-${idx}" value="${Number(s.timeLimit) || 0}" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+                                <span style="color:#999;font-size:0.9em;">0 = không giới hạn</span>
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:0.85em;color:#444;">
+                            <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="reviewItemShowResult-${idx}" ${s.showResult !== false ? 'checked' : ''}> Xem đúng/sai</label>
+                            <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="reviewItemShowAnswers-${idx}" ${s.showAnswers ? 'checked' : ''}> Xem đáp án</label>
+                            <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="reviewItemPractice-${idx}" ${s.practiceMode ? 'checked' : ''}> Báo đúng/sai ngay</label>
+                            <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="reviewItemShuffle-${idx}" ${s.shuffleExam !== false ? 'checked' : ''}> Đảo thứ tự câu</label>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addReviewExam() {
+            const select = document.getElementById('reviewExamSelect');
+            const examId = select.value;
+            if (!examId) return;
+            if (editingReview.items.some((item) => String(item.examId) === String(examId))) {
+                showNotification('Đề này đã có trong danh sách', 'warning');
+                return;
+            }
+            editingReview.items.push({
+                examId: examId,
+                settings: { maxAttempts: 0, timeLimit: 0, showResult: true, showAnswers: false, practiceMode: false, shuffleExam: true }
+            });
+            select.value = '';
+            renderReviewItems();
+        }
+
+        function moveReviewItem(idx, delta) {
+            const target = idx + delta;
+            if (!editingReview || target < 0 || target >= editingReview.items.length) return;
+            const items = editingReview.items;
+            const tmp = items[idx];
+            items[idx] = items[target];
+            items[target] = tmp;
+            renderReviewItems();
+        }
+
+        function removeReviewItem(idx) {
+            if (!editingReview) return;
+            editingReview.items.splice(idx, 1);
+            renderReviewItems();
+        }
+
+        async function saveReviewList() {
+            if (!editingReview) return;
+            const name = document.getElementById('editReviewName').value.trim();
+            if (!name) {
+                showNotification('Vui lòng nhập tên danh sách', 'warning');
+                return;
+            }
+            const items = editingReview.items.map((item, idx) => ({
+                examId: item.examId,
+                settings: {
+                    maxAttempts: Number(document.getElementById('reviewItemMax-' + idx).value) || 0,
+                    timeLimit: Number(document.getElementById('reviewItemTime-' + idx).value) || 0,
+                    showResult: document.getElementById('reviewItemShowResult-' + idx).checked,
+                    showAnswers: document.getElementById('reviewItemShowAnswers-' + idx).checked,
+                    practiceMode: document.getElementById('reviewItemPractice-' + idx).checked,
+                    shuffleExam: document.getElementById('reviewItemShuffle-' + idx).checked
+                }
+            }));
+            try {
+                await reviewFetch('/api/review-lists/' + encodeURIComponent(editingReview.id), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        subject: document.getElementById('editReviewSubject').value,
+                        description: document.getElementById('editReviewDescription').value,
+                        active: document.getElementById('editReviewActive').checked,
+                        items: items
+                    })
+                });
+                closeReviewEditor();
+                showNotification('Đã lưu danh sách ôn tập');
+                loadReviewLists();
+            } catch (err) {
+                showNotification('Lỗi: ' + err.message, 'error');
+            }
+        }
+
+        async function showReviewResults(listId) {
+            const body = document.getElementById('reviewResultsBody');
+            body.innerHTML = '<p style="color:#666;">Đang tải...</p>';
+            document.getElementById('reviewResultsModal').style.display = 'flex';
+            try {
+                const data = await reviewFetch('/api/review-lists/' + encodeURIComponent(listId) + '/results');
+                document.getElementById('reviewResultsTitle').textContent = 'Kết quả: ' + data.list.name;
+                if (!data.exams || !data.exams.length) {
+                    body.innerHTML = '<p style="color:#666;">Danh sách chưa có đề.</p>';
+                    return;
+                }
+                body.innerHTML = data.exams.map((exam) => {
+                    const rows = (exam.attempts || []).map((a) => `
+                        <tr>
+                            <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentSTT)}</td>
+                            <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentName || '')}</td>
+                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>${a.score}</strong></td>
+                            <td style="padding:8px;border-bottom:1px solid #eee;">${a.correctCount}/${a.totalQuestions}</td>
+                            <td style="padding:8px;border-bottom:1px solid #eee;">${formatDuration(a.timeSpent)}</td>
+                            <td style="padding:8px;border-bottom:1px solid #eee;">${formatDate(a.submittedAt)}</td>
+                        </tr>
+                    `).join('');
+                    return `
+                        <div style="margin-bottom:18px;">
+                            <h4 style="margin:0 0 8px 0;">${escapeHtml(exam.examName)} <span style="color:#888;font-weight:normal;font-size:0.85em;">(tối đa ${exam.settings.maxAttempts || '∞'} lượt, ${exam.settings.timeLimit ? exam.settings.timeLimit + ' phút' : 'không giới hạn thời gian'})</span></h4>
+                            ${rows ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                                <thead><tr style="background:#f5f5f5;text-align:left;">
+                                    <th style="padding:8px;">STT</th><th style="padding:8px;">Họ tên</th><th style="padding:8px;">Điểm</th><th style="padding:8px;">Đúng</th><th style="padding:8px;">Thời gian</th><th style="padding:8px;">Nộp lúc</th>
+                                </tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table></div>` : '<p style="color:#888;font-size:0.9em;">Chưa có lượt nộp.</p>'}
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                body.innerHTML = `<p style="color:#c62828;">Lỗi: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        function closeReviewResults() {
+            document.getElementById('reviewResultsModal').style.display = 'none';
+        }
+
+        function formatDuration(seconds) {
+            const total = Math.max(0, Math.floor(Number(seconds) || 0));
+            return Math.floor(total / 60) + ' phút ' + (total % 60) + ' giây';
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '--';
+            try {
+                return new Date(iso).toLocaleString('vi-VN');
+            } catch (err) {
+                return iso;
+            }
+        }
 
         // Initialize
         loadQuestions();

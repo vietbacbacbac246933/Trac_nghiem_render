@@ -38,6 +38,19 @@ var underline = require('./lib/underline');
 // Chuan hoa dap an tra loi ngan (so nguyen/thap phan, khong sai so)
 var shortAnswer = require('./lib/short-answer');
 var answerTables = require('./lib/answer-tables');
+// Kho anh tai len + quy tac noi dung cau hoi (sanitize, diem)
+var assets = require('./lib/assets');
+var questionContent = require('./lib/question-content');
+var sanitizeHtml = questionContent.sanitizeHtml;
+var parsePointsInput = questionContent.parsePointsInput;
+// Danh sach on tap (nhieu de / hoc sinh tu chon)
+var review = require('./lib/review');
+// Cham diem dung chung cho Thi va On tap
+var grading = require('./lib/grading');
+var normalizePoints = grading.normalizePoints;
+var scoreQuestion = grading.scoreQuestion;
+// Logic che do On tap (gioi han luot, thoi gian, loc du lieu tra ve client)
+var practice = require('./lib/practice');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -81,6 +94,23 @@ var importUpload = multer({
     fileFilter: function (req, file, cb) {
         if (!fileValidate.detectKind(file.originalname, file.mimetype)) {
             var err = new Error('Định dạng không hỗ trợ: "' + (file.originalname || '') + '". Chỉ nhận .docx và file ảnh.');
+            err.code = 'UNSUPPORTED_TYPE';
+            return cb(err);
+        }
+        cb(null, true);
+    }
+});
+
+// Multer riêng cho ảnh chèn trực tiếp vào câu hỏi.
+var assetUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: fileValidate.FILE_LIMITS.maxImageBytes,
+        files: 1
+    },
+    fileFilter: function (req, file, cb) {
+        if (fileValidate.detectKind(file.originalname, file.mimetype) !== 'image') {
+            var err = new Error('Chỉ nhận file ảnh (png, jpg, gif, bmp, webp).');
             err.code = 'UNSUPPORTED_TYPE';
             return cb(err);
         }
@@ -196,6 +226,11 @@ app.get('/teacher/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'teacher-login.html'));
 });
 
+// Trang ôn tập: danh sách đề do giáo viên công khai, học sinh tự chọn đề.
+app.get('/on-tap', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'review.html'));
+});
+
 // Đăng nhập giáo viên bằng mật khẩu (TEACHER_PASSWORD)
 app.post('/api/teacher/login', (req, res) => {
     var ip = req.ip || '';
@@ -227,6 +262,51 @@ app.get('/api/teacher/session', (req, res) => {
     res.json({ authenticated: true });
 });
 
+// ========== ẢNH CHÈN TRỰC TIẾP VÀO CÂU HỎI ==========
+// Chỉ giáo viên được tải lên. Nội dung được kiểm tra magic bytes, không tin
+// tên file/MIME do trình duyệt khai báo.
+app.post('/api/assets', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+    assetUpload.single('file')(req, res, function (err) {
+        if (err) {
+            var msg = err.code === 'LIMIT_FILE_SIZE'
+                ? 'Ảnh quá lớn. Tối đa ' + Math.round(fileValidate.FILE_LIMITS.maxImageBytes / 1024 / 1024) + ' MB.'
+                : (err.message || 'Lỗi tải ảnh lên.');
+            return res.status(400).json({ error: msg });
+        }
+        if (!req.file) return res.status(400).json({ error: 'Chưa chọn ảnh.' });
+
+        var check = fileValidate.validateUpload(req.file);
+        if (!check.ok) return res.status(400).json({ error: check.error });
+
+        var id = assets.newId(check.imageType);
+        if (!id) return res.status(400).json({ error: 'Định dạng ảnh không hỗ trợ.' });
+
+        DATA.saveAsset(id, req.file.buffer).then(function () {
+            res.json({ success: true, url: assets.urlForId(id) });
+        }).catch(function () {
+            res.status(500).json({ error: 'Không lưu được ảnh. Vui lòng thử lại.' });
+        });
+    });
+});
+
+// Ảnh dùng chung cho cả giáo viên và học sinh. Id ngẫu nhiên 128-bit nên
+// không đoán được; nội dung đã được xác thực là ảnh ở bước tải lên.
+app.get('/api/assets/:id', function (req, res) {
+    var id = req.params.id;
+    if (!assets.isAssetId(id)) return res.status(404).end();
+
+    DATA.readAsset(id).then(function (buffer) {
+        if (!buffer || !buffer.length) return res.status(404).end();
+        res.set('Content-Type', assets.mimeForId(id));
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+        res.send(buffer);
+    }).catch(function () {
+        res.status(404).end();
+    });
+});
+
 // Lưu trữ dữ liệu
 var questions = [];
 var results = [];
@@ -256,6 +336,10 @@ var examSettings = {
     isOpen: false,
     showScore: false,
     practiceMode: false,
+    // Cấu hình Ôn tập (null = không giới hạn). Mặc định tương thích đề cũ.
+    practiceMaxAttempts: null,
+    practiceTimeLimitMinutes: null,
+    practiceReviewMode: 'answer',
     shuffleExam: false,
     examPassword: '',
     requirePassword: false
@@ -339,6 +423,193 @@ function deleteExam(examId) {
         return true;
     }
     return false;
+}
+
+// ========== DANH SÁCH ÔN TẬP ==========
+// Một danh sách chỉ tham chiếu examId; không sao chép câu hỏi/đáp án.
+var reviewLists = {};
+var REVIEW_LISTS_PATH = path.join(__dirname, 'data', 'review-lists.json');
+
+function isSafeId(id) {
+    return /^[A-Za-z0-9_-]+$/.test(String(id || ''));
+}
+
+function loadReviewLists() {
+    reviewLists = DATA.readJson(REVIEW_LISTS_PATH, {}) || {};
+}
+
+function saveReviewLists() {
+    DATA.writeJson(REVIEW_LISTS_PATH, reviewLists);
+}
+
+function getReviewList(listId) {
+    if (!isSafeId(listId)) return null;
+    return reviewLists[listId] || null;
+}
+
+function getReviewAttemptsPath(listId, examId) {
+    return path.join(__dirname, 'data', 'review-attempts', listId + '__' + examId + '.json');
+}
+
+function loadReviewAttempts(listId, examId) {
+    var data = DATA.readJson(getReviewAttemptsPath(listId, examId), []);
+    return Array.isArray(data) ? data : [];
+}
+
+function saveReviewAttempts(listId, examId, attempts) {
+    DATA.writeJson(getReviewAttemptsPath(listId, examId), attempts);
+}
+
+function findReviewItem(list, examId) {
+    if (!list || !Array.isArray(list.items)) return null;
+    for (var i = 0; i < list.items.length; i++) {
+        if (list.items[i] && String(list.items[i].examId) === String(examId)) return list.items[i];
+    }
+    return null;
+}
+
+function findStudentByStt(stt) {
+    if (stt === undefined || stt === null) return null;
+    for (var i = 0; i < students.length; i++) {
+        if (String(students[i].stt) === String(stt)) return students[i];
+    }
+    return null;
+}
+
+function studentFullName(s) {
+    return ((s.ho || '') + ' ' + (s.ten || '')).trim();
+}
+
+function publicReviewExam(examId, settings) {
+    var exam = loadExam(examId);
+    if (!exam) {
+        return {
+            examId: examId,
+            examName: '[Đề đã bị xóa]',
+            questionCount: 0,
+            available: false,
+            settings: settings
+        };
+    }
+    var qs = Array.isArray(exam.questions) ? exam.questions : [];
+    return {
+        examId: examId,
+        examName: exam.name || examId,
+        questionCount: qs.length,
+        available: true,
+        settings: settings
+    };
+}
+
+function buildReviewListPayload(list, stt) {
+    var items = (list.items || []).map(function (item) {
+        var info = publicReviewExam(item.examId, item.settings);
+        var attempts = loadReviewAttempts(list.id, item.examId);
+        info.history = review.statusOf(attempts, item.settings.maxAttempts, stt);
+        return info;
+    });
+    return {
+        id: list.id,
+        name: list.name,
+        description: list.description || '',
+        subject: list.subject || '',
+        active: list.active !== false,
+        createdAt: list.createdAt,
+        updatedAt: list.updatedAt,
+        itemCount: items.length,
+        items: items
+    };
+}
+
+function formatDuration(seconds) {
+    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    return m + ' phút ' + s + ' giây';
+}
+
+function reviewSettingsPayload(settings) {
+    return {
+        maxAttempts: settings.maxAttempts,
+        timeLimit: settings.timeLimit,
+        showResult: settings.showResult,
+        showAnswers: settings.showAnswers,
+        practiceMode: settings.practiceMode,
+        shuffleExam: settings.shuffleExam
+    };
+}
+
+// Ghi kết quả vào một lượt làm. Dùng chung cho nộp bài và đóng lượt quá hạn.
+// Không ghi đè lượt khác; caller tự lưu mảng attempts.
+function settleReviewAttempt(attempt, questions, answers, settings, expired) {
+    var now = Date.now();
+    var limit = review.attemptTimeLimit(attempt, settings);
+    var elapsedSec = Math.max(0, Math.floor((now - new Date(attempt.startedAt).getTime()) / 1000));
+    if (limit > 0) elapsedSec = Math.min(elapsedSec, limit * 60);
+
+    var graded = gradeQuestions(questions, answers, { snapshot: true });
+    attempt.status = 'submitted';
+    attempt.submittedAt = new Date(now).toISOString();
+    attempt.expired = !!expired;
+    attempt.score = graded.score;
+    attempt.correctCount = graded.correctCount;
+    attempt.partialCount = graded.partialCount;
+    attempt.wrongCount = graded.wrongCount;
+    attempt.unansweredCount = graded.unansweredCount;
+    attempt.totalQuestions = graded.totalQuestions;
+    attempt.timeSpent = formatDuration(elapsedSec);
+    attempt.details = graded.details;
+    return graded;
+}
+
+// Ẩn đáp án trước khi học sinh nộp bài.
+function sanitizeExamForStudent(questionList) {
+    return (questionList || []).map(function (q, index) {
+        var mq = migrateQuestion(q);
+        return {
+            id: index,
+            type: mq.type || 'single',
+            question: mq.question,
+            options: mq.options,
+            image: mq.image || null
+        };
+    });
+}
+
+function filterHistoryDetails(settings, details) {
+    if (!Array.isArray(details)) return null;
+    if (!settings.showResult && !settings.showAnswers) return null;
+    return details.map(function (d, position) {
+        var hasAnswer = d.hasAnswer !== undefined
+            ? !!d.hasAnswer
+            : !!(d.studentAnswerText !== undefined && d.studentAnswerText !== null && String(d.studentAnswerText).trim() !== '');
+        var item = {
+            index: typeof d.index === 'number' ? d.index : position,
+            question: d.question,
+            type: d.type,
+            studentAnswerText: d.studentAnswerText,
+            hasAnswer: hasAnswer,
+            options: Array.isArray(d.options) ? d.options : null,
+            image: d.image || null
+        };
+        if (settings.showResult || settings.showAnswers) {
+            // Đúng / đúng một phần / sai / chưa trả lời. Câu bỏ trống không phải câu sai.
+            item.status = d.status || (hasAnswer
+                ? (d.isCorrect ? 'correct' : (Number(d.questionScore) > 0 ? 'partial' : 'wrong'))
+                : 'unanswered');
+        }
+        if (settings.showResult) {
+            item.isCorrect = d.isCorrect;
+            item.questionScore = d.questionScore;
+        }
+        if (settings.showAnswers) {
+            item.correctAnswerText = d.correctAnswerText;
+            item.correctAnswer = d.correctAnswer;
+            item.correctList = d.correctList;
+            item.correctTF = d.correctTF;
+        }
+        return item;
+    });
 }
 
 // ========== QUẢN LÝ KẾT QUẢ THEO LỚP + BÀI ==========
@@ -798,6 +1069,25 @@ function migrateQuestion(q) {
     };
 }
 
+// Áp cấu hình đã lưu của một đề vào phiên hiện tại.
+// Giữ hành vi cũ: mỗi lần chọn/chuyển đề đều tắt Ôn tập, tắt hiển thị điểm,
+// bật trộn đề và đóng bài thi; riêng cấu hình Ôn tập (số lượt/thời gian/cách
+// xem kết quả) được nạp lại từ đề đã lưu.
+function applyExamSettings(settings) {
+    examSettings.practiceMaxAttempts = null;
+    examSettings.practiceTimeLimitMinutes = null;
+    examSettings.practiceReviewMode = 'answer';
+    examSettings = mergeObjects(examSettings, settings || {});
+    var cfg = practice.normalizeConfig(examSettings);
+    examSettings.practiceMaxAttempts = cfg.maxAttempts;
+    examSettings.practiceTimeLimitMinutes = cfg.timeLimitMinutes;
+    examSettings.practiceReviewMode = cfg.reviewMode;
+    examSettings.practiceMode = false;
+    examSettings.showScore = false;
+    examSettings.shuffleExam = true;
+    examSettings.isOpen = false;
+}
+
 // Load câu hỏi từ file hoặc từ bài kiểm tra hiện tại
 function loadQuestions() {
     // Nếu đang có session với examId, load từ exam đã lưu
@@ -805,11 +1095,7 @@ function loadQuestions() {
         var exam = loadExam(currentSession.examId);
         if (exam) {
             questions = (exam.questions || []).map(migrateQuestion);
-            examSettings = mergeObjects(examSettings, exam.settings);
-            examSettings.practiceMode = false;
-            examSettings.showScore = false;
-            examSettings.shuffleExam = true;
-            examSettings.isOpen = false;
+            applyExamSettings(exam.settings);
             console.log('[OK] Da tai ' + questions.length + ' cau hoi tu bai "' + currentSession.examName + '"');
             return;
         }
@@ -864,6 +1150,50 @@ function loadResults() {
     } else {
         results = DATA.readJson(path.join(__dirname, 'data', 'results.json'), []) || [];
     }
+}
+
+// ========== ÔN TẬP: LƯU LỊCH SỬ TỪNG LƯỢT ==========
+// Mỗi cặp (đề, học sinh) là một document chứa mảng attempts. Không ghi đè lượt cũ.
+function getCurrentExamId() {
+    return currentSession.examId || 'default';
+}
+
+function practiceDocPath(examId, stt) {
+    var safeExam = String(examId).replace(/[^A-Za-z0-9_-]/g, '_');
+    var safeStt = String(stt).replace(/[^A-Za-z0-9_-]/g, '_');
+    return path.join(__dirname, 'data', 'practice', safeExam + '__' + safeStt + '.json');
+}
+
+function loadPracticeDoc(examId, stt) {
+    return DATA.readJson(practiceDocPath(examId, stt), null);
+}
+
+function savePracticeDoc(examId, stt, doc) {
+    DATA.writeJson(practiceDocPath(examId, stt), doc);
+}
+
+function isValidStudentStt(stt) {
+    if (stt === undefined || stt === null || stt === '') return false;
+    return students.some(function(s) { return String(s.stt) === String(stt); });
+}
+
+// Lưu cấu hình phiên hiện tại vào file đề để giữ qua các lần chọn đề.
+function persistCurrentExamSettings() {
+    if (!currentSession.examId) return;
+    var examPath = path.join(__dirname, 'data', 'exams', currentSession.examId + '.json');
+    var examData = DATA.readJson(examPath, null);
+    if (!examData) return;
+    examData.settings = mergeObjects(examData.settings || {}, examSettings);
+    DATA.writeJson(examPath, examData);
+}
+
+// Snapshot câu hỏi tại thời điểm bắt đầu lượt: xem lại không sai nếu giáo viên sửa đề.
+function currentExamSnapshot() {
+    return {
+        name: currentSession.examName || examSettings.title,
+        at: new Date().toISOString(),
+        questions: JSON.parse(JSON.stringify(questions.map(migrateQuestion)))
+    };
 }
 
 // ========== CHỌN TÊN HỌC SINH ==========
@@ -1240,24 +1570,35 @@ app.get('/api/exam', (req, res) => {
         examId: currentSession.examId || 'default',
         examName: currentSession.examName || examSettings.title,
         practiceMode: examSettings.practiceMode || false,
+        practiceMaxAttempts: examSettings.practiceMaxAttempts === undefined ? null : examSettings.practiceMaxAttempts,
+        practiceTimeLimitMinutes: examSettings.practiceTimeLimitMinutes === undefined ? null : examSettings.practiceTimeLimitMinutes,
+        practiceReviewMode: examSettings.practiceReviewMode || 'answer',
         shuffleExam: examSettings.shuffleExam !== false
     });
 });
 
-// API kiểm tra đáp án cho chế độ ôn tập
+// API kiểm tra đáp án trong chế độ ôn tập.
+// Chỉ trả đáp án khi giáo viên cho phép VÀ lượt làm đã nộp (không lộ đáp án
+// trước khi nộp). Giao diện hiện tại dùng /api/practice/review thay thế.
 app.post('/api/check-answer', (req, res) => {
-    if (!examSettings.practiceMode) {
-        return res.status(403).json({ error: 'Chế độ ôn tập chưa được bật' });
+    var cfg = practice.normalizeConfig(examSettings);
+    if (!examSettings.practiceMode || cfg.reviewMode !== 'answer') {
+        return res.status(403).json({ error: 'Chế độ xem đáp án chưa được bật' });
     }
 
-    var { questionIndex, answer } = req.body;
+    var { questionIndex, answer, attemptId, token } = req.body;
+    var doc = loadPracticeDoc(getCurrentExamId(), String(req.body.stt || ''));
+    var attempt = doc ? practice.findById(doc.attempts, attemptId) : null;
+    if (!attempt || attempt.status === 'in_progress' || doc.ownerToken !== token) {
+        return res.status(403).json({ error: 'Chưa thể xem đáp án' });
+    }
 
     if (questionIndex < 0 || questionIndex >= questions.length) {
         return res.json({ error: 'Câu hỏi không hợp lệ' });
     }
 
     var q = migrateQuestion(questions[questionIndex]);
-    var questionScore = scoreQuestion(q, answer);
+    var questionScore = grading.scoreQuestion(q, answer);
 
     res.json({
         isCorrect: questionScore === 1,
@@ -1398,6 +1739,24 @@ app.put('/api/questions/:id', (req, res) => {
     }
 });
 
+// Chỉ đổi điểm (trọng số) của một câu — không ghi đè nội dung/đáp án/ảnh.
+app.patch('/api/questions/:id/points', (req, res) => {
+    if (!isTeacher(req)) {
+        return res.status(403).json({ error: 'Không có quyền truy cập' });
+    }
+    var id = parseInt(req.params.id);
+    if (!(id >= 0 && id < questions.length)) {
+        return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
+    }
+    var points = parsePointsInput(req.body && req.body.points);
+    if (points === null) {
+        return res.status(400).json({ error: 'Điểm phải là số lớn hơn 0 và không quá 100' });
+    }
+    questions[id].points = points;
+    saveQuestions();
+    res.json({ success: true, points: points });
+});
+
 // Xóa câu hỏi (chỉ localhost)
 app.delete('/api/questions/:id', (req, res) => {
     if (!isTeacher(req)) {
@@ -1432,10 +1791,24 @@ app.post('/api/settings', (req, res) => {
     if (!isTeacher(req)) {
         return res.status(403).json({ error: 'Không có quyền thực hiện thao tác này' });
     }
+    var configError = practice.validateConfig(req.body);
+    if (configError) {
+        return res.status(400).json({ success: false, error: configError });
+    }
     examSettings = mergeObjects(examSettings, req.body);
+    var cfg = practice.normalizeConfig(examSettings);
+    examSettings.practiceMaxAttempts = cfg.maxAttempts;
+    examSettings.practiceTimeLimitMinutes = cfg.timeLimitMinutes;
+    examSettings.practiceReviewMode = cfg.reviewMode;
     saveCurrentSession();
+    persistCurrentExamSettings();
     io.emit('examStatusChanged', examSettings.isOpen);
-    io.emit('settingsChanged', { practiceMode: examSettings.practiceMode });
+    io.emit('settingsChanged', {
+        practiceMode: examSettings.practiceMode,
+        practiceMaxAttempts: examSettings.practiceMaxAttempts,
+        practiceTimeLimitMinutes: examSettings.practiceTimeLimitMinutes,
+        practiceReviewMode: examSettings.practiceReviewMode
+    });
     res.json({ success: true });
 });
 
@@ -1537,12 +1910,7 @@ app.post('/api/session', (req, res) => {
         
         // Load câu hỏi từ exam
         questions = exam.questions || [];
-        examSettings = mergeObjects(examSettings, exam.settings, { isOpen: false });
-        // Reset về mặc định khi chuyển đề
-        examSettings.practiceMode = false;
-        examSettings.showScore = false;
-        examSettings.shuffleExam = true;
-        examSettings.isOpen = false;
+        applyExamSettings(exam.settings);
     }
     
     saveCurrentSession();
@@ -1928,12 +2296,7 @@ app.post('/api/exams/switch', (req, res) => {
     
     // Load câu hỏi và cài đặt từ bài kiểm tra
     questions = exam.questions || [];
-    examSettings = mergeObjects(examSettings, exam.settings, { isOpen: false });
-    // Reset về mặc định khi chuyển đề
-    examSettings.practiceMode = false;
-    examSettings.showScore = false;
-    examSettings.shuffleExam = true;
-    examSettings.isOpen = false;
+    applyExamSettings(exam.settings);
     
     // Cập nhật session
     currentSession.examId = examId;
@@ -2170,45 +2533,454 @@ app.post('/api/exams/new', (req, res) => {
 
 // ========== END QUẢN LÝ BÀI KIỂM TRA ==========
 
+// ========== API DANH SÁCH ÔN TẬP ==========
+
+function teacherReviewSummary(list) {
+    var items = (list.items || []).map(function (item) {
+        return publicReviewExam(item.examId, item.settings);
+    });
+    var attemptCount = 0;
+    (list.items || []).forEach(function (item) {
+        attemptCount += loadReviewAttempts(list.id, item.examId).filter(function (a) {
+            return a && a.status === 'submitted';
+        }).length;
+    });
+    return {
+        id: list.id,
+        name: list.name,
+        description: list.description || '',
+        subject: list.subject || '',
+        active: list.active !== false,
+        itemCount: items.length,
+        attemptCount: attemptCount,
+        createdAt: list.createdAt,
+        updatedAt: list.updatedAt
+    };
+}
+
+// --- Giáo viên: quản lý danh sách ---
+app.get('/api/review-lists', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền truy cập' });
+    var lists = Object.keys(reviewLists).map(function (id) {
+        return teacherReviewSummary(reviewLists[id]);
+    }).sort(function (a, b) {
+        return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+    });
+    res.json({ lists: lists });
+});
+
+app.get('/api/review-lists/:listId', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền truy cập' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    res.json({ success: true, list: list });
+});
+
+app.post('/api/review-lists', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    var name = String((req.body && req.body.name) || '').trim();
+    if (!name) return res.status(400).json({ error: 'Vui lòng nhập tên danh sách' });
+    var id = 'review_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    var now = new Date().toISOString();
+    reviewLists[id] = {
+        id: id,
+        name: name.substring(0, 160),
+        description: String((req.body && req.body.description) || '').trim().substring(0, 2000),
+        subject: String((req.body && req.body.subject) || '').trim().substring(0, 120),
+        active: req.body && req.body.active === false ? false : true,
+        items: [],
+        createdAt: now,
+        updatedAt: now
+    };
+    saveReviewLists();
+    res.json({ success: true, list: reviewLists[id] });
+});
+
+app.put('/api/review-lists/:listId', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var body = req.body || {};
+
+    if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+        var name = String(body.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Vui lòng nhập tên danh sách' });
+        list.name = name.substring(0, 160);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'description')) {
+        list.description = String(body.description || '').trim().substring(0, 2000);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'subject')) {
+        list.subject = String(body.subject || '').trim().substring(0, 120);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'active')) {
+        list.active = body.active !== false;
+    }
+
+    if (Array.isArray(body.items)) {
+        for (var vi = 0; vi < body.items.length; vi++) {
+            var rawItem = body.items[vi];
+            if (!rawItem || !rawItem.examId) continue;
+            var settingsError = review.validateSettings(rawItem.settings);
+            if (settingsError) return res.status(400).json({ error: settingsError });
+        }
+        var currentIds = (list.items || []).map(function (item) { return String(item.examId); });
+        var seen = {};
+        var items = [];
+        body.items.forEach(function (raw) {
+            if (!raw || !raw.examId) return;
+            var examId = String(raw.examId);
+            if (!isSafeId(examId) || seen[examId]) return;
+            var exam = loadExam(examId);
+            // Đề đã bị xóa vẫn được giữ nếu đang có trong danh sách (UI hiện cảnh báo).
+            if (!exam && currentIds.indexOf(examId) === -1) return;
+            seen[examId] = true;
+            items.push({
+                examId: examId,
+                settings: review.normalizeSettings(raw.settings, exam)
+            });
+        });
+        list.items = items;
+    }
+
+    list.updatedAt = new Date().toISOString();
+    saveReviewLists();
+    res.json({ success: true, list: list });
+});
+
+app.delete('/api/review-lists/:listId', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    // Chỉ xóa danh sách; giữ file lịch sử làm bài để không mất dữ liệu cũ.
+    delete reviewLists[list.id];
+    saveReviewLists();
+    res.json({ success: true });
+});
+
+app.get('/api/review-lists/:listId/results', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền truy cập' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var exams = (list.items || []).map(function (item) {
+        var info = publicReviewExam(item.examId, item.settings);
+        var attempts = loadReviewAttempts(list.id, item.examId).filter(function (a) {
+            return a && a.status === 'submitted';
+        }).map(function (a) {
+            return {
+                id: a.id,
+                studentSTT: a.studentSTT,
+                studentName: a.studentName,
+                studentClass: a.studentClass,
+                score: a.score,
+                correctCount: a.correctCount,
+                totalQuestions: a.totalQuestions,
+                timeSpent: a.timeSpent,
+                submittedAt: a.submittedAt
+            };
+        });
+        info.attempts = attempts;
+        return info;
+    });
+    res.json({ success: true, list: { id: list.id, name: list.name }, exams: exams });
+});
+
+// --- Học sinh: xem danh sách và tự chọn đề ---
+app.get('/api/review/students', function (req, res) {
+    res.json({
+        students: students.map(function (s) {
+            return { stt: s.stt, fullName: studentFullName(s) };
+        }),
+        className: currentSession.className || ''
+    });
+});
+
+app.get('/api/review/lists', function (req, res) {
+    var lists = Object.keys(reviewLists).map(function (id) {
+        var list = reviewLists[id];
+        if (list.active === false) return null;
+        return {
+            id: list.id,
+            name: list.name,
+            description: list.description || '',
+            subject: list.subject || '',
+            itemCount: (list.items || []).length,
+            updatedAt: list.updatedAt
+        };
+    }).filter(Boolean).sort(function (a, b) {
+        return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+    });
+    res.json({ lists: lists });
+});
+
+app.get('/api/review/lists/:listId', function (req, res) {
+    var list = getReviewList(req.params.listId);
+    if (!list || list.active === false) {
+        return res.status(404).json({ error: 'Danh sách ôn tập không tồn tại hoặc đã bị tắt' });
+    }
+    var stt = req.query.stt;
+    if (stt && !findStudentByStt(stt)) {
+        return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+    }
+    res.json({ success: true, list: buildReviewListPayload(list, stt) });
+});
+
+app.get('/api/review/history', function (req, res) {
+    var list = getReviewList(req.query.listId);
+    if (!list || list.active === false) {
+        return res.status(404).json({ error: 'Danh sách ôn tập không tồn tại hoặc đã bị tắt' });
+    }
+    var item = findReviewItem(list, req.query.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var student = findStudentByStt(req.query.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var summary = review.summarize(attempts, student.stt);
+    var settings = item.settings;
+    var canViewDetails = settings.showResult || settings.showAnswers;
+
+    // Số thứ tự lượt theo thời điểm bắt đầu (kể cả lượt bỏ dở) để không đánh
+    // số lại lịch sử cũ.
+    var noById = {};
+    attempts.filter(function (a) {
+        return a && String(a.studentSTT) === String(student.stt);
+    }).sort(function (a, b) {
+        return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+    }).forEach(function (a, index) {
+        noById[a.id] = index + 1;
+    });
+
+    var publicAttempts = attempts.filter(function (a) {
+        return a && a.status === 'submitted' && String(a.studentSTT) === String(student.stt);
+    }).sort(function (a, b) {
+        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+    }).map(function (a) {
+        return {
+            id: a.id,
+            attemptNo: a.no || noById[a.id] || null,
+            score: a.score,
+            correctCount: a.correctCount,
+            partialCount: a.partialCount,
+            wrongCount: a.wrongCount,
+            unansweredCount: a.unansweredCount,
+            totalQuestions: a.totalQuestions,
+            timeSpent: a.timeSpent,
+            submittedAt: a.submittedAt,
+            expired: !!a.expired,
+            canViewDetails: canViewDetails,
+            details: canViewDetails ? filterHistoryDetails(settings, a.details) : null
+        };
+    });
+
+    res.json({
+        success: true,
+        list: { id: list.id, name: list.name },
+        exam: { id: item.examId, name: (loadExam(item.examId) || {}).name || '[Đề đã bị xóa]' },
+        settings: reviewSettingsPayload(settings),
+        summary: summary,
+        attempts: publicAttempts
+    });
+});
+
+app.get('/api/review/play', function (req, res) {
+    var list = getReviewList(req.query.listId);
+    if (!list || list.active === false) {
+        return res.status(404).json({ error: 'Danh sách ôn tập không tồn tại hoặc đã bị tắt' });
+    }
+    var item = findReviewItem(list, req.query.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var exam = loadExam(item.examId);
+    if (!exam || !Array.isArray(exam.questions) || exam.questions.length === 0) {
+        return res.status(409).json({ error: 'Đề này không còn khả dụng' });
+    }
+    var student = findStudentByStt(req.query.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var now = Date.now();
+    var plan = review.planAttempt(attempts, item.settings, student.stt, now);
+
+    // Lượt dở đã quá hạn: đóng và chấm với 0 câu trả lời (server không giữ
+    // tiến độ), để lượt đó vẫn được tính vào giới hạn.
+    if (plan.action === 'close') {
+        settleReviewAttempt(plan.attempt, exam.questions, {}, item.settings, true);
+        saveReviewAttempts(list.id, item.examId, attempts);
+        plan = review.planAttempt(attempts, item.settings, student.stt, Date.now());
+    }
+    if (plan.action === 'deny') {
+        return res.status(429).json({ error: 'Bạn đã hết lượt làm đề này' });
+    }
+
+    var active = plan.attempt;
+    if (!active) {
+        active = {
+            id: 'att_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            listId: list.id,
+            examId: item.examId,
+            studentSTT: student.stt,
+            studentName: studentFullName(student),
+            studentClass: currentSession.className || 'Ôn tập',
+            status: 'active',
+            no: review.countAttempts(attempts, student.stt) + 1,
+            timeLimit: item.settings.timeLimit,
+            startedAt: new Date(now).toISOString()
+        };
+        attempts.push(active);
+        saveReviewAttempts(list.id, item.examId, attempts);
+    }
+
+    var attemptsUsed = review.countAttempts(attempts, student.stt);
+    var playSettings = reviewSettingsPayload(item.settings);
+    // Dùng đúng thời gian đã chốt cho lượt này (kể cả khi giáo viên vừa sửa đề).
+    playSettings.timeLimit = review.attemptTimeLimit(active, item.settings);
+    res.json({
+        success: true,
+        list: { id: list.id, name: list.name, description: list.description || '', subject: list.subject || '' },
+        student: {
+            stt: student.stt,
+            name: studentFullName(student),
+            className: currentSession.className || 'Ôn tập'
+        },
+        exam: {
+            id: item.examId,
+            name: exam.name || item.examId,
+            questionCount: exam.questions.length,
+            questions: sanitizeExamForStudent(exam.questions)
+        },
+        settings: playSettings,
+        attempt: { id: active.id, startedAt: active.startedAt },
+        serverNow: now,
+        attemptsUsed: attemptsUsed,
+        remainingAttempts: item.settings.maxAttempts > 0
+            ? Math.max(0, item.settings.maxAttempts - attemptsUsed)
+            : null
+    });
+});
+
+app.post('/api/review/submit', function (req, res) {
+    var body = req.body || {};
+    var list = getReviewList(body.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var item = findReviewItem(list, body.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var exam = loadExam(item.examId);
+    if (!exam || !Array.isArray(exam.questions) || exam.questions.length === 0) {
+        return res.status(409).json({ error: 'Đề này không còn khả dụng' });
+    }
+    var student = findStudentByStt(body.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var attempt = null;
+    for (var i = 0; i < attempts.length; i++) {
+        if (attempts[i] && attempts[i].id === body.attemptId &&
+            attempts[i].status === 'active' &&
+            String(attempts[i].studentSTT) === String(student.stt)) {
+            attempt = attempts[i];
+            break;
+        }
+    }
+    if (!attempt) {
+        return res.status(409).json({ error: 'Lượt làm bài không hợp lệ hoặc đã được nộp' });
+    }
+
+    var elapsedSec = Math.max(0, Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000));
+    var limit = review.attemptTimeLimit(attempt, item.settings);
+    var late = limit > 0 && elapsedSec > limit * 60 + 120;
+
+    // Quá hạn + 2 phút ân hạn: vẫn đóng lượt và lưu kết quả (0 câu trả lời)
+    // thay vì để lượt treo, nhưng không chấp nhận đáp án gửi muộn.
+    if (late) {
+        var expiredGraded = settleReviewAttempt(attempt, exam.questions, {}, item.settings, true);
+        saveReviewAttempts(list.id, item.examId, attempts);
+        var expiredUsed = review.countAttempts(attempts, student.stt);
+        return res.json({
+            success: true,
+            expired: true,
+            score: expiredGraded.score,
+            correctCount: expiredGraded.correctCount,
+            partialCount: expiredGraded.partialCount,
+            wrongCount: expiredGraded.wrongCount,
+            unansweredCount: expiredGraded.unansweredCount,
+            totalQuestions: expiredGraded.totalQuestions,
+            showScore: true,
+            showAnswers: item.settings.showAnswers,
+            attemptsUsed: expiredUsed,
+            remainingAttempts: item.settings.maxAttempts > 0
+                ? Math.max(0, item.settings.maxAttempts - expiredUsed)
+                : null
+        });
+    }
+
+    var graded = settleReviewAttempt(attempt, exam.questions, body.answers, item.settings, false);
+    saveReviewAttempts(list.id, item.examId, attempts);
+
+    var usedCount = review.countAttempts(attempts, student.stt);
+    res.json({
+        success: true,
+        score: graded.score,
+        correctCount: graded.correctCount,
+        partialCount: graded.partialCount,
+        wrongCount: graded.wrongCount,
+        unansweredCount: graded.unansweredCount,
+        totalQuestions: graded.totalQuestions,
+        showScore: true,
+        showAnswers: item.settings.showAnswers,
+        attemptsUsed: usedCount,
+        remainingAttempts: item.settings.maxAttempts > 0
+            ? Math.max(0, item.settings.maxAttempts - usedCount)
+            : null
+    });
+});
+
+app.post('/api/review/check-answer', function (req, res) {
+    var body = req.body || {};
+    var list = getReviewList(body.listId);
+    if (!list || list.active === false) {
+        return res.status(404).json({ error: 'Danh sách ôn tập không tồn tại hoặc đã bị tắt' });
+    }
+    var item = findReviewItem(list, body.examId);
+    if (!item || !item.settings.practiceMode) {
+        return res.status(403).json({ error: 'Chế độ xem đáp án ngay chưa được bật cho đề này' });
+    }
+    var exam = loadExam(item.examId);
+    if (!exam || !Array.isArray(exam.questions)) {
+        return res.status(409).json({ error: 'Đề này không còn khả dụng' });
+    }
+    var student = findStudentByStt(body.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var active = review.findActiveAttempt(attempts, student.stt);
+    if (!active) return res.status(403).json({ error: 'Bạn chưa bắt đầu lượt làm bài này' });
+    if (review.isOverDeadline(item.settings, active, Date.now())) {
+        return res.status(409).json({ error: 'Đã hết thời gian làm bài của lượt này' });
+    }
+
+    var questionIndex = parseInt(body.questionIndex, 10);
+    if (isNaN(questionIndex) || questionIndex < 0 || questionIndex >= exam.questions.length) {
+        return res.status(400).json({ error: 'Câu hỏi không hợp lệ' });
+    }
+    var q = migrateQuestion(exam.questions[questionIndex]);
+    var questionScore = scoreQuestion(q, body.answer);
+    res.json({
+        isCorrect: questionScore === 1,
+        questionScore: questionScore,
+        type: q.type || 'single',
+        correctAnswer: q.correct,
+        correctAnswerText: (q.type === 'shortanswer') ? (q.correctAnswer || null) : null,
+        correctList: q.correctList || null,
+        correctTF: q.correctTF || null,
+        yourAnswer: body.answer
+    });
+});
+
 // ========== CHẤM ĐIỂM ==========
-// Trả về số thực 0.0–1.0 (phần điểm của câu đó)
-// single/multi: 0 hoặc 1 (all-or-nothing)
-// truefalse: số phát biểu đúng / tổng số phát biểu (theo chuẩn BGD 2025)
-function scoreQuestion(q, studentAnswer) {
-    var type = q.type || 'single';
-
-    if (type === 'single') {
-        return studentAnswer === q.correct ? 1 : 0;
-    }
-
-    if (type === 'multi') {
-        if (!Array.isArray(studentAnswer) || !Array.isArray(q.correctList)) return 0;
-        if (studentAnswer.length !== q.correctList.length) return 0;
-        var sorted1 = studentAnswer.slice().sort(function(a,b){return a-b;});
-        var sorted2 = q.correctList.slice().sort(function(a,b){return a-b;});
-        for (var i = 0; i < sorted1.length; i++) {
-            if (sorted1[i] !== sorted2[i]) return 0;
-        }
-        return 1;
-    }
-
-    if (type === 'truefalse') {
-        if (!Array.isArray(studentAnswer) || !Array.isArray(q.correctTF)) return 0;
-        var total = q.correctTF.length;
-        if (total === 0) return 0;
-        var correct = 0;
-        for (var j = 0; j < total; j++) {
-            if (j < studentAnswer.length && studentAnswer[j] === q.correctTF[j]) correct++;
-        }
-        return correct / total;
-    }
-
-    if (type === 'shortanswer') {
-        // So khop chinh xac ve gia tri so; sai dinh dang/bo trong -> 0.
-        return shortAnswer.equals(studentAnswer, q.correctAnswer) ? 1 : 0;
-    }
-
-    return 0;
+// Chấm điểm một đề bất kỳ. Dùng chung cho thi chính thức và ôn tập.
+// opts.snapshot = true để lưu nội dung câu hỏi/đáp án phục vụ xem lại.
+function gradeQuestions(questionList, answers, opts) {
+    return grading.grade((questionList || []).map(migrateQuestion), answers, opts);
 }
 
 // Nộp bài
@@ -2223,85 +2995,20 @@ app.post('/api/submit', (req, res) => {
         });
     }
     
-    // Chấm điểm
-    var totalScore = 0; // tổng điểm thực (đã nhân trọng số từng câu)
-    var totalPoints = 0; // tổng trọng số các câu (mặc định mỗi câu 1)
-    var correctCount = 0;   // câu đúng hoàn toàn (score = 1)
-    var partialCount = 0;   // câu đúng một phần (0 < score < 1, chỉ truefalse)
-    var wrongCount = 0;     // câu sai hoàn toàn (score = 0, có trả lời)
-    var unansweredCount = 0; // câu không trả lời
-    var details = questions.map((q, index) => {
-        q = migrateQuestion(q);
-        var studentAnswer = answers[index];
-        var type = q.type || 'single';
-        var questionScore = scoreQuestion(q, studentAnswer); // 0.0–1.0
-        var isCorrect = questionScore === 1;
-        var hasAnswer = studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== -1
-            && !(Array.isArray(studentAnswer) && studentAnswer.length === 0)
-            && !(typeof studentAnswer === 'string' && studentAnswer.trim() === '');
-        var qPoints = normalizePoints(q.points);
-        totalScore += questionScore * qPoints;
-        totalPoints += qPoints;
-        if (isCorrect) correctCount++;
-        else if (!hasAnswer) unansweredCount++;
-        else if (questionScore > 0) partialCount++;
-        else wrongCount++;
-
-        // Nội dung đáp án để hiển thị
-        var studentAnswerText = null;
-        var correctAnswerText = null;
-        if (type === 'single') {
-            studentAnswerText = (typeof studentAnswer === 'number' && studentAnswer >= 0 && studentAnswer < q.options.length)
-                ? q.options[studentAnswer] : null;
-            correctAnswerText = q.options[q.correct];
-        } else if (type === 'multi') {
-            studentAnswerText = Array.isArray(studentAnswer)
-                ? studentAnswer.map(function(i) { return q.options[i] || ''; }).join(', ') : null;
-            correctAnswerText = Array.isArray(q.correctList)
-                ? q.correctList.map(function(i) { return q.options[i] || ''; }).join(', ') : '';
-        } else if (type === 'truefalse') {
-            studentAnswerText = Array.isArray(studentAnswer)
-                ? studentAnswer.map(function(v, i) { return (String.fromCharCode(65+i)) + ': ' + (v === true ? 'Đúng' : v === false ? 'Sai' : '?'); }).join(', ') : null;
-            correctAnswerText = Array.isArray(q.correctTF)
-                ? q.correctTF.map(function(v, i) { return (String.fromCharCode(65+i)) + ': ' + (v ? 'Đúng' : 'Sai'); }).join(', ') : '';
-        } else if (type === 'shortanswer') {
-            studentAnswerText = (typeof studentAnswer === 'string' || typeof studentAnswer === 'number')
-                ? String(studentAnswer).trim() || null : null;
-            correctAnswerText = q.correctAnswer || '';
-        }
-
-        return {
-            question: q.question,
-            type: type,
-            studentAnswer: studentAnswer,
-            studentAnswerText: studentAnswerText,
-            correctAnswer: type === 'shortanswer' ? (q.correctAnswer || null) : q.correct,
-            correctAnswerText: correctAnswerText,
-            correctList: q.correctList || null,
-            correctTF: q.correctTF || null,
-            isCorrect,
-            questionScore: questionScore
-        };
-    });
-
-    // Điểm = (tổng điểm thực đã nhân trọng số / tổng trọng số) × 10
-    // Khi mọi câu đều có trọng số 1 (mặc định) thì kết quả GIỐNG HỆT công thức cũ.
-    // truefalse tính partial (số phát biểu đúng / tổng phát biểu), single/multi all-or-nothing
-    var score = totalPoints > 0 ? Math.round((totalScore / totalPoints) * 100) / 10 : 0;
-    
+    var graded = gradeQuestions(questions, answers);
     var result = {
         studentSTT,
         studentName,
         studentClass,
-        score,
-        correctCount,
-        partialCount,
-        wrongCount,
-        unansweredCount,
-        totalQuestions: questions.length,
+        score: graded.score,
+        correctCount: graded.correctCount,
+        partialCount: graded.partialCount,
+        wrongCount: graded.wrongCount,
+        unansweredCount: graded.unansweredCount,
+        totalQuestions: graded.totalQuestions,
         timeSpent,
         submittedAt: new Date().toLocaleString('vi-VN'),
-        details
+        details: graded.details
     };
     
     // Tìm và cập nhật kết quả cũ nếu có, hoặc thêm mới
@@ -2334,12 +3041,12 @@ app.post('/api/submit', (req, res) => {
     
     res.json({
         success: true,
-        score,
-        correctCount,
-        partialCount,
-        wrongCount,
-        unansweredCount,
-        totalQuestions: questions.length,
+        score: graded.score,
+        correctCount: graded.correctCount,
+        partialCount: graded.partialCount,
+        wrongCount: graded.wrongCount,
+        unansweredCount: graded.unansweredCount,
+        totalQuestions: graded.totalQuestions,
         showScore: examSettings.showScore
     });
 });
@@ -3358,66 +4065,9 @@ app.get('/api/ocr/status', function (req, res) {
     res.json({ success: true, ocr: ocr.status() });
 });
 
-// ========== HTML SANITIZER (server-side, regex-based) ==========
-var ALLOWED_HTML_TAGS = {
-    'b': [], 'strong': [], 'i': [], 'em': [], 'u': [],
-    'p': [], 'br': [], 'span': ['style'], 'sub': [], 'sup': [],
-    'img': ['src', 'alt', 'width', 'height', 'style'],
-    'pre': [], 'code': []
-};
-
-function sanitizeStyleAttr(style) {
-    if (/url\s*\(|expression\s*\(|javascript:/i.test(style)) return '';
-    var safeParts = [];
-    var declarations = style.split(';');
-    var SAFE_PROPS = ['color','background-color','font-size','font-weight','font-style',
-                      'text-decoration','vertical-align','width','height','max-width','max-height'];
-    for (var i = 0; i < declarations.length; i++) {
-        var parts = declarations[i].split(':');
-        if (parts.length >= 2) {
-            var prop = parts[0].trim().toLowerCase();
-            var val = parts.slice(1).join(':').trim();
-            if (SAFE_PROPS.indexOf(prop) >= 0 && !/url|expression|javascript/i.test(val)) {
-                safeParts.push(prop + ':' + val);
-            }
-        }
-    }
-    return safeParts.join(';');
-}
-
-function sanitizeHtml(html) {
-    if (!html || typeof html !== 'string') return '';
-    html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
-    html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
-    html = html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/gi, function(fullMatch, tagName, attrs) {
-        var lowerTag = tagName.toLowerCase();
-        if (fullMatch.charAt(1) === '/') {
-            return ALLOWED_HTML_TAGS.hasOwnProperty(lowerTag) ? '</' + lowerTag + '>' : '';
-        }
-        if (!ALLOWED_HTML_TAGS.hasOwnProperty(lowerTag)) return '';
-        var allowedAttrs = ALLOWED_HTML_TAGS[lowerTag];
-        var cleanAttrs = '';
-        for (var i = 0; i < allowedAttrs.length; i++) {
-            var attrName = allowedAttrs[i];
-            var attrRegex = new RegExp(attrName + '\\s*=\\s*("([^"]*)"' + "|'([^']*)'|(\\S+))", 'i');
-            var attrMatch = attrs.match(attrRegex);
-            if (attrMatch) {
-                var attrVal = attrMatch[2] !== undefined ? attrMatch[2] : (attrMatch[3] !== undefined ? attrMatch[3] : (attrMatch[4] || ''));
-                if (attrName === 'src') {
-                    if (attrVal.indexOf('data:image/') !== 0) continue;
-                }
-                if (attrName === 'style') {
-                    attrVal = sanitizeStyleAttr(attrVal);
-                    if (!attrVal) continue;
-                }
-                cleanAttrs += ' ' + attrName + '="' + attrVal + '"';
-            }
-        }
-        var selfClose = (lowerTag === 'br' || lowerTag === 'img') ? ' /' : '';
-        return '<' + lowerTag + cleanAttrs + selfClose + '>';
-    });
-    return html.trim();
-}
+// ========== HTML SANITIZER ==========
+// sanitizeHtml duoc tach sang lib/question-content.js de test rieng. Cho phep
+// anh cu (data:image/) va anh tai len moi (/api/assets/<id>).
 
 // ========== OMML -> LATEX CONVERTER ==========
 // Escape ky tu dac biet cua LaTeX trong phan van ban cua cong thuc.
@@ -4225,15 +4875,9 @@ function dropUnansweredShortAnswers(list, warnings) {
 }
 
 // ========== VALIDATE CÂU HỎI (dùng chung) ==========
+// normalizePoints nam trong lib/grading.js (co test rieng).
 // Trong so diem cua 1 cau (mac dinh 1). Giu tuong thich nguoc: khong co
 // `points` thi diem van duoc tinh nhu cu (moi cau trong so 1).
-function normalizePoints(v) {
-    var n = Number(v);
-    if (!isFinite(n) || n <= 0) return 1;
-    if (n > 100) return 100;
-    return Math.round(n * 100) / 100;
-}
-
 function validateAndNormalizeQuestion(q, qNum, errors) {
     if (!q.question || q.question.trim() === '') {
         errors.push('Câu ' + qNum + ': Thiếu nội dung câu hỏi');
@@ -4241,6 +4885,14 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
     }
 
     var type = q.type || 'single';
+    var points = 1;
+    if (q.points !== undefined && q.points !== null) {
+        points = parsePointsInput(q.points);
+        if (points === null) {
+            errors.push('Câu ' + qNum + ': Điểm phải là số lớn hơn 0 và không quá 100');
+            return null;
+        }
+    }
 
     if (type === 'shortanswer') {
         var answer = shortAnswer.normalize(q.correctAnswer);
@@ -4257,7 +4909,7 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correctTF: null,
             correctAnswer: answer,
             image: q.image || null,
-            points: normalizePoints(q.points)
+            points: points
         };
     }
 
@@ -4279,7 +4931,7 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correctList: null,
             correctTF: null,
             image: q.image || null,
-            points: normalizePoints(q.points)
+            points: points
         };
     }
 
@@ -4302,7 +4954,7 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correctList: q.correctList,
             correctTF: null,
             image: q.image || null,
-            points: normalizePoints(q.points)
+            points: points
         };
     }
 
@@ -4319,7 +4971,7 @@ function validateAndNormalizeQuestion(q, qNum, errors) {
             correctList: null,
             correctTF: q.correctTF,
             image: q.image || null,
-            points: normalizePoints(q.points)
+            points: points
         };
     }
 
@@ -4519,6 +5171,8 @@ function loadAllData() {
 
     try { loadReports(); safeLog('[OK] loadReports'); } catch(e) { safeLog('[LOI] loadReports: ' + e.message); }
 
+    try { loadReviewLists(); safeLog('[OK] loadReviewLists'); } catch(e) { safeLog('[LOI] loadReviewLists: ' + e.message); }
+
     try { loadServerProgress(); safeLog('[OK] loadServerProgress'); } catch(e) { safeLog('[LOI] loadServerProgress: ' + e.message); }
 
     safeLog('');
@@ -4564,6 +5218,7 @@ function printStartupInfo() {
     safeLog('');
     safeLog('   LINK GIAO VIEN: /teacher   (can dang nhap)');
     safeLog('   LINK HOC SINH : /');
+    safeLog('   LINK ON TAP  : /on-tap');
     safeLog('');
     safeLog('   (LAN) http://' + hostname + ':' + PORT);
     safeLog('   (LAN) http://' + ip + ':' + PORT);

@@ -10,6 +10,8 @@
     "test:shortanswer": "node tests/test-shortanswer.js",
     "test:import-shortanswer": "node tests/test-import-shortanswer.js",
     "test:answer-tables": "node tests/test-answer-tables.js",
+    "test:question-editor": "node tests/test-question-editor.js",
+    "test:review": "node tests/test-review.js",
     "build": "node build-scripts/build.js",
     "admin": "node license/admin-tool.js",
     "generate-license": "node license/admin-tool.js generate"

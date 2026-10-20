@@ -11,7 +11,9 @@
     "correct": 2,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "truefalse",
@@ -30,7 +32,9 @@
       false,
       true
     ],
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -44,7 +48,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -58,7 +64,9 @@
     "correct": 2,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "multi",
@@ -77,7 +85,9 @@
       2
     ],
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -91,7 +101,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -105,7 +117,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "truefalse",
@@ -124,7 +138,9 @@
       false,
       true
     ],
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -138,7 +154,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "multi",
@@ -157,7 +175,9 @@
       2
     ],
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -171,7 +191,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -185,7 +207,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "truefalse",
@@ -204,7 +228,9 @@
       true,
       true
     ],
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -218,7 +244,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "multi",
@@ -237,7 +265,9 @@
       3
     ],
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -251,7 +281,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -265,7 +297,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "truefalse",
@@ -284,7 +318,9 @@
       false,
       true
     ],
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -298,7 +334,9 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
   },
   {
     "type": "single",
@@ -312,6 +350,151 @@
     "correct": 1,
     "correctList": null,
     "correctTF": null,
-    "image": null
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "single",
+    "question": "1 + 1 bằng bao nhiêu?",
+    "options": [
+      "phương án 0",
+      "đúng",
+      "phương án 2",
+      "phương án 3"
+    ],
+    "correct": 1,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "single",
+    "question": "2 + 2 bằng bao nhiêu?",
+    "options": [
+      "phương án 0",
+      "phương án 1",
+      "đúng",
+      "phương án 3"
+    ],
+    "correct": 2,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "truefalse",
+    "question": "Xét các phát biểu sau:",
+    "options": [
+      "Nước có công thức H2O.",
+      "Nước không dẫn điện.",
+      "Nước đóng băng ở 0 độ C.",
+      "Nước có vị ngọt."
+    ],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": [
+      true,
+      true,
+      false,
+      true
+    ],
+    "correctAnswer": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "shortanswer",
+    "question": "Tính 2 + 3.",
+    "options": [],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": "3",
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "shortanswer",
+    "question": "Tính 8 x 3.",
+    "options": [],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": "24",
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "single",
+    "question": "Thủ đô của Việt Nam là thành phố nào?",
+    "options": [
+      "TP. Hồ Chí Minh",
+      "Hà Nội",
+      "Đà Nẵng",
+      "Cần Thơ"
+    ],
+    "correct": 1,
+    "correctList": null,
+    "correctTF": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "single",
+    "question": "Kết quả của 2 + 2 bằng bao nhiêu?",
+    "options": [
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "correct": 1,
+    "correctList": null,
+    "correctTF": null,
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "truefalse",
+    "question": "Xét các phát biểu sau về nước:",
+    "options": [
+      "Nước có công thức hóa học là H2O.",
+      "Nước không dẫn điện."
+    ],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": [
+      true,
+      false
+    ],
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "shortanswer",
+    "question": "Tính 2 + 3.",
+    "options": [],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": "5",
+    "image": null,
+    "points": 1
+  },
+  {
+    "type": "shortanswer",
+    "question": "Có 8 phân tử DNA tự nhân đôi một số lần bằng nhau đã tổng hợp được 112 mạch pôlinucleotide mới lấy nguyên liệu hoàn toàn từ môi trường nội bào. Số lần tự nhân đôi của mỗi phân tử DNA trên là bao nhiêu?",
+    "options": [],
+    "correct": 0,
+    "correctList": null,
+    "correctTF": null,
+    "correctAnswer": "3",
+    "image": null,
+    "points": 1
   }
 ]
