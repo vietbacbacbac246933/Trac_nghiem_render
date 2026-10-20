@@ -63,7 +63,8 @@
         padding: 10px 12px;
         border: 1px solid #cbd2e1;
         border-radius: 8px;
-        font-size: 0.95em;
+        /* 16px: iOS Safari tự phóng to trang nếu ô nhập nhỏ hơn 16px. */
+        font-size: 16px;
         background: #fff;
         color: #24303f;
     }
@@ -399,7 +400,12 @@
     function formatScore(score) {
         var n = Number(score);
         if (isNaN(n)) return '--';
-        return n.toFixed(1).replace('.', ',');
+        return n.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+    }
+
+    function formatScoreWithMax(score, maxScore) {
+        var max = Number(maxScore);
+        return formatScore(score) + (max > 0 ? '/' + formatScore(max) : '');
     }
 
     function loadStudents() {
@@ -539,8 +545,8 @@
             var h = item.history || {};
             var scoreLine = '';
             if (h.attemptCount > 0) {
-                scoreLine = 'Điểm gần nhất: <strong>' + formatScore(h.latestScore) + '</strong>' +
-                    ' • Điểm cao nhất: <strong>' + formatScore(h.bestScore) + '</strong>';
+                scoreLine = 'Điểm gần nhất: <strong>' + formatScoreWithMax(h.latestScore, h.latestMaxScore) + '</strong>' +
+                    ' • Điểm cao nhất: <strong>' + formatScoreWithMax(h.bestScore, h.bestMaxScore) + '</strong>';
             } else {
                 scoreLine = 'Chưa nộp lần nào';
             }
@@ -623,8 +629,8 @@
         var summary = historyData.summary || {};
         var body = '<div class="summary-grid">' +
             '<div class="summary-item"><strong>' + (summary.attemptCount || 0) + '</strong><span>Số lần đã nộp</span></div>' +
-            '<div class="summary-item"><strong>' + (summary.bestScore === null || summary.bestScore === undefined ? '--' : formatScore(summary.bestScore)) + '</strong><span>Điểm cao nhất</span></div>' +
-            '<div class="summary-item"><strong>' + (summary.latestScore === null || summary.latestScore === undefined ? '--' : formatScore(summary.latestScore)) + '</strong><span>Điểm gần nhất</span></div>' +
+            '<div class="summary-item"><strong>' + (summary.bestScore === null || summary.bestScore === undefined ? '--' : formatScoreWithMax(summary.bestScore, summary.bestMaxScore)) + '</strong><span>Điểm cao nhất</span></div>' +
+            '<div class="summary-item"><strong>' + (summary.latestScore === null || summary.latestScore === undefined ? '--' : formatScoreWithMax(summary.latestScore, summary.latestMaxScore)) + '</strong><span>Điểm gần nhất</span></div>' +
             '</div>';
 
         var attempts = historyData.attempts || [];
@@ -673,7 +679,7 @@
             var ratio = a.totalQuestions ? Math.round((a.correctCount || 0) / a.totalQuestions * 100) : 0;
             return '<div class="attempt">' +
                 '<div class="attempt-head">' +
-                    '<strong>Lần ' + esc(a.attemptNo || '--') + ' • ' + formatScore(a.score) + ' điểm</strong>' +
+                    '<strong>Lần ' + esc(a.attemptNo || '--') + ' • ' + formatScoreWithMax(a.score, a.maxScore) + ' điểm</strong>' +
                     '<span class="badge">' + esc(a.timeSpent || '--') + '</span>' +
                 '</div>' +
                 '<div class="attempt-meta">Nộp lúc: ' + esc(formatDate(a.submittedAt)) +

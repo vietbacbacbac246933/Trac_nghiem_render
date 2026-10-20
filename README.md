@@ -101,8 +101,8 @@ Trong **Quản lý Bài kiểm tra** → nút **“Nhập Word/Ảnh”**:
 3. Server trích văn bản (kèm công thức toán và ảnh nhúng) rồi phân tích thành
    câu hỏi / đáp án.
 4. Hiện **bản xem trước cho sửa được**: nội dung câu, đáp án, chọn đáp án đúng,
-   đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, **điểm
-   (trọng số)** từng câu, bật/tắt từng câu. Có **bộ lọc nhanh** *Tất cả / ✓ Đọc
+   đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, **điểm**
+   từng câu, bật/tắt từng câu. Có **bộ lọc nhanh** *Tất cả / ✓ Đọc
    hoàn hảo / ⚠ Cần kiểm tra* (xem mục *Lọc nhanh câu hỏi trong bản xem trước*).
 5. Giáo viên bấm **Xác nhận lưu** thì mới ghi dữ liệu, vào **bài mới** hoặc
    **bài đang soạn** (tự chọn).
@@ -196,10 +196,12 @@ Nguyên tắc riêng cho OCR:
   của giáo viên không bị chậm. Trên Render, ổ đĩa là tạm nên sau khi service ngủ
   dậy sẽ tải lại một lần.
 
-**Điểm (trọng số) từng câu:** ô `Điểm` trong bản xem trước là **trọng số** (mặc
-định 1). Điểm bài vẫn quy về thang 10 theo tỉ lệ trọng số:
-`điểm = (Σ điểm từng câu × trọng số) / (Σ trọng số) × 10`. Nếu mọi câu đều để
-trọng số 1 thì **kết quả giống hệt trước đây** (tương thích ngược hoàn toàn).
+**Điểm từng câu:** ô `Điểm` là **điểm thực của câu** (mặc định 1). Điểm bài là
+tổng điểm các câu, nên có thể **lớn hơn 10**. Câu Đúng/Sai 4 ý được chấm theo
+số ý đúng: 1 ý = 0,1; 2 ý = 0,25; 3 ý = 0,5; 4 ý = 1 điểm (nhân với điểm tối đa
+của câu). Trong tab **Câu hỏi** có bộ lọc theo phần (một đáp án / Đúng–Sai / trả
+lời ngắn / nhiều đáp án) và nút áp dụng nhanh cùng một mức điểm cho mọi câu của
+phần đang chọn.
 
 API mới (đều yêu cầu đăng nhập giáo viên):
 

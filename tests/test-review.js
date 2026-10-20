@@ -161,14 +161,36 @@ assert.strictEqual(wrong.details[0].status, 'wrong');
 var right = grading.grade([single], { 0: 1 });
 assert.strictEqual(right.correctCount, 1);
 assert.strictEqual(right.details[0].status, 'correct');
-assert.strictEqual(right.score, 10);
+assert.strictEqual(right.score, 1);
+assert.strictEqual(right.maxScore, 1);
 
-// truefalse dung mot phan; bo trong khong tinh la sai.
+// Tong diem la tong diem cac cau, co the lon hon 10.
+var totalOverTen = grading.grade([
+    { type: 'single', question: 'a', options: ['A', 'B'], correct: 0, points: 6 },
+    { type: 'single', question: 'b', options: ['A', 'B'], correct: 0, points: 6 }
+], { 0: 0, 1: 0 });
+assert.strictEqual(totalOverTen.score, 12);
+assert.strictEqual(totalOverTen.maxScore, 12);
+
+// truefalse 4 y: 1/2/3/4 y dung -> 0,1 / 0,25 / 0,5 / 1.
+var tf4 = { type: 'truefalse', question: 'tf4', options: ['a', 'b', 'c', 'd'], correctTF: [true, true, true, true], points: 1 };
+var tf4Scores = [
+    [true, false, false, false],
+    [true, true, false, false],
+    [true, true, true, false],
+    [true, true, true, true]
+];
+assert.deepStrictEqual(tf4Scores.map(function (answer) {
+    return grading.grade([tf4], { 0: answer }).score;
+}), [0.1, 0.25, 0.5, 1]);
+
+// truefalse khong du 4 y: chia deu nhu cu; bo trong khong tinh la sai.
 var tf = { type: 'truefalse', question: 'tf', options: ['a', 'b'], correctTF: [true, false], points: 1 };
 var partialTf = grading.grade([tf], { 0: [true, true] });
 assert.strictEqual(partialTf.partialCount, 1);
 assert.strictEqual(partialTf.details[0].status, 'partial');
 assert.strictEqual(partialTf.details[0].questionScore, 0.5);
+assert.strictEqual(partialTf.score, 0.5);
 var blankTf = grading.grade([tf], {});
 assert.strictEqual(blankTf.unansweredCount, 1);
 assert.strictEqual(blankTf.details[0].status, 'unanswered');

@@ -42,7 +42,7 @@ Sản phẩm giữ được **giám sát thi trực tiếp** (mở/đóng bài t
 - Quản lý lớp; nhập danh sách học sinh từ file; kết quả xuất Excel.
 - Quản lý ngân hàng câu hỏi và nhiều bài kiểm tra; chuyển đổi giữa các bài.
 - Nhập đề từ `.docx` và từ ảnh rời; nhập đề từ ảnh bằng OCR (tesseract.js mặc định, OCR.space nếu có `OCR_SPACE_API_KEY`).
-- Bản xem trước sửa được: sửa nội dung/đáp án, chọn đáp án đúng, đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, điểm (trọng số) từng câu, bật/tắt từng câu, lọc nhanh *Tất cả / Đọc hoàn hảo / Cần kiểm tra*.
+- Bản xem trước sửa được: sửa nội dung/đáp án, chọn đáp án đúng, đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, điểm từng câu, bật/tắt từng câu, lọc nhanh *Tất cả / Đọc hoàn hảo / Cần kiểm tra*.
 - Mở/đóng bài thi, chế độ ôn tập (`practiceMode`), mật khẩu phòng thi.
 - Học sinh chọn tên (không PIN), làm bài, nộp bài; lưu tiến trình; báo chọn nhầm tên; giáo viên duyệt/từ chối báo cáo và cho thi lại.
 - Giám sát trực tiếp qua Socket.IO: `studentTabLeave`, `studentFullscreenExit`, `newResult`, `studentStatusUpdated`.

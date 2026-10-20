@@ -974,6 +974,32 @@
             font-size: 0.82em;
             color: #777;
         }
+        .type-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .type-filter-btn {
+            background: #fff;
+            border: 1px solid #c7d2fe;
+            color: #445;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.86em;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .type-filter-btn:hover { background: #eef0ff; }
+        .type-filter-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: #fff;
+        }
+        .type-filter-btn .count {
+            font-weight: 400;
+            opacity: 0.8;
+        }
         .points-summary {
             display: flex;
             gap: 12px;
@@ -1042,7 +1068,8 @@
             margin: 0;
         }
         @media (max-width: 640px) {
-            .points-bulk { margin-left: 0; width: 100%; }
+            .points-bulk { margin-left: 0; width: 100%; flex-wrap: wrap; }
+            .type-filter-btn { padding: 6px 10px; }
             .question-header { flex-direction: column; gap: 10px; }
             .question-actions { width: 100%; }
             .q-points input { width: 70px; }
@@ -1377,10 +1404,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Điểm / trọng số câu này:</label>
+                    <label>Điểm câu này:</label>
                     <input type="number" id="newQuestionPoints" min="0.01" max="100" step="any" inputmode="decimal" value="1"
                         style="width:120px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.95em;">
-                    <div class="editor-hint">Điểm bài thi luôn quy về thang 10 theo tỉ lệ trọng số các câu.</div>
+                    <div class="editor-hint">Điểm bài thi là tổng điểm các câu, có thể lớn hơn 10.</div>
                 </div>
 
                 <div class="form-group" id="newOptionsGroup">
@@ -1401,16 +1428,18 @@
 
             <div class="question-list">
                 <h2 style="margin-top: 40px; margin-bottom: 20px;">Danh sách câu hỏi</h2>
+                <div id="typeFilters" class="type-filters" role="group" aria-label="Lọc câu hỏi theo phần"></div>
                 <div class="points-summary">
-                    <span>Tổng trọng số: <strong id="pointsTotal">0</strong></span>
-                    <span style="color:#666;">Điểm bài thi quy về thang 10</span>
+                    <span>Tổng điểm: <strong id="pointsTotal">0</strong></span>
+                    <span style="color:#666;">Điểm bài thi = tổng điểm các câu (có thể &gt; 10)</span>
                     <span class="points-bulk">
                         Áp dụng
-                        <input type="number" id="bulkPointsInput" min="0.01" max="100" step="any" inputmode="decimal" value="1" aria-label="Điểm áp dụng cho tất cả câu">
-                        cho tất cả
-                        <button type="button" onclick="applyPointsToAll()">Áp dụng</button>
+                        <input type="number" id="bulkPointsInput" min="0.01" max="100" step="any" inputmode="decimal" value="1" aria-label="Điểm áp dụng cho phần đang chọn">
+                        cho <strong id="bulkTargetLabel">tất cả câu</strong>
+                        <button type="button" onclick="applyPointsToSection()">Áp dụng</button>
                     </span>
                 </div>
+                <div class="editor-hint" id="pointsHint" style="margin:-4px 0 14px;"></div>
                 <div id="questionsList"></div>
             </div>
         </div>
@@ -1605,6 +1634,7 @@
                     <h3 id="reviewResultsTitle" style="margin:0;font-size:1.15em;">Kết quả ôn tập</h3>
                     <button onclick="closeReviewResults()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:1.2em;cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1;">&times;</button>
                 </div>
+                <div id="reviewResultsFilters" style="display:none;gap:10px;flex-wrap:wrap;padding:16px 22px 0;"></div>
                 <div id="reviewResultsBody" style="padding:20px 22px;max-height:calc(100vh - 180px);overflow-y:auto;"></div>
             </div>
         </div>
@@ -1779,9 +1809,10 @@
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label for="editQuestionPoints" style="display: block; margin-bottom: 6px; font-weight: 600; color: #333;">Điểm / trọng số câu này:</label>
+                    <label for="editQuestionPoints" style="display: block; margin-bottom: 6px; font-weight: 600; color: #333;">Điểm câu này:</label>
                     <input type="number" id="editQuestionPoints" min="0.01" max="100" step="any" inputmode="decimal" value="1"
                         style="width:120px;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:1em;box-sizing:border-box;">
+                    <div class="editor-hint">Tổng điểm bài thi là tổng điểm các câu, có thể lớn hơn 10.</div>
                 </div>
 
                 <!-- Options cho single/multi -->
@@ -1993,6 +2024,15 @@ C. Công thức nước là H₂O. (Đ)</pre>
         let results = [];
         let students = [];
         let reports = [];
+        let currentTypeFilter = 'all';
+        const QUESTION_TYPE_LABELS = { single: 'Một đáp án', multi: 'Nhiều đáp án', truefalse: 'Đúng/Sai', shortanswer: 'Trả lời ngắn' };
+        const QUESTION_FILTERS = [
+            ['all', 'Tất cả'],
+            ['single', 'Một đáp án'],
+            ['truefalse', 'Đúng/Sai'],
+            ['shortanswer', 'Trả lời ngắn'],
+            ['multi', 'Nhiều đáp án']
+        ];
         
         // Hàm escape HTML để hiển thị các thẻ HTML như text
         function escapeHtml(text) {
@@ -2050,13 +2090,13 @@ C. Công thức nước là H₂O. (Đ)</pre>
 
         // Socket events
         socket.on('newResult', (result) => {
-            showNotification(`${result.studentName} đã nộp bài - Điểm: ${result.score}`);
+            showNotification(`${result.studentName} đã nộp bài - Điểm: ${result.score}${Number(result.maxScore) > 0 && Number(result.maxScore) !== 10 ? '/' + result.maxScore : ''}`);
             loadResults();
             loadStudents();
         });
 
         socket.on('resultUpdated', (result) => {
-            showNotification(`${result.studentName} đã cập nhật bài - Điểm: ${result.score}`);
+            showNotification(`${result.studentName} đã cập nhật bài - Điểm: ${result.score}${Number(result.maxScore) > 0 && Number(result.maxScore) !== 10 ? '/' + result.maxScore : ''}`);
             loadResults();
             loadStudents();
         });
@@ -2140,16 +2180,79 @@ C. Công thức nước là H₂O. (Đ)</pre>
             return sign + intPart + (frac ? '.' + frac : '');
         }
 
+        function questionType(q) {
+            return q.type || 'single';
+        }
+
+        function visibleQuestions() {
+            return questions.map((q, i) => ({ q, i })).filter(function (item) {
+                return currentTypeFilter === 'all' || questionType(item.q) === currentTypeFilter;
+            });
+        }
+
+        function renderTypeFilters() {
+            const wrap = document.getElementById('typeFilters');
+            if (!wrap) return;
+
+            const counts = { all: questions.length };
+            questions.forEach(function (q) {
+                const type = questionType(q);
+                counts[type] = (counts[type] || 0) + 1;
+            });
+
+            wrap.innerHTML = QUESTION_FILTERS.map(function (filter) {
+                const type = filter[0];
+                const label = filter[1];
+                return `<button type="button" class="type-filter-btn${currentTypeFilter === type ? ' active' : ''}"
+                    aria-pressed="${currentTypeFilter === type}" onclick="setTypeFilter('${type}')">${label} <span class="count">(${counts[type] || 0})</span></button>`;
+            }).join('');
+
+            const selected = QUESTION_FILTERS.find(function (filter) { return filter[0] === currentTypeFilter; }) || QUESTION_FILTERS[0];
+            const target = document.getElementById('bulkTargetLabel');
+            if (target) target.textContent = currentTypeFilter === 'all' ? 'tất cả câu' : 'phần ' + selected[1].toLowerCase();
+
+            const hint = document.getElementById('pointsHint');
+            if (hint) {
+                if (currentTypeFilter === 'truefalse') {
+                    hint.textContent = 'Đúng/Sai mặc định: 1 ý đúng 0,1 · 2 ý 0,25 · 3 ý 0,5 · 4 ý 1 điểm (theo điểm tối đa của câu).';
+                } else if (currentTypeFilter === 'single') {
+                    hint.textContent = 'Ví dụ: áp dụng 0,25 điểm cho mọi câu một đáp án.';
+                } else if (currentTypeFilter === 'shortanswer') {
+                    hint.textContent = 'Ví dụ: áp dụng 0,5 điểm cho mọi câu trả lời ngắn.';
+                } else if (currentTypeFilter === 'multi') {
+                    hint.textContent = 'Ví dụ: áp dụng 0,25 điểm cho mọi câu nhiều đáp án.';
+                } else {
+                    hint.textContent = 'Chọn một phần để lọc và áp dụng nhanh điểm cho các câu của phần đó.';
+                }
+            }
+        }
+
+        function setTypeFilter(type) {
+            if (!QUESTION_FILTERS.some(function (filter) { return filter[0] === type; })) type = 'all';
+            currentTypeFilter = type;
+            const defaults = { single: 0.25, truefalse: 1, shortanswer: 0.5, multi: 0.25 };
+            const bulk = document.getElementById('bulkPointsInput');
+            if (bulk && defaults[type] !== undefined) bulk.value = String(defaults[type]);
+            renderQuestions();
+        }
+
         // Render questions
         function renderQuestions() {
             const container = document.getElementById('questionsList');
+            renderTypeFilters();
+            updatePointsSummary();
+
             if (questions.length === 0) {
                 container.innerHTML = '<p style="color: #666; text-align: center;">Chưa có câu hỏi nào. Hãy thêm câu hỏi mới!</p>';
-                updatePointsSummary();
                 return;
             }
 
-            const typeLabel = { single: 'Một đáp án', multi: 'Nhiều đáp án', truefalse: 'Đúng/Sai', shortanswer: 'Trả lời ngắn' };
+            const items = visibleQuestions();
+            if (items.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center;">Không có câu hỏi thuộc phần này.</p>';
+                return;
+            }
+
             const typeBadgeColor = {
                 single: 'background:#e9ecef;color:#495057;',
                 multi: 'background:#fff3cd;color:#856404;border:1px solid #ffc107;',
@@ -2157,9 +2260,11 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 shortanswer: 'background:#e8eaf6;color:#283593;border:1px solid #5c6bc0;'
             };
 
-            container.innerHTML = questions.map((q, i) => {
-                const type = q.type || 'single';
-                const label = typeLabel[type] || type;
+            container.innerHTML = items.map(function (item) {
+                const q = item.q;
+                const i = item.i;
+                const type = questionType(q);
+                const label = QUESTION_TYPE_LABELS[type] || type;
                 const badgeStyle = typeBadgeColor[type] || typeBadgeColor.single;
                 const points = normalizePointsClient(q.points);
 
@@ -2203,7 +2308,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     <div class="question-header">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span class="question-number">Câu ${i + 1}</span>
-                            <label class="q-points" title="Điểm / trọng số của câu này">
+                            <label class="q-points" title="Điểm của câu này">
                                 Điểm
                                 <input type="number" min="0.01" max="100" step="any" inputmode="decimal"
                                     value="${formatPointsClient(points)}" data-qi="${i}"
@@ -2223,7 +2328,6 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     <div class="question-options${type === 'truefalse' ? ' options-single-col' : ''}">${optionsHtml}</div>
                 </div>`;
             }).join('');
-            updatePointsSummary();
             renderKatex(container);
         }
 
@@ -2314,19 +2418,25 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
-        async function applyPointsToAll() {
-            if (questions.length === 0) return;
+        async function applyPointsToSection() {
+            const targets = visibleQuestions();
+            if (targets.length === 0) return;
+
             const bulkInput = document.getElementById('bulkPointsInput');
             const value = parsePointsClient(bulkInput.value);
             if (value === null) {
                 showNotification('Điểm phải là số lớn hơn 0 và không quá 100.', 'error');
                 return;
             }
-            if (!confirm(`Áp dụng ${value} điểm cho tất cả ${questions.length} câu?`)) return;
+
+            const sectionName = currentTypeFilter === 'all'
+                ? 'tất cả câu'
+                : 'phần ' + QUESTION_TYPE_LABELS[currentTypeFilter].toLowerCase();
+            if (!confirm(`Áp dụng ${value} điểm cho ${targets.length} câu ${sectionName}?`)) return;
 
             try {
-                const saved = await Promise.all(questions.map((q, i) => {
-                    return fetch(`/api/questions/${i}/points`, {
+                await Promise.all(targets.map(function (item) {
+                    return fetch(`/api/questions/${item.i}/points`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ points: value })
@@ -2336,13 +2446,13 @@ C. Công thức nước là H₂O. (Đ)</pre>
                         return data.points;
                     });
                 }));
-                questions.forEach((q, i) => {
-                    q.points = normalizePointsClient(saved[i]);
-                    const input = document.querySelector(`input[data-qi="${i}"]`);
-                    if (input) input.value = formatPointsClient(q.points);
+                targets.forEach(function (item) {
+                    item.q.points = normalizePointsClient(value);
+                    const input = document.querySelector(`input[data-qi="${item.i}"]`);
+                    if (input) input.value = formatPointsClient(item.q.points);
                 });
                 updatePointsSummary();
-                showNotification('Đã áp dụng điểm cho tất cả câu!');
+                showNotification(`Đã áp dụng ${value} điểm cho ${targets.length} câu ${sectionName}!`);
             } catch (err) {
                 showNotification('Lỗi khi áp dụng điểm: ' + err.message, 'error');
                 loadQuestions();
@@ -2757,6 +2867,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 document.getElementById('questionTextStatus').textContent = '';
                 document.getElementById('newQuestionPoints').value = '1';
                 updateNewFormForType();
+                if (currentTypeFilter !== 'all' && currentTypeFilter !== type) currentTypeFilter = type;
                 loadQuestions();
             } else {
                 const err = await res.json();
@@ -3086,6 +3197,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 if (res.ok) {
                     showNotification('Đã cập nhật câu hỏi!');
                     closeEditQuestionModal();
+                    if (currentTypeFilter !== 'all' && currentTypeFilter !== (updatedQuestion.type || 'single')) {
+                        currentTypeFilter = updatedQuestion.type || 'single';
+                    }
                     loadQuestions();
                 } else {
                     showAlert('Lỗi khi lưu câu hỏi!');
@@ -3109,6 +3223,16 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
+        function resultMaxScore(r) {
+            const max = Number(r && r.maxScore);
+            return max > 0 ? max : 10;
+        }
+
+        function resultPercent(r) {
+            const max = resultMaxScore(r);
+            return max > 0 ? Number(r.score) / max : 0;
+        }
+
         // Render results
         function renderResults() {
             const tbody = document.getElementById('resultsBody');
@@ -3117,13 +3241,17 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 return;
             }
 
-            tbody.innerHTML = results.map((r, i) => `
+            tbody.innerHTML = results.map((r, i) => {
+                const max = resultMaxScore(r);
+                const percent = resultPercent(r);
+                const scoreText = max === 10 ? String(r.score) : `${r.score}<span style="color:#888;font-weight:400;">/${max}</span>`;
+                return `
                 <tr>
                     <td>${i + 1}</td>
                     <td>${escapeHtml(r.studentName)}</td>
                     <td>${escapeHtml(r.studentClass || '-')}</td>
                     <td>${r.studentSTT || r.studentId || '-'}</td>
-                    <td class="${r.score >= 8 ? 'score-high' : r.score >= 5 ? 'score-medium' : 'score-low'}">${r.score}</td>
+                    <td class="${percent >= 0.8 ? 'score-high' : percent >= 0.5 ? 'score-medium' : 'score-low'}">${scoreText}</td>
                     <td style="color:#2e7d32;font-weight:bold;">${r.correctCount}</td>
                     <td style="color:#f9a825;">${r.partialCount || 0}</td>
                     <td style="color:#c62828;">${r.wrongCount || 0}</td>
@@ -3132,7 +3260,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     <td>${r.submittedAt}</td>
                     <td><button class="btn btn-secondary" onclick="showDetail(${i})">️ Xem</button></td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // Update stats
@@ -3237,7 +3366,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 <p><strong>Họ tên:</strong> ${escapeHtml(r.studentName)}</p>
                 <p><strong>Lớp:</strong> ${escapeHtml(r.studentClass || '-')}</p>
                 <p><strong>STT:</strong> ${r.studentSTT || r.studentId || '-'}</p>
-                <p><strong>Điểm:</strong> ${r.score} (${r.correctCount}/${r.totalQuestions} câu đúng hoàn toàn${r.partialCount > 0 ? ', ' + r.partialCount + ' đúng một phần' : ''}${r.wrongCount > 0 ? ', ' + r.wrongCount + ' sai' : ''}${r.unansweredCount > 0 ? ', ' + r.unansweredCount + ' chưa trả lời' : ''})</p>
+                <p><strong>Điểm:</strong> ${r.score}/${resultMaxScore(r)} (${r.correctCount}/${r.totalQuestions} câu đúng hoàn toàn${r.partialCount > 0 ? ', ' + r.partialCount + ' đúng một phần' : ''}${r.wrongCount > 0 ? ', ' + r.wrongCount + ' sai' : ''}${r.unansweredCount > 0 ? ', ' + r.unansweredCount + ' chưa trả lời' : ''})</p>
                 ${unansweredCount > 0 ? `<p style="color:#ff9800;font-weight:bold;">Có ${unansweredCount} câu không chọn đáp án!</p>` : ''}
                 <hr style="margin:15px 0;">
                 <h4>Chi tiết từng câu:</h4>
@@ -4502,9 +4631,15 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
+        let reviewResultsData = null;
+
         async function showReviewResults(listId) {
             const body = document.getElementById('reviewResultsBody');
+            const filters = document.getElementById('reviewResultsFilters');
             body.innerHTML = '<p style="color:#666;">Đang tải...</p>';
+            filters.style.display = 'none';
+            filters.innerHTML = '';
+            reviewResultsData = null;
             document.getElementById('reviewResultsModal').style.display = 'flex';
             try {
                 const data = await reviewFetch('/api/review-lists/' + encodeURIComponent(listId) + '/results');
@@ -4513,36 +4648,120 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     body.innerHTML = '<p style="color:#666;">Danh sách chưa có đề.</p>';
                     return;
                 }
-                body.innerHTML = data.exams.map((exam) => {
-                    const rows = (exam.attempts || []).map((a) => `
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentSTT)}</td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentName || '')}</td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>${a.score}</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">${a.correctCount}/${a.totalQuestions}</td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">${formatDuration(a.timeSpent)}</td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">${formatDate(a.submittedAt)}</td>
-                        </tr>
-                    `).join('');
-                    return `
-                        <div style="margin-bottom:18px;">
-                            <h4 style="margin:0 0 8px 0;">${escapeHtml(exam.examName)} <span style="color:#888;font-weight:normal;font-size:0.85em;">(tối đa ${exam.settings.maxAttempts || '∞'} lượt, ${exam.settings.timeLimit ? exam.settings.timeLimit + ' phút' : 'không giới hạn thời gian'})</span></h4>
-                            ${rows ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em;">
-                                <thead><tr style="background:#f5f5f5;text-align:left;">
-                                    <th style="padding:8px;">STT</th><th style="padding:8px;">Họ tên</th><th style="padding:8px;">Điểm</th><th style="padding:8px;">Đúng</th><th style="padding:8px;">Thời gian</th><th style="padding:8px;">Nộp lúc</th>
-                                </tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table></div>` : '<p style="color:#888;font-size:0.9em;">Chưa có lượt nộp.</p>'}
-                        </div>
-                    `;
-                }).join('');
+                reviewResultsData = data;
+                renderReviewResultFilters();
+                renderReviewResults();
             } catch (err) {
                 body.innerHTML = `<p style="color:#c62828;">Lỗi: ${escapeHtml(err.message)}</p>`;
             }
         }
 
+        function renderReviewResultFilters() {
+            const data = reviewResultsData;
+            const students = new Map();
+            (data.exams || []).forEach((exam) => (exam.attempts || []).forEach((a) => {
+                const key = String(a.studentSTT);
+                if (!students.has(key)) students.set(key, a.studentName || ('STT ' + key));
+            }));
+            const options = (items) => items.map(([value, label]) =>
+                `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
+            const selectStyle = 'padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9em;background:#fff;';
+            const labelStyle = 'display:flex;flex-direction:column;gap:4px;font-size:0.85em;color:#555;';
+
+            const filters = document.getElementById('reviewResultsFilters');
+            filters.innerHTML = `
+                <label style="${labelStyle}">Học sinh
+                    <select id="reviewFilterStudent" style="${selectStyle}" onchange="renderReviewResults()">
+                        <option value="">Tất cả học sinh</option>
+                        ${options([...students.entries()].sort((a, b) => a[1].localeCompare(b[1], 'vi'))
+                            .map(([stt, name]) => [stt, name + ' (STT ' + stt + ')']))}
+                    </select>
+                </label>
+                <label style="${labelStyle}">Đề đã làm
+                    <select id="reviewFilterExam" style="${selectStyle}" onchange="renderReviewResults()">
+                        <option value="">Tất cả đề</option>
+                        ${options(data.exams.map((exam) => [exam.examId, exam.examName]))}
+                    </select>
+                </label>
+                <label style="${labelStyle}">Lần làm
+                    <select id="reviewFilterAttempt" style="${selectStyle}" onchange="renderReviewResults()">
+                        <option value="">Tất cả các lần</option>
+                    </select>
+                </label>`;
+            filters.style.display = 'flex';
+        }
+
+        // Các lượt khớp bộ lọc học sinh + đề; dùng để dựng danh sách "lần làm".
+        function reviewFilteredExams() {
+            const data = reviewResultsData;
+            const student = document.getElementById('reviewFilterStudent').value;
+            const examId = document.getElementById('reviewFilterExam').value;
+            return (data.exams || []).filter((exam) => !examId || String(exam.examId) === examId)
+                .map((exam) => ({
+                    exam: exam,
+                    attempts: (exam.attempts || []).filter((a) => !student || String(a.studentSTT) === student)
+                }))
+                .filter((entry) => entry.attempts.length > 0);
+        }
+
+        function renderReviewResults() {
+            const resultBody = document.getElementById('reviewResultsBody');
+            const attemptSelect = document.getElementById('reviewFilterAttempt');
+            const filtered = reviewFilteredExams();
+
+            const attemptNos = [...new Set(filtered.flatMap((entry) =>
+                entry.attempts.map((a) => a.attemptNo).filter((n) => n !== null && n !== undefined)))];
+            attemptNos.sort((a, b) => Number(a) - Number(b));
+            const currentAttempt = attemptSelect.value;
+            attemptSelect.innerHTML = '<option value="">Tất cả các lần</option>' +
+                attemptNos.map((n) => `<option value="${escapeHtml(String(n))}">Lần ${escapeHtml(String(n))}</option>`).join('');
+            if (attemptNos.some((n) => String(n) === currentAttempt)) attemptSelect.value = currentAttempt;
+
+            const attempt = attemptSelect.value;
+            const entries = filtered.map((entry) => ({
+                exam: entry.exam,
+                attempts: entry.attempts.filter((a) => !attempt || String(a.attemptNo) === attempt)
+            })).filter((entry) => entry.attempts.length > 0);
+            if (!entries.length) {
+                resultBody.innerHTML = '<p style="color:#888;font-size:0.9em;">Không có lượt nộp phù hợp với bộ lọc.</p>';
+                return;
+            }
+
+            resultBody.innerHTML = entries.map((entry) => {
+                const exam = entry.exam;
+                const rows = entry.attempts.map((a) => `
+                    <tr>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentSTT)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentName || '')}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(String(a.attemptNo || '--'))}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;"><strong>${a.score}${Number(a.maxScore) > 0 ? '/' + a.maxScore : ''}</strong></td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${a.correctCount}/${a.totalQuestions}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(displayTimeSpent(a.timeSpent))}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${formatDate(a.submittedAt)}</td>
+                    </tr>
+                `).join('');
+                return `
+                    <div style="margin-bottom:18px;">
+                        <h4 style="margin:0 0 8px 0;">${escapeHtml(exam.examName)} <span style="color:#888;font-weight:normal;font-size:0.85em;">(tối đa ${exam.settings.maxAttempts || '∞'} lượt, ${exam.settings.timeLimit ? exam.settings.timeLimit + ' phút' : 'không giới hạn thời gian'})</span></h4>
+                        ${rows ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                            <thead><tr style="background:#f5f5f5;text-align:left;">
+                                <th style="padding:8px;">STT</th><th style="padding:8px;">Họ tên</th><th style="padding:8px;">Lần</th><th style="padding:8px;">Điểm</th><th style="padding:8px;">Đúng</th><th style="padding:8px;">Thời gian</th><th style="padding:8px;">Nộp lúc</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table></div>` : '<p style="color:#888;font-size:0.9em;">Không có lượt nộp phù hợp.</p>'}
+                    </div>
+                `;
+            }).join('');
+        }
+
         function closeReviewResults() {
             document.getElementById('reviewResultsModal').style.display = 'none';
+        }
+
+        // Máy chủ đã trả chuỗi "x phút y giây"; số giây chỉ dùng cho dữ liệu cũ.
+        function displayTimeSpent(value) {
+            if (typeof value === 'number') return formatDuration(value);
+            return value ? String(value) : '--';
         }
 
         function formatDuration(seconds) {
@@ -5274,7 +5493,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                                 <option value="shortanswer" ${q.type === 'shortanswer' ? 'selected' : ''}>Trả lời ngắn</option>
                             </select>
                             <label style="font-size:0.86em; color:#555; white-space:nowrap;">Điểm
-                                <input type="number" min="1" max="100" step="0.5" value="${(Number(q.points) > 0) ? q.points : 1}" data-role="points" data-qi="${i}" onchange="onImportPointsChange(this)" style="width:66px; padding:4px 6px; border:1px solid #ddd; border-radius:6px; font-size:0.88em;">
+                                <input type="number" min="0.01" max="100" step="any" value="${(Number(q.points) > 0) ? q.points : 1}" data-role="points" data-qi="${i}" onchange="onImportPointsChange(this)" style="width:66px; padding:4px 6px; border:1px solid #ddd; border-radius:6px; font-size:0.88em;">
                             </label>
                             <label style="font-size:0.86em; color:#555; cursor:pointer; white-space:nowrap;"><input type="checkbox" data-role="include" data-qi="${i}" ${q.include !== false ? 'checked' : ''} onchange="onImportIncludeChange(this)"> Lưu câu này</label>
                         </div>

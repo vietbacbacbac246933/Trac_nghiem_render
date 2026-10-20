@@ -552,6 +552,7 @@ function settleReviewAttempt(attempt, questions, answers, settings, expired) {
     attempt.submittedAt = new Date(now).toISOString();
     attempt.expired = !!expired;
     attempt.score = graded.score;
+    attempt.maxScore = graded.maxScore;
     attempt.correctCount = graded.correctCount;
     attempt.partialCount = graded.partialCount;
     attempt.wrongCount = graded.wrongCount;
@@ -1739,7 +1740,7 @@ app.put('/api/questions/:id', (req, res) => {
     }
 });
 
-// Chỉ đổi điểm (trọng số) của một câu — không ghi đè nội dung/đáp án/ảnh.
+// Chỉ đổi điểm của một câu — không ghi đè nội dung/đáp án/ảnh.
 app.patch('/api/questions/:id/points', (req, res) => {
     if (!isTeacher(req)) {
         return res.status(403).json({ error: 'Không có quyền truy cập' });
@@ -2664,7 +2665,23 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
     if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
     var exams = (list.items || []).map(function (item) {
         var info = publicReviewExam(item.examId, item.settings);
-        var attempts = loadReviewAttempts(list.id, item.examId).filter(function (a) {
+        var rawAttempts = loadReviewAttempts(list.id, item.examId);
+        // Dữ liệu cũ có thể thiếu trường no: đánh số theo thứ tự bắt đầu.
+        var noById = {};
+        var byStudent = {};
+        rawAttempts.forEach(function (a) {
+            if (!a) return;
+            var key = String(a.studentSTT);
+            (byStudent[key] = byStudent[key] || []).push(a);
+        });
+        Object.keys(byStudent).forEach(function (key) {
+            byStudent[key].sort(function (a, b) {
+                return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+            }).forEach(function (a, index) {
+                noById[a.id] = index + 1;
+            });
+        });
+        var attempts = rawAttempts.filter(function (a) {
             return a && a.status === 'submitted';
         }).map(function (a) {
             return {
@@ -2672,7 +2689,9 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
                 studentSTT: a.studentSTT,
                 studentName: a.studentName,
                 studentClass: a.studentClass,
+                attemptNo: a.no || noById[a.id] || null,
                 score: a.score,
+                maxScore: a.maxScore,
                 correctCount: a.correctCount,
                 totalQuestions: a.totalQuestions,
                 timeSpent: a.timeSpent,
@@ -2760,6 +2779,7 @@ app.get('/api/review/history', function (req, res) {
             id: a.id,
             attemptNo: a.no || noById[a.id] || null,
             score: a.score,
+            maxScore: a.maxScore,
             correctCount: a.correctCount,
             partialCount: a.partialCount,
             wrongCount: a.wrongCount,
@@ -2899,6 +2919,7 @@ app.post('/api/review/submit', function (req, res) {
             success: true,
             expired: true,
             score: expiredGraded.score,
+            maxScore: expiredGraded.maxScore,
             correctCount: expiredGraded.correctCount,
             partialCount: expiredGraded.partialCount,
             wrongCount: expiredGraded.wrongCount,
@@ -2920,6 +2941,7 @@ app.post('/api/review/submit', function (req, res) {
     res.json({
         success: true,
         score: graded.score,
+        maxScore: graded.maxScore,
         correctCount: graded.correctCount,
         partialCount: graded.partialCount,
         wrongCount: graded.wrongCount,
@@ -3001,6 +3023,7 @@ app.post('/api/submit', (req, res) => {
         studentName,
         studentClass,
         score: graded.score,
+        maxScore: graded.maxScore,
         correctCount: graded.correctCount,
         partialCount: graded.partialCount,
         wrongCount: graded.wrongCount,
@@ -3042,6 +3065,7 @@ app.post('/api/submit', (req, res) => {
     res.json({
         success: true,
         score: graded.score,
+        maxScore: graded.maxScore,
         correctCount: graded.correctCount,
         partialCount: graded.partialCount,
         wrongCount: graded.wrongCount,
@@ -3699,11 +3723,16 @@ app.post('/api/import/preview',
         // 2) Phân tích file Word (nếu có)
         var parsePromise = Promise.resolve([]);
         var answerTableReport = null;
+        var completeness = null;
         if (docxFile) {
             parsePromise = mammothToHtml(docxFile.buffer).then(function (result) {
                 var parseOpts = { trackReview: true };
                 var questions = parseQuestionsFromHtml(result.value, parseOpts);
                 answerTableReport = parseOpts.answerTableReport || null;
+                completeness = analyzeImportCompleteness(questions);
+                if (completeness.warnings.length > 1) {
+                    console.warn('[IMPORT] ' + docxFile.originalname + ': ' + completeness.warnings.join(' '));
+                }
                 return questions;
             });
         }
@@ -4546,6 +4575,12 @@ function parseQuestionsFromHtml(html, opts) {
     // giu lai cau truc bang de ghep dap an sau khi phan tich xong cau hoi.
     var tableResult = answerTables.extract(html);
     html = tableResult.cleanedHtml;
+
+    // Mammoth xuat cac doan dung style Heading thanh <h1>..<h6>. Neu chi tach
+    // cau hoi theo <p> thi toan bo cau nam trong heading bi bo qua am tham
+    // (de that "Su-Trac nghiem.docx": mat 33/120 cau vi chung o <h1>).
+    html = html.replace(/<(\/?)h[1-6]\b[^>]*>/gi, '<$1p>');
+
     var paragraphs = [];
 
     // Merge <pre> blocks into the preceding <p> so code stays attached to its question/option
@@ -4860,6 +4895,108 @@ function parseQuestionsFromHtml(html, opts) {
     }
 
     return parsedQuestions;
+}
+
+// ========== KIỂM TRA TÍNH ĐẦY ĐỦ SAU KHI PHÂN TÍCH ==========
+// Chỉ BÁO CÁO, không tự tạo câu giả để bù số lượng thiếu.
+function analyzeImportCompleteness(questions) {
+    var report = {
+        detected: questions.length,
+        numbers: [],
+        missingNumbers: [],
+        duplicateNumbers: [],
+        emptyQuestions: [],
+        missingOptions: [],
+        unparsedContent: [],
+        imageCount: 0,
+        unresolvedImages: [],
+        warnings: []
+    };
+
+    function labelOf(q, i) {
+        var n = q.importMeta && q.importMeta.number;
+        return (n === null || n === undefined) ? ('câu #' + (i + 1)) : ('Câu ' + n);
+    }
+
+    var groups = {};
+    questions.forEach(function (q, i) {
+        var meta = q.importMeta || {};
+        var label = labelOf(q, i);
+        var questionHtml = String(q.question || '');
+        var options = Array.isArray(q.options) ? q.options : [];
+        var type = q.type || 'single';
+
+        report.numbers.push(meta.number === undefined ? null : meta.number);
+
+        var plain = stripHtmlTags(questionHtml).trim();
+        var hasImg = /<img\b/i.test(questionHtml);
+        if (plain === '' && !hasImg) {
+            report.emptyQuestions.push(label);
+        }
+
+        if (type === 'shortanswer') {
+            if (!q.correctAnswer) report.missingOptions.push(label + ' (thiếu đáp án trả lời ngắn)');
+        } else if (options.length < 2) {
+            report.missingOptions.push(label + ' (chỉ có ' + options.length + ' phương án)');
+        }
+
+        (q.reviewReasons || []).forEach(function (r) {
+            if (/chưa nhận dạng được/i.test(String(r))) {
+                report.unparsedContent.push(label + ': ' + String(r));
+            }
+        });
+
+        var allHtml = questionHtml + ' ' + options.join(' ');
+        var imgs = allHtml.match(/<img\b[^>]*>/gi) || [];
+        report.imageCount += imgs.length;
+        imgs.forEach(function (tag) {
+            var src = (tag.match(/\bsrc\s*=\s*["']?([^"'\s>]*)/i) || [])[1] || '';
+            if (!/^(data:|https?:)/i.test(src)) {
+                report.unresolvedImages.push(label + ' (' + (src ? src.slice(0, 40) : 'không có src') + ')');
+            }
+        });
+
+        // Đánh số được kiểm tra theo từng phần (đề có thể đánh số lại từ 1 ở Phần II).
+        var groupKey = String(meta.sectionIndex);
+        if (!groups[groupKey]) groups[groupKey] = [];
+        if (typeof meta.number === 'number') groups[groupKey].push(meta.number);
+    });
+
+    Object.keys(groups).forEach(function (key) {
+        var nums = groups[key].slice().sort(function (a, b) { return a - b; });
+        if (nums.length === 0) return;
+        var seen = {};
+        nums.forEach(function (n) {
+            if (seen[n]) {
+                if (report.duplicateNumbers.indexOf(n) === -1) report.duplicateNumbers.push(n);
+            }
+            seen[n] = true;
+        });
+        for (var n = nums[0]; n < nums[nums.length - 1]; n++) {
+            if (!seen[n]) report.missingNumbers.push(n);
+        }
+    });
+
+    report.warnings.push('Nhận diện được ' + report.detected + ' câu hỏi.');
+    if (report.missingNumbers.length) {
+        report.warnings.push('Thiếu số thứ tự câu: ' + report.missingNumbers.join(', ') + '.');
+    }
+    if (report.duplicateNumbers.length) {
+        report.warnings.push('Số thứ tự câu bị trùng: ' + report.duplicateNumbers.join(', ') + '.');
+    }
+    if (report.emptyQuestions.length) {
+        report.warnings.push('Câu không có nội dung: ' + report.emptyQuestions.join(', ') + '.');
+    }
+    if (report.missingOptions.length) {
+        report.warnings.push('Câu thiếu phương án/đáp án: ' + report.missingOptions.join(', ') + '.');
+    }
+    if (report.unparsedContent.length) {
+        report.warnings.push('Nội dung chưa phân tích được: ' + report.unparsedContent.length + ' đoạn (xem từng câu trong danh sách cần kiểm tra).');
+    }
+    if (report.unresolvedImages.length) {
+        report.warnings.push('Hình ảnh chưa xử lý được: ' + report.unresolvedImages.join(', ') + '.');
+    }
+    return report;
 }
 
 // Câu trả lời ngắn do file Word không kèm đáp án thì KHÔNG lưu thẳng:
