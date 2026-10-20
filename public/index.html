@@ -2306,10 +2306,12 @@
             var listId = p.get('reviewList');
             var examId = p.get('reviewExam');
             var stt = p.get('reviewStt');
-            if (!listId || !examId || !stt) return null;
+            if (!listId && !examId && !stt) return null;
+            if (!listId || !examId || !stt) return { invalid: true };
             return { listId: listId, examId: examId, stt: stt, settings: null };
         })();
         var reviewAttemptId = null;
+        var reviewInitStarted = false;
         var studentInfo = { name: '', class: '', stt: '' };
         var selectedStudent = null;
         var nameConfirmed = false;
@@ -2457,6 +2459,7 @@
         });
 
         socket.on('studentStatusUpdated', function(data) {
+            if (reviewContext) return; // ôn tập không dùng danh sách học sinh của phiên thi
             // Cập nhật trực tiếp từ data thay vì gọi lại API — tránh HTTP request không cần thiết
             if (data && data.stt !== undefined && data.status) {
                 for (var _i = 0; _i < students.length; _i++) {
@@ -2895,6 +2898,22 @@
 
         // ==================== CHẾ ĐỘ ÔN TẬP ====================
         function initReviewMode() {
+            if (reviewInitStarted || !reviewContext) return;
+            reviewInitStarted = true;
+            // Thay màn hình chọn tên bằng trạng thái đang mở đề ngay khi vào trang.
+            document.getElementById('examTitleDisplay').textContent = 'Ôn tập';
+            document.getElementById('step2Content').style.display = 'none';
+            document.getElementById('step3Content').style.display = 'none';
+            document.getElementById('step1Content').innerHTML =
+                '<div style="text-align:center;padding:24px;color:#555;">Đang mở đề ôn tập...</div>';
+            if (reviewContext.invalid) {
+                document.getElementById('step1Content').innerHTML =
+                    '<div style="background:#fdecea;color:#b3261e;border-radius:10px;padding:14px;margin-bottom:14px;">' +
+                    'Đường dẫn ôn tập không hợp lệ.</div>' +
+                    '<a class="btn btn-primary" href="/on-tap" style="display:block;text-align:center;text-decoration:none;">' +
+                    'Quay lại danh sách ôn tập</a>';
+                return;
+            }
             var url = '/api/review/play?listId=' + encodeURIComponent(reviewContext.listId) +
                 '&examId=' + encodeURIComponent(reviewContext.examId) +
                 '&stt=' + encodeURIComponent(reviewContext.stt);
@@ -5003,14 +5022,14 @@
 
             updateQuestionNavigation();
 
-            // Scroll to top. Thanh tiêu đề dính (.exam-header) che mất mấy dòng
-            // đầu của câu hỏi sau khi cuộn, nên chừa đúng chiều cao thật của nó.
+            // Chỉ kéo câu mới lên khi phần đầu câu đang bị thanh tiêu đề dính che.
+            // Đang ở đầu trang thì giữ nguyên vị trí cuộn, không nhảy.
             var qContainer = document.getElementById('questionsContainer');
             var examHeader = document.querySelector('.exam-header');
-            if (qContainer && examHeader) {
+            if (qContainer && examHeader && qContainer.getBoundingClientRect().top < examHeader.offsetHeight) {
                 qContainer.style.scrollMarginTop = (examHeader.offsetHeight + 8) + 'px';
+                qContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-            qContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
             // Render công thức toán nếu có
             renderKatex(document.getElementById('questionsContainer'));
@@ -5440,13 +5459,18 @@
         })();
 
         // Initialize - load ngay khi trang ready, không chờ socket
-        loadStudents();
-        checkExam();
-        renderSavedResults();
+        if (reviewContext) {
+            // Vào thẳng đề ôn tập, không tải danh sách học sinh / bài thi chính.
+            initReviewMode();
+        } else {
+            loadStudents();
+            checkExam();
+            renderSavedResults();
+        }
         
         // Nếu socket không kết nối được sau 3 giây, thử load lại
         setTimeout(function() {
-            if (!mySocketId) {
+            if (!mySocketId && !reviewContext) {
                 loadStudents();
                 checkExam();
             }
