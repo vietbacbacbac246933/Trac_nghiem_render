@@ -190,6 +190,8 @@ lib/datastore.js     # Lớp lưu trữ PostgreSQL / file
 lib/auth.js          # Xác thực giáo viên (cookie ký HMAC)
 lib/file-validate.js # Kiểm tra định dạng/dung lượng file nhập đề
 lib/import-sessions.js # Phiên xem trước khi nhập đề (RAM, tự hết hạn)
+lib/mem-monitor.js   # Bộ đo RAM nền (process.memoryUsage mỗi 30s)
+scripts/mem-stats.js # Tính thống kê RAM nền từ log [MEM]
 public/              # Giao diện học sinh, giáo viên, trang đăng nhập
 data/                # Dữ liệu gieo ban đầu (câu hỏi, đề thi, file mẫu)
 tests/               # Test (chạy tay, cần server đang chạy)
@@ -207,6 +209,62 @@ $env:PORT="3999"; $env:TEACHER_PASSWORD="test123"; node server.js
 
 # Cửa sổ 2
 npm run test:import        # hoặc: node tests/test-import-docx.js
+npm run test:mem           # test bộ đo RAM, không cần server
 ```
 
 Đổi địa chỉ bằng biến môi trường `TEST_BASE` / mật khẩu bằng `TEST_PASSWORD`.
+
+## 9. Đo RAM nền và đánh giá giới hạn 512 MB
+
+Server tự ghi một dòng log mỗi **30 giây** (không cần bật gì thêm):
+
+```
+[MEM] t=2026-10-21T14:46:25.984Z uptime=30s pid=8212 rss=62.8MB heapUsed=26.0MB heapTotal=28.7MB external=5.1MB arrayBuffers=2.9MB
+```
+
+- `rss` = RAM tiến trình Node.js đang chiếm (gần nhất với giới hạn Render).
+- `heapUsed/heapTotal` = heap JS; `external/arrayBuffers` = buffer, ảnh base64…
+- `uptime` = số giây kể từ khi tiến trình khởi động.
+- Bộ đo chỉ chạy 1 timer duy nhất, `unref()` nên không giữ process sống và
+  **không** nằm trong route/middleware (không tốn thêm gì cho mỗi request).
+
+### Quy trình đo RAM nền trên Render
+1. Deploy. Mở **Render → service → Logs**, tìm dòng `[MEM] Bat dau do RAM moi 30s`.
+2. Để server **nhàn rỗi 5–10 phút** (không mở trang giáo viên, không cho học sinh vào).
+3. Copy các dòng `[MEM]` vào một file, ví dụ `mem.log`.
+4. Tính thống kê:
+   ```powershell
+   node scripts/mem-stats.js mem.log --skip 10   # bỏ 10 mẫu đầu lúc mới khởi động
+   ```
+   Script in ra số mẫu, khoảng thời gian, TB / trung vị / min / max của RSS và
+   heapUsed, cùng ước tính `512 MB - RSS trung vị`.
+
+### Đọc kết quả cho đúng
+- Đây là **RAM của tiến trình Node.js** (`process.memoryUsage()`), **không phải
+  RAM toàn bộ container**. Container còn có phần chạy Node runtime, thư viện
+  native, bộ đệm hệ điều hành… nên RSS trung vị luôn **thấp hơn** mức Render báo.
+- `512 MB - RSS nền` chỉ là **phép ước tính sơ bộ**. Không được coi toàn bộ phần
+  còn lại là dùng được an toàn, và **không suy ra** 45–50 học sinh tốn bao nhiêu
+  RAM chỉ từ con số nền.
+- Một mẫu duy nhất không phải RAM nền: RSS thường giảm sau lần GC đầu tiên rồi mới
+  ổn định. Cần nhiều mẫu sau khi server đã chạy ổn định.
+
+### Đo khi tải tăng dần
+1. Ghi lại RSS nền (bước trên).
+2. Tăng tải theo bậc, mỗi bậc giữ 3–5 phút rồi đọc lại RSS/heapUsed:
+   10 → 20 → 30 → 45 → 50 học sinh (dùng nhiều máy/trình duyệt hoặc k6).
+3. Sau mỗi bậc, dừng tải 2–3 phút và xem RSS có **giảm về gần mức cũ** không.
+   - Giảm về gần mức cũ → bộ nhớ được giải phóng, tạm ổn.
+   - Tăng liên tục không giảm → nghi rò rỉ hoặc giữ tham chiếu quá lâu.
+4. Theo dõi song song: HTTP 5xx, thời gian phản hồi (p95), timeout, và log Render
+   `Ran out of memory`.
+5. Nếu dùng k6: chỉ chạy **thử nghiệm nhỏ, tăng dần**, không chạy tải lớn trên
+   production đang phục vụ học sinh thật.
+
+### Kiến trúc và thành phần tốn RAM (đã kiểm tra mã nguồn)
+- Một tiến trình duy nhất: `server.js` (Express + Socket.IO + `pg`).
+- Timer định kỳ: bộ đo RAM (30s) và dọn phiên nhập đề (5 phút) — cả hai đều `unref()`.
+- `DATA.cache` giữ toàn bộ dữ liệu JSON/PostgreSQL trong RAM và **không evict**.
+- Kết quả chấm điểm lưu kèm nội dung câu/đáp án (có thể chứa ảnh base64).
+- Ảnh nhúng trong Word nằm trong “phiên nhập đề” RAM, tối đa 20 phiên × 30 phút.
+

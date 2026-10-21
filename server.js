@@ -31,6 +31,8 @@ var auth = require('./lib/auth');
 var fileValidate = require('./lib/file-validate');
 // Phien xem truoc khi nhap de (luu RAM, co TTL)
 var importSessions = require('./lib/import-sessions');
+// Bo do RAM nen (ghi process.memoryUsage moi 30s, chi 1 timer)
+var memMonitor = require('./lib/mem-monitor');
 // Chuan hoa dap an tra loi ngan (so nguyen/thap phan, khong sai so)
 var shortAnswer = require('./lib/short-answer');
 var answerTables = require('./lib/answer-tables');
@@ -5226,6 +5228,10 @@ DATA.init().then(function() {
     printStartupInfo();
     safeLog('Dang khoi dong server...');
     startListening();
+    // Do RAM nen: ghi process.memoryUsage() moi 30s, chi 1 timer, khong nam trong request.
+    safeLog('[MEM] Bat dau do RAM moi ' + Math.round(memMonitor.INTERVAL_MS / 1000) + 's' +
+        ' (pid=' + process.pid + ', node=' + process.version + ').');
+    memMonitor.start({ log: function (line) { safeLog(line); } });
 }).catch(function(err) {
     safeLog('[LOI] Khoi tao storage that bai: ' + (err && err.message));
     process.exit(1);
@@ -5235,6 +5241,7 @@ DATA.init().then(function() {
 function shutdown(signal) {
     safeLog('');
     safeLog('Nhan tin hieu ' + signal + '. Dang tat server...');
+    memMonitor.stop();
     Promise.resolve(DATA.flush()).then(function() {
         server.close(function() {
             safeLog('Server da tat.');
