@@ -3008,8 +3008,6 @@
             document.getElementById('examTitleDisplay').textContent = 'Ôn tập';
             document.getElementById('step2Content').style.display = 'none';
             document.getElementById('step3Content').style.display = 'none';
-            document.getElementById('step1Content').innerHTML =
-                '<div style="text-align:center;padding:24px;color:#555;">Đang mở đề ôn tập...</div>';
             if (reviewContext.invalid) {
                 document.getElementById('step1Content').innerHTML =
                     '<div style="background:#fdecea;color:#b3261e;border-radius:10px;padding:14px;margin-bottom:14px;">' +
@@ -3018,6 +3016,34 @@
                     'Quay lại danh sách ôn tập</a>';
                 return;
             }
+            document.getElementById('step1Content').innerHTML =
+                '<div style="text-align:center;padding:10px 0;">' +
+                    '<div style="font-size:2.2em;margin-bottom:8px;">🖥️</div>' +
+                    '<h3 style="margin:0 0 8px;color:#333;">Sẵn sàng làm bài ôn tập</h3>' +
+                    '<p style="color:#666;margin:0 0 18px;line-height:1.5;">' +
+                        'Bài làm sẽ mở ở chế độ toàn màn hình.<br>' +
+                        'Trình duyệt yêu cầu bấm nút để bật toàn màn hình.' +
+                    '</p>' +
+                    '<button class="btn btn-primary" onclick="beginReviewPlay()" style="font-size:1.1em;padding:14px 28px;">' +
+                        'Bắt đầu làm bài' +
+                    '</button>' +
+                '</div>';
+        }
+
+        var reviewPlayStarted = false;
+
+        function beginReviewPlay() {
+            // Phải gọi trong thao tác bấm nút thì trình duyệt mới cho vào toàn màn hình.
+            requestFullscreen();
+            loadReviewPlay();
+        }
+
+        function loadReviewPlay() {
+            if (reviewPlayStarted) return;
+            reviewPlayStarted = true;
+            document.getElementById('step1Content').innerHTML =
+                '<div style="text-align:center;padding:24px;color:#555;">Đang mở đề ôn tập...</div>';
+
             var url = '/api/review/play?listId=' + encodeURIComponent(reviewContext.listId) +
                 '&examId=' + encodeURIComponent(reviewContext.examId) +
                 '&stt=' + encodeURIComponent(reviewContext.stt);
@@ -5380,15 +5406,6 @@
             enableAntiCopy();
             setupTabDetection();
             setupFullscreen();
-
-            // Trình duyệt chỉ cho vào toàn màn hình sau thao tác của người dùng.
-            if (!isFullscreen()) {
-                var enter = function () {
-                    if (!isFullscreen()) requestFullscreen();
-                };
-                document.addEventListener('click', enter, { once: true });
-                document.addEventListener('keydown', enter, { once: true });
-            }
         }
 
         // ==================== FULLSCREEN ====================
