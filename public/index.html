@@ -2168,7 +2168,7 @@
         <h2>Bạn đã thoát toàn màn hình!</h2>
         <p>Bài thi yêu cầu làm bài ở chế độ toàn màn hình.<br>Vui lòng bấm nút bên dưới để quay lại.</p>
         <button class="fw-btn" id="fsReturnBtn" onclick="reenterFullscreen()">↩ Quay lại toàn màn hình (<span id="fsCountdown">10</span>s)</button>
-        <div class="fw-violation">Vi phạm lần <span id="fsViolationCount">1</span> — Giáo viên đã được thông báo</div>
+        <div class="fw-violation">Vi phạm lần <span id="fsViolationCount">1</span><span id="fsNotifySuffix"> — Giáo viên đã được thông báo</span></div>
     </div>
 
     <!-- AI Sidebar Warning -->
@@ -2229,6 +2229,10 @@
                 <div class="result-row">
                     <span>Họ tên</span>
                     <strong id="resultName"></strong>
+                </div>
+                <div class="result-row">
+                    <span>Vi phạm (thoát toàn màn hình &amp; đổi tab)</span>
+                    <strong id="resultViolations">0 &amp; 0</strong>
                 </div>
             </div>
             
@@ -3056,6 +3060,7 @@
             document.getElementById('examScreen').style.display = 'block';
             document.getElementById('displayName').textContent = studentInfo.name;
             document.getElementById('displayClass').textContent = 'Ôn tập - STT ' + studentInfo.stt;
+            initReviewAntiCheat();
 
             if (practiceMode) {
                 showPracticeModeNotice();
@@ -4765,7 +4770,11 @@
                 examId: reviewContext.examId,
                 stt: studentInfo.stt,
                 attemptId: reviewAttemptId,
-                answers: answersArray
+                answers: answersArray,
+                violations: {
+                    fsExitCount: fsViolationCount,
+                    tabSwitchCount: tabLeaveCount
+                }
             } : {
                 studentSTT: studentInfo.stt,
                 studentName: studentInfo.name,
@@ -4872,6 +4881,7 @@
             
             document.getElementById('timeSpent').textContent = timeSpent;
             document.getElementById('resultName').textContent = studentInfo.name;
+            document.getElementById('resultViolations').textContent = fsViolationCount + ' & ' + tabLeaveCount;
 
             if (reviewContext) {
                 document.getElementById('resultMessage').textContent = result.expired
@@ -4992,6 +5002,7 @@
 
             document.getElementById('timeSpent').textContent = result.timeSpent;
             document.getElementById('resultName').textContent = result.name;
+            document.getElementById('resultViolations').textContent = '—';
         }
         
         function renderSavedResults() {
@@ -5261,12 +5272,15 @@
                     document.getElementById('tabLeaveCount').textContent = tabLeaveCount;
                     document.getElementById('tabWarning').style.display = 'block';
 
-                    socket.emit('tabLeave', {
-                        stt: studentInfo.stt,
-                        name: studentInfo.name,
-                        count: tabLeaveCount,
-                        time: getServerTimeSync().toISOString()
-                    });
+                    // Ôn tập: chỉ đếm trên máy, số liệu gửi kèm lúc nộp bài.
+                    if (!reviewContext) {
+                        socket.emit('tabLeave', {
+                            stt: studentInfo.stt,
+                            name: studentInfo.name,
+                            count: tabLeaveCount,
+                            time: getServerTimeSync().toISOString()
+                        });
+                    }
                 }
             });
             
@@ -5299,12 +5313,47 @@
             _fsSuppressUntil = 0;
             _fsDebounceUntil = 0;
 
+            var notifySuffix = document.getElementById('fsNotifySuffix');
+            if (notifySuffix) notifySuffix.style.display = '';
+
             createWatermark();
             enableAntiCopy();
             setupTabDetection();
             setupFullscreen();
             setupAISidebarDetection();
             currentQuestionIndex = 0;
+        }
+
+        // Chống gian lận cho ôn tập: chỉ đếm trên máy, không gửi realtime.
+        // Bộ đếm được gửi kèm lúc nộp bài để lưu vào lượt làm và file Excel.
+        function initReviewAntiCheat() {
+            tabLeaveCount = 0;
+            fsViolationCount = 0;
+            document.getElementById('tabLeaveCount').textContent = '0';
+            document.getElementById('fsLeaveCount').textContent = '0';
+            document.getElementById('tabWarning').style.display = 'none';
+            document.getElementById('fsWarningBadge').style.display = 'none';
+
+            fsExitBySystem = false;
+            _fsWasFullscreen = false;
+            _fsSuppressUntil = 0;
+            _fsDebounceUntil = 0;
+
+            var suffix = document.getElementById('fsNotifySuffix');
+            if (suffix) suffix.style.display = 'none';
+
+            enableAntiCopy();
+            setupTabDetection();
+            setupFullscreen();
+
+            // Trình duyệt chỉ cho vào toàn màn hình sau thao tác của người dùng.
+            if (!isFullscreen()) {
+                var enter = function () {
+                    if (!isFullscreen()) requestFullscreen();
+                };
+                document.addEventListener('click', enter, { once: true });
+                document.addEventListener('keydown', enter, { once: true });
+            }
         }
 
         // ==================== FULLSCREEN ====================
@@ -5362,13 +5411,15 @@
             document.getElementById('fsLeaveCount').textContent = fsViolationCount;
             document.getElementById('fsWarningBadge').style.display = 'block';
 
-            // Báo ngay về server
-            socket.emit('fullscreenExit', {
-                stt: studentInfo.stt,
-                name: studentInfo.name,
-                count: fsViolationCount,
-                time: getServerTimeSync().toISOString()
-            });
+            // Ôn tập: chỉ đếm trên máy, số liệu gửi kèm lúc nộp bài.
+            if (!reviewContext) {
+                socket.emit('fullscreenExit', {
+                    stt: studentInfo.stt,
+                    name: studentInfo.name,
+                    count: fsViolationCount,
+                    time: getServerTimeSync().toISOString()
+                });
+            }
 
             // Countdown tự động quay lại fullscreen
             if (fsCountdownInterval) clearInterval(fsCountdownInterval);

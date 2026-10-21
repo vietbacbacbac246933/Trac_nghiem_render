@@ -2707,7 +2707,9 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
                 correctCount: a.correctCount,
                 totalQuestions: a.totalQuestions,
                 timeSpent: a.timeSpent,
-                submittedAt: a.submittedAt
+                submittedAt: a.submittedAt,
+                fsExitCount: typeof a.fsExitCount === 'number' ? a.fsExitCount : null,
+                tabSwitchCount: typeof a.tabSwitchCount === 'number' ? a.tabSwitchCount : null
             };
         });
         info.attempts = attempts;
@@ -2744,7 +2746,7 @@ app.get('/api/review-lists/:listId/results/export', function (req, res) {
     var ws = XLSX.utils.aoa_to_sheet([table.headers].concat(table.rows));
     var cols = [{ wch: 5 }, { wch: 28 }, { wch: 12 }];
     for (var i = 0; i < table.maxAttempts; i++) cols.push({ wch: 10 });
-    cols.push({ wch: 12 }, { wch: 20 }, { wch: 18 });
+    cols.push({ wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 18 });
     ws['!cols'] = cols;
     ws['!autofilter'] = {
         ref: XLSX.utils.encode_range({
@@ -2875,6 +2877,8 @@ app.get('/api/review/history', function (req, res) {
             timeSpent: a.timeSpent,
             submittedAt: a.submittedAt,
             expired: !!a.expired,
+            fsExitCount: typeof a.fsExitCount === 'number' ? a.fsExitCount : null,
+            tabSwitchCount: typeof a.tabSwitchCount === 'number' ? a.tabSwitchCount : null,
             canViewDetails: canViewDetails,
             details: canViewDetails ? filterHistoryDetails(settings, a.details) : null
         };
@@ -2965,6 +2969,13 @@ app.get('/api/review/play', function (req, res) {
     });
 });
 
+// Chi nhan bo dem vi pham dang so nguyen khong am, chan gia tri rac tu client.
+function toViolationCount(value) {
+    var n = Math.floor(Number(value));
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.min(n, 9999);
+}
+
 app.post('/api/review/submit', function (req, res) {
     var body = req.body || {};
     var list = getReviewList(body.listId);
@@ -3000,6 +3011,8 @@ app.post('/api/review/submit', function (req, res) {
     // thay vì để lượt treo, nhưng không chấp nhận đáp án gửi muộn.
     if (late) {
         var expiredGraded = settleReviewAttempt(attempt, exam.questions, {}, item.settings, true);
+        attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
+        attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
         saveReviewAttempts(list.id, item.examId, attempts);
         var expiredUsed = review.countAttempts(attempts, student.stt);
         return res.json({
@@ -3022,6 +3035,8 @@ app.post('/api/review/submit', function (req, res) {
     }
 
     var graded = settleReviewAttempt(attempt, exam.questions, body.answers, item.settings, false);
+    attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
+    attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
     saveReviewAttempts(list.id, item.examId, attempts);
 
     var usedCount = review.countAttempts(attempts, student.stt);

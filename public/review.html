@@ -890,10 +890,19 @@
         return '<span class="hist-count ' + cls + '">' + esc(label) + ' <strong>' + value + '</strong></span>';
     }
 
+    // "6 & 8" = số lần thoát toàn màn hình & số lần đổi tab. Lượt cũ -> null.
+    function violationText(a) {
+        var fs = a.fsExitCount;
+        var tab = a.tabSwitchCount;
+        if ((fs === null || fs === undefined) && (tab === null || tab === undefined)) return null;
+        return (Number(fs) || 0) + ' & ' + (Number(tab) || 0);
+    }
+
     function renderOverview(a) {
         var summary = historyData.summary || {};
         var total = a.totalQuestions || 0;
         var ratio = total ? Math.round((a.correctCount || 0) / total * 100) : 0;
+        var violations = violationText(a);
         var html = '<div class="hist-overview">' +
             '<div class="hist-topline">' +
                 '<div class="hist-score">' + esc(formatScoreWithMax(a.score, a.maxScore)) + ' <small>điểm</small></div>' +
@@ -901,6 +910,9 @@
                     '<span>Thời gian làm: <strong>' + esc(a.timeSpent || '--') + '</strong></span>' +
                     '<span>Nộp lúc: ' + esc(formatDate(a.submittedAt)) + '</span>' +
                     '<span>Tỉ lệ đúng: <strong>' + ratio + '%</strong> (' + (a.correctCount || 0) + '/' + total + ')</span>' +
+                    (violations !== null
+                        ? '<span>Vi phạm: <strong>' + violations + '</strong> (thoát toàn màn hình &amp; đổi tab)</span>'
+                        : '') +
                 '</div>' +
             '</div>' +
             '<div class="hist-counts">' +

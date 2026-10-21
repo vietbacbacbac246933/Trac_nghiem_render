@@ -208,9 +208,9 @@ var roster = [
 ];
 var teacherAttempts = [
     // Chen le thoi gian: phai duoc sap xep lai theo thoi diem bat dau.
-    { id: 't3', studentSTT: '1', status: 'submitted', score: 0, maxScore: 10, startedAt: '2026-01-05T00:00:00Z', submittedAt: '2026-01-05T00:10:00Z', timeSpent: '10 phút 0 giây' },
-    { id: 't1', studentSTT: '1', status: 'submitted', score: 6.5, maxScore: 10, startedAt: '2026-01-01T00:00:00Z', submittedAt: '2026-01-01T00:20:30Z', timeSpent: '20 phút 30 giây' },
-    { id: 't2', studentSTT: '1', status: 'submitted', score: 8, maxScore: 10, startedAt: '2026-01-03T00:00:00Z', submittedAt: '2026-01-03T00:05:00Z', timeSpent: '' },
+    { id: 't3', studentSTT: '1', status: 'submitted', score: 0, maxScore: 10, startedAt: '2026-01-05T00:00:00Z', submittedAt: '2026-01-05T00:10:00Z', timeSpent: '10 phút 0 giây', fsExitCount: 0, tabSwitchCount: 2 },
+    { id: 't1', studentSTT: '1', status: 'submitted', score: 6.5, maxScore: 10, startedAt: '2026-01-01T00:00:00Z', submittedAt: '2026-01-01T00:20:30Z', timeSpent: '20 phút 30 giây', fsExitCount: 6, tabSwitchCount: 8 },
+    { id: 't2', studentSTT: '1', status: 'submitted', score: 8, maxScore: 10, startedAt: '2026-01-03T00:00:00Z', submittedAt: '2026-01-03T00:05:00Z', timeSpent: '', fsExitCount: 0, tabSwitchCount: 1 },
     { id: 't4', studentSTT: '1', status: 'active', startedAt: '2026-01-06T00:00:00Z' },
     { id: 't5', studentSTT: '2', status: 'submitted', score: '7', maxScore: '10', startedAt: '2026-01-02T00:00:00Z', submittedAt: '2026-01-02T00:30:00Z', timeSpent: 1800 },
     // Trung ten voi hoc sinh STT 1 nhung khac STT/lop -> phai la dong rieng.
@@ -260,12 +260,14 @@ assert.deepStrictEqual(built.summary, {
 });
 
 var table = review.resultTable(built.students);
-assert.deepStrictEqual(table.headers, ['STT', 'Họ và tên', 'Lớp', 'Lần 1', 'Lần 2', 'Lần 3', 'Số lần làm', 'Thời gian làm bài', 'Trạng thái']);
+assert.deepStrictEqual(table.headers, ['STT', 'Họ và tên', 'Lớp', 'Lần 1', 'Lần 2', 'Lần 3', 'Vi phạm (FS & tab)', 'Số lần làm', 'Thời gian làm bài', 'Trạng thái']);
 assert.strictEqual(table.maxAttempts, 3);
+var row1 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '1'; })];
+assert.strictEqual(row1[6], 'L1: 6 & 8; L2: 0 & 1; L3: 0 & 2');
 var row3 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '3'; })];
-assert.deepStrictEqual(row3, ['3', 'Lê Văn C', '12A2', '—', '—', '—', 0, '—', 'Chưa làm']);
+assert.deepStrictEqual(row3, ['3', 'Lê Văn C', '12A2', '—', '—', '—', '—', 0, '—', 'Chưa làm']);
 var row2 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '2'; })];
-assert.deepStrictEqual(row2, ['2', 'Trần Văn B', '12A1', 7, '—', '—', 1, '30 phút 0 giây', 'Đã hoàn thành']);
+assert.deepStrictEqual(row2, ['2', 'Trần Văn B', '12A1', 7, '—', '—', '—', 1, '30 phút 0 giây', 'Đã hoàn thành']);
 var row6 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '6'; })];
 assert.strictEqual(row6[3], '—'); // thieu diem -> khong tu dien 0
 
@@ -279,7 +281,7 @@ var reread = XLSX.read(excelBuffer, { type: 'buffer' });
 assert.strictEqual(reread.SheetNames[0], 'Ket qua');
 var excelRows = XLSX.utils.sheet_to_json(reread.Sheets['Ket qua'], { header: 1, defval: '' });
 assert.deepStrictEqual(excelRows[0], table.headers);
-assert.strictEqual(excelRows[0].length, 9);
+assert.strictEqual(excelRows[0].length, 10);
 var excelRow1 = excelRows[1];
 assert.strictEqual(excelRow1[0], table.rows[0][0]);
 assert.strictEqual(typeof excelRow1[3], 'number'); // diem goc la so

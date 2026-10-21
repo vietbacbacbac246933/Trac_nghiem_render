@@ -4721,6 +4721,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
         let reviewResultsData = null;
         let reviewResultsListId = null;
         let reviewResultsExamId = '';
+        let reviewFilterStudent = ''; // stt, '' = tất cả học sinh
+        let reviewFilterAttempt = ''; // lần thứ mấy (1..N), '' = tất cả
 
         async function showReviewResults(listId) {
             const body = document.getElementById('reviewResultsBody');
@@ -4730,6 +4732,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             filters.innerHTML = '';
             reviewResultsData = null;
             reviewResultsListId = listId;
+            reviewFilterStudent = '';
+            reviewFilterAttempt = '';
             document.getElementById('reviewResultsModal').style.display = 'flex';
             try {
                 const data = await reviewFetch('/api/review-lists/' + encodeURIComponent(listId) + '/results');
@@ -4754,21 +4758,78 @@ C. Công thức nước là H₂O. (Đ)</pre>
             return (data.exams || []).find((exam) => String(exam.examId) === String(reviewResultsExamId)) || null;
         }
 
+        function currentReviewStudent() {
+            const exam = currentReviewExam();
+            if (!exam || !reviewFilterStudent) return null;
+            return (exam.students || []).find((s) => String(s.stt) === String(reviewFilterStudent)) || null;
+        }
+
         function selectReviewExam(examId) {
             reviewResultsExamId = examId;
+            reviewFilterAttempt = '';
+            const exam = currentReviewExam();
+            if (!exam || !(exam.students || []).some((s) => String(s.stt) === String(reviewFilterStudent))) {
+                reviewFilterStudent = '';
+            }
+            renderReviewResultFilters();
             renderReviewResults();
+        }
+
+        function selectReviewStudent(stt) {
+            reviewFilterStudent = stt;
+            reviewFilterAttempt = '';
+            renderReviewResultFilters();
+            renderReviewResults();
+        }
+
+        function selectReviewAttempt(no) {
+            reviewFilterAttempt = no;
+            renderReviewResultFilters();
+            renderReviewResults();
+        }
+
+        function formatReviewTime(value) {
+            const d = new Date(value);
+            if (!value || isNaN(d.getTime())) return '—';
+            return d.toLocaleString('vi-VN', { hour12: false });
         }
 
         function renderReviewResultFilters() {
             const data = reviewResultsData;
+            const exam = currentReviewExam();
+            const students = (exam && exam.students) || [];
+            const focus = currentReviewStudent();
+            const attemptCount = focus
+                ? (focus.attempts || []).length
+                : students.reduce((max, s) => Math.max(max, (s.attempts || []).length), 0);
             const selectStyle = 'padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9em;background:#fff;max-width:100%;';
-            const labelStyle = 'display:flex;flex-direction:column;gap:4px;font-size:0.85em;color:#555;min-width:220px;';
+            const labelStyle = 'display:flex;flex-direction:column;gap:4px;font-size:0.85em;color:#555;min-width:200px;';
             const filters = document.getElementById('reviewResultsFilters');
+            const studentOptions = ['<option value="">Tất cả học sinh</option>'].concat(students.map((s) => {
+                const label = s.stt + ' - ' + s.name + (s.className ? ' (' + s.className + ')' : '');
+                return `<option value="${escapeHtml(String(s.stt))}"${String(s.stt) === String(reviewFilterStudent) ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+            })).join('');
+            const attemptOptions = ['<option value="">Tất cả bài làm</option>'].concat((focus ? focus.attempts : []).map((a) =>
+                `<option value="${a.attemptNo}"${String(a.attemptNo) === String(reviewFilterAttempt) ? ' selected' : ''}>Lần ${a.attemptNo} • ${formatReviewScoreOrDash(a.score)} điểm</option>`
+            )).join('');
+            const roundOptions = ['<option value="">Tất cả</option>'].concat(
+                Array.from({ length: attemptCount }, (_, i) =>
+                    `<option value="${i + 1}"${String(i + 1) === String(reviewFilterAttempt) ? ' selected' : ''}>Lần ${i + 1}</option>`)
+            ).join('');
             filters.innerHTML = `
                 <label style="${labelStyle}">Bài ôn tập
                     <select id="reviewFilterExam" style="${selectStyle}" onchange="selectReviewExam(this.value)">
-                        ${data.exams.map((exam) => `<option value="${escapeHtml(exam.examId)}"${String(exam.examId) === String(reviewResultsExamId) ? ' selected' : ''}>${escapeHtml(exam.examName)}</option>`).join('')}
+                        ${data.exams.map((item) => `<option value="${escapeHtml(item.examId)}"${String(item.examId) === String(reviewResultsExamId) ? ' selected' : ''}>${escapeHtml(item.examName)}</option>`).join('')}
                     </select>
+                </label>
+                <label style="${labelStyle}">Tên học sinh
+                    <select id="reviewFilterStudent" style="${selectStyle}" onchange="selectReviewStudent(this.value)">${studentOptions}</select>
+                </label>
+                <label style="${labelStyle}">Bài làm
+                    <select id="reviewFilterAttempt" style="${selectStyle}"${focus ? '' : ' disabled title="Chọn học sinh trước"'} onchange="selectReviewAttempt(this.value)">${attemptOptions}</select>
+                </label>
+                <label style="${labelStyle}">Lần thứ mấy
+                    <select id="reviewFilterRound" style="${selectStyle}" onchange="selectReviewAttempt(this.value)">${roundOptions}</select>
                 </label>
                 <button type="button" class="review-export-btn" onclick="exportReviewResults()">Xuất Excel</button>`;
             filters.style.display = 'flex';
@@ -4799,6 +4860,24 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 (max > 0 ? `<span style="color:#8a94a6;">/${escapeHtml(formatReviewScore(max))}</span>` : '') + '</td>';
         }
 
+        // "6 & 8" = số lần thoát toàn màn hình & số lần đổi tab.
+        function formatReviewViolation(attempt) {
+            if (!attempt) return '—';
+            const fs = attempt.fsExitCount;
+            const tab = attempt.tabSwitchCount;
+            if ((fs === null || fs === undefined) && (tab === null || tab === undefined)) return '—';
+            return (Number(fs) || 0) + ' & ' + (Number(tab) || 0);
+        }
+
+        // Lọc theo một lần thì chỉ hiện vi phạm của lần đó.
+        function reviewViolationCell(attempts, attemptIndex) {
+            const list = attempts || [];
+            if (attemptIndex !== null) return formatReviewViolation(list[attemptIndex]);
+            if (!list.length) return '—';
+            if (list.length === 1) return formatReviewViolation(list[0]);
+            return list.map((a, i) => 'L' + (i + 1) + ': ' + formatReviewViolation(a)).join('; ');
+        }
+
         function renderReviewResults() {
             const resultBody = document.getElementById('reviewResultsBody');
             const exam = currentReviewExam();
@@ -4808,7 +4887,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
 
             const summary = exam.summary || {};
-            const students = exam.students || [];
+            const focus = currentReviewStudent();
+            const students = focus ? [focus] : (exam.students || []);
             const stats = [
                 ['Tổng số học sinh', summary.totalStudents || 0],
                 ['Đã làm bài', summary.submittedStudents || 0],
@@ -4834,7 +4914,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             if (exam.rosterClassName) meta.unshift('Lớp hiện tại: ' + exam.rosterClassName);
             const metaHtml = `<p class="review-exam-meta">${escapeHtml(meta.join(' • '))}` +
                 ' • Điểm TB/cao nhất/thấp nhất tính theo lần làm gần nhất của mỗi học sinh.' +
-                ' • Thời gian là tổng các lượt đã nộp.</p>';
+                ' • Thời gian là tổng các lượt đã nộp.' +
+                ' • Vi phạm: số lần thoát toàn màn hình &amp; số lần đổi tab.</p>';
 
             if (!students.length) {
                 resultBody.innerHTML = overview + metaHtml +
@@ -4846,26 +4927,55 @@ C. Công thức nước là H₂O. (Đ)</pre>
             students.forEach((s) => {
                 maxAttempts = Math.max(maxAttempts, (s.attempts || []).length);
             });
-            const attemptHeads = Array.from({ length: maxAttempts }, (_, i) => `<th class="review-score-cell">Lần ${i + 1}</th>`).join('');
+            const attemptIndex = reviewFilterAttempt ? Number(reviewFilterAttempt) - 1 : null;
+            // Chọn "lần thứ mấy" thì chỉ hiện đúng cột lần đó.
+            const columns = attemptIndex !== null && attemptIndex >= 0
+                ? [attemptIndex]
+                : Array.from({ length: maxAttempts }, (_, i) => i);
+            const attemptHeads = columns.map((i) => `<th class="review-score-cell">Lần ${i + 1}</th>`).join('');
             const rows = students.map((s) => {
-                const cells = Array.from({ length: maxAttempts }, (_, i) => scoreCell((s.attempts || [])[i])).join('');
+                const cells = columns.map((i) => scoreCell((s.attempts || [])[i])).join('');
+                const violations = escapeHtml(reviewViolationCell(s.attempts, attemptIndex));
                 return `<tr>
                     <td>${escapeHtml(String(s.stt))}</td>
                     <td class="col-name">${escapeHtml(s.name)}</td>
                     <td>${escapeHtml(s.className || '—')}</td>
                     ${cells}
+                    <td>${violations}</td>
                     <td class="review-score-cell">${s.attemptCount}</td>
                     <td>${escapeHtml(s.totalDurationText || '—')}</td>
                     <td><span class="review-status ${reviewStatusClass(s.status)}">${escapeHtml(s.statusLabel || '—')}</span></td>
                 </tr>`;
             }).join('');
 
-            resultBody.innerHTML = overview + metaHtml + `
+            let focusHtml = '';
+            if (focus) {
+                const parts = [
+                    focus.name,
+                    focus.className || '—',
+                    focus.statusLabel || '—',
+                    focus.attemptCount + ' lần làm',
+                    'Tổng thời gian: ' + (focus.totalDurationText || '—')
+                ];
+                if (attemptIndex !== null) {
+                    const attempt = (focus.attempts || [])[attemptIndex];
+                    parts.push(attempt
+                        ? `Lần ${attemptIndex + 1}: ${formatReviewScoreOrDash(attempt.score)} điểm • ` +
+                            `${attempt.durationText || '—'} • nộp lúc ${formatReviewTime(attempt.submittedAt)}` +
+                            (attempt.expired ? ' (hết giờ)' : '')
+                        : `Chưa có lần ${attemptIndex + 1}`);
+                }
+                focusHtml = `<p class="review-exam-meta" style="background:#f4f7ff;border-left:3px solid #4353b8;padding:8px 10px;border-radius:6px;">` +
+                    `<strong>Đang xem:</strong> ${escapeHtml(parts.join(' • '))}</p>`;
+            }
+
+            resultBody.innerHTML = overview + metaHtml + focusHtml + `
                 <div class="review-table-wrap">
                     <table class="review-summary-table">
                         <thead><tr>
                             <th>STT</th><th class="col-name">Họ và tên</th><th>Lớp</th>
                             ${attemptHeads}
+                            <th>Vi phạm (FS &amp; tab)</th>
                             <th class="review-score-cell">Số lần làm</th><th>Thời gian làm bài</th><th>Trạng thái</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
