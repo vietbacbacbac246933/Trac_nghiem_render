@@ -10,7 +10,7 @@ web
 
 **Học sinh — người làm bài.** Ngồi trong lớp, dùng **điện thoại của chính mình**, làm bài **đồng thời** với cả lớp trong tiết kiểm tra. Việc các em cần làm: chọn đúng tên mình trong danh sách của lớp (không có mã PIN), làm bài đã được giáo viên mở, nộp bài, và biết kết quả. Mỗi tên chỉ một học sinh làm bài: tên bị khóa ngay khi được chọn.
 
-**Giáo viên — người ra đề và tổ chức thi.** Việc cần làm: quản lý lớp và danh sách học sinh, nhập đề từ file Word/ảnh đã soạn sẵn, sửa và xác nhận đề trước khi lưu, mở/đóng bài thi cho cả lớp, theo dõi học sinh đang làm, xem điểm và xuất Excel.
+**Giáo viên — người ra đề và tổ chức thi.** Việc cần làm: quản lý lớp và danh sách học sinh, nhập đề từ file Word đã soạn sẵn, sửa và xác nhận đề trước khi lưu, mở/đóng bài thi cho cả lớp, theo dõi học sinh đang làm, xem điểm và xuất Excel.
 
 Chưa có bằng chứng về vai thứ ba (phụ huynh, quản trị viên nhà trường, học sinh tự đăng ký tài khoản).
 
@@ -22,7 +22,7 @@ Thành công nghĩa là: giáo viên nhập được đề thật (kể cả đ�
 
 ## Positioning
 
-Cơ chế riêng: **đọc đề từ Word/ảnh và tự nhận ra đáp án đúng** — dấu `*`, `[x]`, `(đúng)`, hoặc **gạch chân dưới đáp án** (dò trực tiếp điểm ảnh, và trong `.docx` theo định dạng gạch chân, chỉ xét trong dòng đáp án). Kết quả luôn đi qua **bản xem trước sửa được** và chỉ ghi dữ liệu khi giáo viên bấm xác nhận; câu thiếu căn cứ bị gắn nhãn *cần kiểm tra* và **bị bỏ qua khi lưu** chứ không tự gán đáp án A.
+Cơ chế riêng: **đọc đề từ Word và tự nhận ra đáp án đúng** — dấu `*`, `[x]`, `(đúng)`, hoặc **gạch chân dưới đáp án** trong `.docx` (chỉ xét trong dòng đáp án). Kết quả luôn đi qua **bản xem trước sửa được** và chỉ ghi dữ liệu khi giáo viên bấm xác nhận; câu thiếu căn cứ bị gắn nhãn *cần kiểm tra* và **bị bỏ qua khi lưu** chứ không tự gán đáp án A.
 
 Sản phẩm giữ được **giám sát thi trực tiếp** (mở/đóng bài theo thời gian thực, phát hiện thoát toàn màn hình và chuyển tab, lịch sử chọn nhầm tên, cho phép thi lại) — thứ mà Google Forms không có — nhưng chạy trên **hạ tầng tự host, không thu phí theo đầu học sinh** như Quizizz/Azota. Lợi thế cạnh tranh không nằm ở giao diện thi, mà ở **chi phí nhập đề bằng 0 cho giáo viên**.
 
@@ -31,7 +31,7 @@ Sản phẩm giữ được **giám sát thi trực tiếp** (mở/đóng bài t
 - **Một phòng học, một lớp, một thời điểm.** Giáo viên mở bài từ máy của mình, cả lớp làm cùng lúc trên điện thoại cá nhân.
 - **Hạ tầng: Internet, không phải LAN.** Server chạy trên Render kèm PostgreSQL; tên gọi cũ "LAN" là di sản của bản gốc chạy trong mạng nội bộ.
 - **Một instance duy nhất.** Socket.IO giữ trạng thái trong RAM của process, nên mọi trạng thái thi (ai đang làm, mở/đóng bài) sống trong một process.
-- **Đầu vào là đề có sẵn:** `.docx` do giáo viên soạn, hoặc ảnh chụp/scan đề giấy. Giáo viên nhập đề **trước** giờ kiểm tra, không phải trong lúc học sinh đang làm.
+- **Đầu vào là đề có sẵn:** `.docx` do giáo viên soạn. Giáo viên nhập đề **trước** giờ kiểm tra, không phải trong lúc học sinh đang làm.
 - **Thiết bị học sinh là điện thoại** (màn hình nhỏ, cảm ứng, bàn phím ảo) — không phải máy tính phòng máy.
 - **Gói miễn phí của Render sẽ ngủ** sau khoảng 15 phút không dùng, nên lần truy cập đầu có thể chậm.
 
@@ -41,7 +41,7 @@ Sản phẩm giữ được **giám sát thi trực tiếp** (mở/đóng bài t
 
 - Quản lý lớp; nhập danh sách học sinh từ file; kết quả xuất Excel.
 - Quản lý ngân hàng câu hỏi và nhiều bài kiểm tra; chuyển đổi giữa các bài.
-- Nhập đề từ `.docx` và từ ảnh rời; nhập đề từ ảnh bằng OCR (tesseract.js mặc định, OCR.space nếu có `OCR_SPACE_API_KEY`).
+- Nhập đề từ `.docx` (kể cả ảnh nhúng trong file Word).
 - Bản xem trước sửa được: sửa nội dung/đáp án, chọn đáp án đúng, đổi loại câu (một đáp án / nhiều đáp án / Đúng–Sai), thêm–bớt đáp án, điểm từng câu, bật/tắt từng câu, lọc nhanh *Tất cả / Đọc hoàn hảo / Cần kiểm tra*.
 - Mở/đóng bài thi, chế độ ôn tập (`practiceMode`), mật khẩu phòng thi.
 - Học sinh chọn tên (không PIN), làm bài, nộp bài; lưu tiến trình; báo chọn nhầm tên; giáo viên duyệt/từ chối báo cáo và cho thi lại.
@@ -54,8 +54,7 @@ Ràng buộc kỹ thuật (không được giả định là có thể thay đ�
 - Stack hiện tại: Node.js + Express + Socket.IO, giao diện HTML/CSS/JS thuần, lưu trữ PostgreSQL khi có `DATABASE_URL` và file JSON khi không có. Mã nguồn đã trả lời câu hỏi stack, không phải quyết định mở.
 - Xác thực giáo viên hiện là **một mật khẩu duy nhất** (`TEACHER_PASSWORD`) + cookie ký HMAC.
 - Tài liệu Word: không cam kết hỗ trợ mọi định dạng `.docx`.
-- Giới hạn file nhập đề: `.docx` ≤ 15 MB, mỗi ảnh ≤ 8 MB, tổng ≤ 25 MB, tối đa 30 ảnh/lần; phiên xem trước tự xoá sau 30 phút.
-- Dò gạch chân chỉ chạy với tesseract; nếu dùng OCR.space thì không dò được.
+- Giới hạn file nhập đề: `.docx` ≤ 15 MB; phiên xem trước tự xoá sau 30 phút.
 - Chưa giới hạn tần suất ở mọi API (chỉ có ở đăng nhập giáo viên).
 
 Yêu cầu đã xác nhận nhưng **chưa có trong mã nguồn** (không được mô tả như tính năng đang hoạt động):
@@ -81,7 +80,6 @@ Nội dung thật, có thể dùng làm bằng chứng (đường dẫn trong re
 - `data/de-mau-test.docx`, `data/de-mau-toan.docx`, `data/de-tin-demo.docx`, `data/de-toan-demo3.docx`, `data/de-toan-mau.docx`, `data/de-toan-thpt-mau2.docx`, `data/mau-cau-hoi.docx` — đề thật của giáo viên.
 - `data/questions.json`, `data/mau-cau-hoi.json` — dữ liệu câu hỏi gieo ban đầu.
 - `data/exams/*.json` — 8 bài kiểm tra đã tạo.
-- `tests/fixtures/` — ảnh mẫu cho test OCR (kèm `make-fixtures.ps1` để tạo lại).
 - `TRIEN-KHAI-RENDER.md` — nhật ký kiểm thử thật (60/60, 61/61, 84/84… theo từng đợt).
 - `README.md` — mô tả luồng và các quy tắc nhập đề.
 

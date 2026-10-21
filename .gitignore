@@ -50,8 +50,6 @@ data/progress/
 # Danh sach on tap va lich su lam bai (du lieu chay, co ten hoc sinh)
 data/review-lists.json
 data/review-attempts/
-# Cache du lieu ngon ngu OCR (tesseract.js tu tai ve, khong phai file nguoi dung)
-data/ocr-cache/
 # Danh sach hoc sinh (chua ho ten -> thong tin ca nhan)
 data/default-students.json
 data/class-students/

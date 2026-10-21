@@ -31,10 +31,6 @@ var auth = require('./lib/auth');
 var fileValidate = require('./lib/file-validate');
 // Phien xem truoc khi nhap de (luu RAM, co TTL)
 var importSessions = require('./lib/import-sessions');
-// OCR (trich xuat chu tu anh) + chuan hoa van ban OCR
-var ocr = require('./lib/ocr');
-var ocrParse = require('./lib/ocr-parse');
-var underline = require('./lib/underline');
 // Chuan hoa dap an tra loi ngan (so nguyen/thap phan, khong sai so)
 var shortAnswer = require('./lib/short-answer');
 var answerTables = require('./lib/answer-tables');
@@ -79,21 +75,26 @@ function copyArray(arr) {
 
 var APP_VERSION = '1.0.0';
 
-// Cấu hình multer để lưu file trong memory
-var upload = multer({ storage: multer.memoryStorage() });
-
-// Multer riêng cho tính năng "Nhập đề từ Word/Ảnh": có giới hạn dung lượng + lọc định dạng.
-// KHÔNG đụng tới `upload` ở trên để không làm đổi hành vi các API cũ.
-var importUpload = multer({
+// Cấu hình multer để lưu file trong memory.
+// Giới hạn 15 MB cho các API cũ (Word/Excel/JSON) để tránh file lớn nằm toàn bộ trong RAM.
+var upload = multer({
     storage: multer.memoryStorage(),
     limits: {
         fileSize: fileValidate.FILE_LIMITS.maxDocxBytes,
-        files: fileValidate.FILE_LIMITS.maxImageCount + 1,
-        fields: 10
+        files: 1
+    }
+});
+
+// Multer riêng cho file Word: chỉ nhận .docx, tối đa 15 MB.
+var docxUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: fileValidate.FILE_LIMITS.maxDocxBytes,
+        files: 1
     },
     fileFilter: function (req, file, cb) {
-        if (!fileValidate.detectKind(file.originalname, file.mimetype)) {
-            var err = new Error('Định dạng không hỗ trợ: "' + (file.originalname || '') + '". Chỉ nhận .docx và file ảnh.');
+        if (fileValidate.detectKind(file.originalname, file.mimetype) !== 'docx') {
+            var err = new Error('Chỉ nhận file Word (.docx).');
             err.code = 'UNSUPPORTED_TYPE';
             return cb(err);
         }
@@ -117,28 +118,6 @@ var assetUpload = multer({
         cb(null, true);
     }
 });
-
-// Bọc multer để luôn trả JSON lỗi gọn gàng (thay vì trang lỗi HTML mặc định)
-function importUploadMiddleware(field, max) {
-    var handler = importUpload.array(field, max);
-    return function (req, res, next) {
-        handler(req, res, function (err) {
-            if (err) {
-                var msg;
-                if (err.code === 'LIMIT_FILE_SIZE') {
-                    msg = 'File quá lớn. Tối đa ' + Math.round(fileValidate.FILE_LIMITS.maxDocxBytes / 1024 / 1024) + ' MB cho Word và ' +
-                        Math.round(fileValidate.FILE_LIMITS.maxImageBytes / 1024 / 1024) + ' MB cho ảnh.';
-                } else if (err.code === 'LIMIT_FILE_COUNT') {
-                    msg = 'Quá nhiều file. Tối đa ' + (fileValidate.FILE_LIMITS.maxImageCount + 1) + ' file mỗi lần.';
-                } else {
-                    msg = err.message || 'Lỗi tải file lên.';
-                }
-                return res.status(400).json({ success: false, error: msg });
-            }
-            next();
-        });
-    };
-}
 
 var app = express();
 var server = http.createServer(app);
@@ -2446,7 +2425,7 @@ app.post('/api/exams/:examId/import-json', upload.single('file'), (req, res) => 
 });
 
 // Import Word vào bài kiểm tra cụ thể
-app.post('/api/exams/:examId/import-word', upload.single('file'), (req, res) => {
+app.post('/api/exams/:examId/import-word', docxUpload.single('file'), (req, res) => {
     if (!isTeacher(req)) {
         return res.status(403).json({ error: 'Không có quyền thực hiện' });
     }
@@ -3576,7 +3555,7 @@ app.post('/api/upload-questions-json', express.json({ limit: '10mb' }), (req, re
 });
 
 // Preview câu hỏi từ file Word (không lưu, trả về để xác nhận)
-app.post('/api/preview-word', upload.single('file'), function(req, res) {
+app.post('/api/preview-word', docxUpload.single('file'), function(req, res) {
     if (!isTeacher(req)) {
         return res.status(403).json({ error: 'Không có quyền' });
     }
@@ -3633,7 +3612,7 @@ app.post('/api/preview-word', upload.single('file'), function(req, res) {
 });
 
 // Import câu hỏi từ file Word
-app.post('/api/import-word', upload.single('file'), async (req, res) => {
+app.post('/api/import-word', docxUpload.single('file'), async (req, res) => {
     if (!isTeacher(req)) {
         return res.status(403).json({ error: 'Không có quyền import câu hỏi' });
     }
@@ -3729,22 +3708,6 @@ function expandTokens(html, pool) {
     });
 }
 
-// Câu hỏi giữ chỗ cho 1 file ảnh: có ảnh, KHÔNG bịa nội dung/đáp án
-function placeholderQuestionFromImage(dataUri) {
-    return {
-        type: 'single',
-        question: '<img src="' + dataUri + '" />',
-        options: [],
-        correct: -1,
-        correctList: null,
-        correctTF: null,
-        image: null,
-        answerDetected: false,
-        needsReview: true,
-        reviewReasons: ['Câu hỏi tạo từ file ảnh — cần nhập nội dung chữ và đáp án.']
-    };
-}
-
 // Chuẩn hoá 1 câu hỏi do client gửi về (đã qua chỉnh sửa ở bản xem trước)
 function normalizeEditedQuestion(raw, qNum) {
     if (!raw || typeof raw !== 'object') return { error: 'Câu ' + qNum + ': dữ liệu không hợp lệ' };
@@ -3781,128 +3744,83 @@ function normalizeEditedQuestion(raw, qNum) {
     return { question: out };
 }
 
-// ---- Bước 1: phân tích file -> trả về bản xem trước để giáo viên sửa ----
-app.post('/api/import/preview',
-    importUploadMiddleware('files', fileValidate.FILE_LIMITS.maxImageCount + 1),
-    function (req, res) {
-        if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+// ---- Bước 1: phân tích file Word -> trả về bản xem trước để giáo viên sửa ----
+app.post('/api/import/preview', docxUpload.single('file'), function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
 
-        var files = req.files || [];
-        if (files.length === 0) {
-            return res.json({ success: false, error: 'Chưa chọn file nào.' });
-        }
-
-        // 1) Kiểm tra định dạng + dung lượng từng file
-        var docxFile = null;
-        var imageFiles = [];
-        var errors = [];
-        var totalBytes = 0;
-
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            totalBytes += (f.size || (f.buffer ? f.buffer.length : 0));
-            var v = fileValidate.validateUpload(f);
-            if (!v.ok) { errors.push(v.error); continue; }
-            if (v.kind === 'docx') {
-                if (docxFile) { errors.push('Mỗi lần chỉ nhập được 1 file Word. Đã bỏ qua "' + f.originalname + '".'); continue; }
-                docxFile = f;
-            } else {
-                imageFiles.push({ file: f, imageType: v.imageType });
-            }
-        }
-
-        if (totalBytes > fileValidate.FILE_LIMITS.maxTotalBytes) {
-            return res.json({
-                success: false,
-                error: 'Tổng dung lượng quá lớn (tối đa ' +
-                    Math.round(fileValidate.FILE_LIMITS.maxTotalBytes / 1024 / 1024) + ' MB).'
-            });
-        }
-        if (!docxFile && imageFiles.length === 0) {
-            return res.json({ success: false, error: errors.join(' ') || 'Không có file hợp lệ.' });
-        }
-
-        // 2) Phân tích file Word (nếu có)
-        var parsePromise = Promise.resolve([]);
-        var answerTableReport = null;
-        var completeness = null;
-        if (docxFile) {
-            parsePromise = mammothToHtml(docxFile.buffer).then(function (result) {
-                var parseOpts = { trackReview: true };
-                var questions = parseQuestionsFromHtml(result.value, parseOpts);
-                answerTableReport = parseOpts.answerTableReport || null;
-                completeness = analyzeImportCompleteness(questions);
-                if (completeness.warnings.length > 1) {
-                    console.warn('[IMPORT] ' + docxFile.originalname + ': ' + completeness.warnings.join(' '));
-                }
-                return questions;
-            });
-        }
-
-        parsePromise.then(function (docxQuestions) {
-            var questions = docxQuestions.slice();
-
-            // Ảnh rời: mỗi ảnh thành 1 câu giữ chỗ, đánh dấu cần giáo viên nhập
-            imageFiles.forEach(function (item) {
-                var dataUri = 'data:' + item.imageType + ';base64,' + item.file.buffer.toString('base64');
-                questions.push(placeholderQuestionFromImage(dataUri));
-            });
-
-            // 3) Tách ảnh thành token cho payload xác nhận gọn nhẹ
-            var pool = extractImagesToTokens(questions);
-
-            // 4) Lưu phiên (RAM, có TTL, tự dọn)
-            var sessionId = importSessions.create({ pool: pool });
-
-            var needsReview = questions.filter(function (q) { return q.needsReview; }).length;
-
-            res.json({
-                success: true,
-                sessionId: sessionId,
-                count: questions.length,
-                needsReview: needsReview,
-                warnings: errors,
-                answerTables: answerTableReport,
-                completeness: completeness,
-                imagePool: pool,
-                source: {
-                    docx: docxFile ? docxFile.originalname : null,
-                    images: imageFiles.map(function (it) { return it.file.originalname; })
-                },
-                questions: questions.map(function (q, idx) {
-                    var detected = !!q.answerDetected;
-                    return {
-                        index: idx,
-                        type: q.type || 'single',
-                        question: q.question || '',
-                        options: q.options || [],
-                        // Chưa xác định được đáp án -> null (KHÔNG tự gán đáp án A)
-                        correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
-                        correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
-                        correctTF: q.correctTF || null,
-                        correctAnswer: q.type === 'shortanswer' ? (q.correctAnswer || null) : null,
-                        points: normalizePoints(q.points),
-                        needsReview: !!q.needsReview,
-                        reviewReasons: q.reviewReasons || [],
-                        answerDetected: detected,
-                        // Thong tin phan/cau de giao vien doi chieu bang dap an da ghep.
-                        importSection: q.importMeta ? q.importMeta.sectionLabel : null,
-                        importNumber: q.importMeta ? q.importMeta.number : null,
-                        answerSource: q.answerSource || null,
-                        answerTableNotes: q.answerTableNotes || null,
-                        answerWarnings: q.answerWarnings || null
-                    };
-                })
-            });
-        }).catch(function (err) {
-            console.error('Lỗi đọc file khi xem trước:', err);
-            res.json({
-                success: false,
-                error: 'Không thể đọc file: ' + (err && err.message ? err.message : 'lỗi không xác định')
-            });
-        });
+    var file = req.file;
+    if (!file) {
+        return res.json({ success: false, error: 'Chưa chọn file Word nào.' });
     }
-);
+
+    var check = fileValidate.validateUpload(file);
+    if (!check.ok) {
+        return res.json({ success: false, error: check.error });
+    }
+    if (check.kind !== 'docx') {
+        return res.json({ success: false, error: 'Chỉ nhận file Word (.docx).' });
+    }
+
+    mammothToHtml(file.buffer).then(function (result) {
+        var parseOpts = { trackReview: true };
+        var questions = parseQuestionsFromHtml(result.value, parseOpts);
+        var answerTableReport = parseOpts.answerTableReport || null;
+        var completeness = analyzeImportCompleteness(questions);
+        if (completeness.warnings.length > 1) {
+            console.warn('[IMPORT] ' + file.originalname + ': ' + completeness.warnings.join(' '));
+        }
+
+        // Tách ảnh nhúng trong Word thành token cho payload xác nhận gọn nhẹ.
+        var pool = extractImagesToTokens(questions);
+        var sessionId = importSessions.create({ pool: pool });
+        var needsReview = questions.filter(function (q) { return q.needsReview; }).length;
+
+        res.json({
+            success: true,
+            sessionId: sessionId,
+            count: questions.length,
+            needsReview: needsReview,
+            warnings: [],
+            answerTables: answerTableReport,
+            completeness: completeness,
+            imagePool: pool,
+            source: {
+                docx: file.originalname,
+                images: []
+            },
+            questions: questions.map(function (q, idx) {
+                var detected = !!q.answerDetected;
+                return {
+                    index: idx,
+                    type: q.type || 'single',
+                    question: q.question || '',
+                    options: q.options || [],
+                    // Chưa xác định được đáp án -> null (KHÔNG tự gán đáp án A)
+                    correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
+                    correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
+                    correctTF: q.correctTF || null,
+                    correctAnswer: q.type === 'shortanswer' ? (q.correctAnswer || null) : null,
+                    points: normalizePoints(q.points),
+                    needsReview: !!q.needsReview,
+                    reviewReasons: q.reviewReasons || [],
+                    answerDetected: detected,
+                    // Thong tin phan/cau de giao vien doi chieu bang dap an da ghep.
+                    importSection: q.importMeta ? q.importMeta.sectionLabel : null,
+                    importNumber: q.importMeta ? q.importMeta.number : null,
+                    answerSource: q.answerSource || null,
+                    answerTableNotes: q.answerTableNotes || null,
+                    answerWarnings: q.answerWarnings || null
+                };
+            })
+        });
+    }).catch(function (err) {
+        console.error('Lỗi đọc file khi xem trước:', err);
+        res.json({
+            success: false,
+            error: 'Không thể đọc file: ' + (err && err.message ? err.message : 'lỗi không xác định')
+        });
+    });
+});
 
 // ---- Bước 2: lưu SAU KHI giáo viên xác nhận (không lưu trước đó) ----
 app.post('/api/import/confirm', function (req, res) {
@@ -4011,206 +3929,6 @@ app.post('/api/import/confirm', function (req, res) {
         examId: newExamId, examName: examData.name,
         saved: saved.length, skipped: skipped, total: saved.length
     }, saveCounts));
-});
-
-// ===========================================================================
-// NHẬP ĐỀ TỪ ẢNH BẰNG OCR
-// ===========================================================================
-// Tách bước rõ ràng:
-//   B1  POST /api/ocr/extract   - upload (RAM) + kiểm tra + OCR      -> sessionId
-//   B2  POST /api/ocr/analyze   - chuẩn hoá + phân tích -> xem trước (chưa lưu)
-//   B3  POST /api/import/confirm- giáo viên xác nhận -> mới ghi dữ liệu
-// Ảnh KHÔNG ghi ra đĩa: multer dùng memoryStorage, OCR nhận Buffer trực tiếp.
-// Không tự bịa câu hỏi/đáp án: câu thiếu đáp án có correct = null + needsReview.
-
-var OCR_MAX_CHARS = ocrParse.MAX_TEXT_CHARS;
-
-// B1: upload + OCR
-app.post('/api/ocr/extract',
-    importUploadMiddleware('files', fileValidate.FILE_LIMITS.maxImageCount),
-    async function (req, res) {
-        if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
-
-        var files = req.files || [];
-        if (files.length === 0) {
-            return res.json({ success: false, error: 'Chưa chọn ảnh nào.' });
-        }
-
-        var images = [];
-        var errors = [];
-        var totalBytes = 0;
-
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            totalBytes += (f.size || (f.buffer ? f.buffer.length : 0));
-            var v = fileValidate.validateUpload(f);
-            if (!v.ok) { errors.push(v.error); continue; }
-            if (v.kind !== 'image') {
-                errors.push('"' + f.originalname + '" không phải ảnh. Bước này chỉ nhận ảnh');
-                continue;
-            }
-            images.push({ name: f.originalname, buffer: f.buffer, mime: v.imageType });
-        }
-
-        if (totalBytes > fileValidate.FILE_LIMITS.maxTotalBytes) {
-            return res.json({
-                success: false,
-                error: 'Tổng dung lượng quá lớn (tối đa ' +
-                    Math.round(fileValidate.FILE_LIMITS.maxTotalBytes / 1024 / 1024) + ' MB).'
-            });
-        }
-        if (images.length === 0) {
-            return res.json({ success: false, error: errors.join(' ') || 'Không có ảnh hợp lệ.' });
-        }
-
-        // OCR tuần tự từng ảnh để giới hạn RAM
-        var results = [];
-        var parts = [];
-        var underlinedTotal = 0;
-        try {
-            for (var k = 0; k < images.length; k++) {
-                var img = images[k];
-                var out = await ocr.recognize(img.buffer, img.mime);
-                // Dap an dung co the duoc danh dau bang GACH CHAN trong anh
-                // (khong phai dau "*"). Doc diem anh de biet dong nao bi gach chan,
-                // roi them dau "*" vao cuoi dong do -> phan phan tich phia sau
-                // khong phai sua gi.
-                var markedCount = 0;
-                try {
-                    var flags = underline.detectUnderlinedLines(img.buffer, img.mime, out.lines || []);
-                    var marked = underline.applyUnderlineMarkers(out.text || '', out.lines || [], flags);
-                    if (marked.marked > 0) {
-                        out.text = marked.text;
-                        markedCount = marked.marked;
-                        underlinedTotal += markedCount;
-                    }
-                } catch (e) {
-                    // Khong doc duoc diem anh (dinh dang la) -> bo qua, khong lam hong luong OCR
-                    console.error('Lỗi dò gạch chân:', e && e.message);
-                }
-                results.push({
-                    name: img.name,
-                    provider: out.provider,
-                    confidence: out.confidence,
-                    chars: (out.text || '').length,
-                    underlined: markedCount
-                });
-                parts.push(out.text || '');
-            }
-        } catch (err) {
-            console.error('Lỗi OCR:', err);
-            return res.json({
-                success: false,
-                error: 'OCR thất bại: ' + ((err && err.message) || 'lỗi không xác định') +
-                    '. Hãy thử ảnh rõ hơn hoặc kiểm tra cấu hình OCR.'
-            });
-        }
-
-        var text = parts.join('\n\n');
-        if (text.length > OCR_MAX_CHARS) text = text.slice(0, OCR_MAX_CHARS);
-
-        var sessionId = importSessions.create({ ocr: { images: results, text: text, underlined: underlinedTotal } });
-
-        res.json({
-            success: true,
-            sessionId: sessionId,
-            provider: ocr.resolveProvider(),
-            images: results,
-            chars: text.length,
-            // So dong duoc suy ra dap an nho GACH CHAN (de bao cho giao vien)
-            underlined: underlinedTotal,
-            // Van ban tho de giao vien doi chieu voi anh
-            text: text,
-            warnings: errors
-        });
-    }
-);
-
-// B2: phân tích văn bản OCR thành câu hỏi (xem trước, CHƯA lưu)
-app.post('/api/ocr/analyze', function (req, res) {
-    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
-
-    var sessionId = (req.body || {}).sessionId;
-    var session = importSessions.get(sessionId);
-    if (!session || !session.ocr || !session.ocr.text) {
-        return res.json({ success: false, error: 'Phiên OCR đã hết hạn hoặc không tồn tại. Vui lòng chọn ảnh lại.' });
-    }
-
-    var raw = session.ocr.text;
-    var info = ocrParse.analyze(raw);
-
-    if (info.questionMarkers === 0) {
-        return res.json({
-            success: false,
-            ocrIssues: true,
-            error: 'OCR không nhận ra câu hỏi nào (ảnh có thể mờ, nghiêng hoặc không có chữ). ' +
-                'Hãy thử ảnh rõ hơn, chụp thẳng và đủ sáng.',
-            questionMarkers: info.questionMarkers,
-            optionMarkers: info.optionMarkers,
-            text: raw
-        });
-    }
-
-    var parsed = parseQuestionsFromText(info.normalized, { trackReview: true });
-    if (!parsed || parsed.length === 0) {
-        return res.json({
-            success: false,
-            ocrIssues: true,
-            error: 'Có dấu hiệu câu hỏi nhưng chưa tách được câu nào hoàn chỉnh. ' +
-                'Ảnh có thể bị mờ hoặc thiếu đáp án.',
-            questionMarkers: info.questionMarkers,
-            optionMarkers: info.optionMarkers,
-            text: raw
-        });
-    }
-
-    var questions = parsed.map(function (q, idx) {
-        var detected = !!q.answerDetected;
-        return {
-            index: idx,
-            type: q.type || 'single',
-            question: q.question || '',
-            options: q.options || [],
-            // Không xác định được đáp án đúng -> null + đánh dấu cần kiểm tra
-            correct: (detected && typeof q.correct === 'number' && q.correct >= 0) ? q.correct : null,
-            correctList: (q.correctList && q.correctList.length) ? q.correctList : null,
-            correctTF: q.correctTF || null,
-            points: 1,
-            needsReview: !!q.needsReview,
-            reviewReasons: (q.reviewReasons || []).slice(),
-            answerDetected: detected,
-            source: 'ocr'
-        };
-    });
-
-    session.pool = session.pool || {};
-    session.ocr.questions = questions;
-
-    var needsReview = questions.filter(function (q) { return q.needsReview; }).length;
-
-    res.json({
-        success: true,
-        sessionId: sessionId,
-        count: questions.length,
-        needsReview: needsReview,
-        warnings: [],
-        imagePool: session.pool,
-        source: { ocr: (session.ocr.images || []).map(function (im) { return im.name; }) },
-        ocr: {
-            provider: ocr.resolveProvider(),
-            questionMarkers: info.questionMarkers,
-            optionMarkers: info.optionMarkers,
-            // Số dòng được suy ra "đáp án đúng" nhờ GẠCH CHÂN trong ảnh
-            underlined: session.ocr.underlined || 0
-        },
-        questions: questions
-    });
-});
-
-// Trạng thái OCR (để giao diện biết đã sẵn sàng chưa)
-app.get('/api/ocr/status', function (req, res) {
-    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
-    res.json({ success: true, ocr: ocr.status() });
 });
 
 // ========== HTML SANITIZER ==========
@@ -5378,6 +5096,18 @@ io.on('connection', function(socket) {
     });
 });
 
+// Trả lỗi JSON gọn cho các lỗi upload (multer) thay vì trang HTML mặc định.
+app.use(function (err, req, res, next) {
+    if (err && (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FILE_COUNT' ||
+        err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'UNSUPPORTED_TYPE')) {
+        var msg = err.code === 'UNSUPPORTED_TYPE'
+            ? err.message
+            : 'File quá lớn hoặc không hợp lệ.';
+        return res.status(400).json({ success: false, error: msg });
+    }
+    next(err);
+});
+
 // Lấy địa chỉ IP
 function getLocalIP() {
     var interfaces = os.networkInterfaces();
@@ -5496,11 +5226,6 @@ DATA.init().then(function() {
     printStartupInfo();
     safeLog('Dang khoi dong server...');
     startListening();
-    // Khoi dong truoc OCR o nen: tai du lieu ngon ngu tesseract ngay khi boot
-    // de request dau tien cua giao vien khong bi cham (Render proxy timeout).
-    ocr.warmUp().then(function(ok) {
-        if (ok) safeLog('[OCR] San sang (tesseract, ngon ngu: ' + ocr.getLangs().join('+') + ').');
-    });
 }).catch(function(err) {
     safeLog('[LOI] Khoi tao storage that bai: ' + (err && err.message));
     process.exit(1);
@@ -5510,9 +5235,7 @@ DATA.init().then(function() {
 function shutdown(signal) {
     safeLog('');
     safeLog('Nhan tin hieu ' + signal + '. Dang tat server...');
-    Promise.resolve(ocr.terminate()).catch(function() { return null; }).then(function() {
-        return DATA.flush();
-    }).then(function() {
+    Promise.resolve(DATA.flush()).then(function() {
         server.close(function() {
             safeLog('Server da tat.');
             process.exit(0);

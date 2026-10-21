@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Test cho tính năng "Nhập đề thi từ Word (.docx) và ảnh".
+ * Test cho tính năng "Nhập đề thi từ Word (.docx)".
  *
  * Yêu cầu: server đang chạy ở cổng 3999 với TEACHER_PASSWORD=test123.
  *   PowerShell:
@@ -16,6 +16,7 @@
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun } = require(path.join(ROOT, 'node_modules', 'docx'));
+const importSessions = require(path.join(ROOT, 'lib', 'import-sessions'));
 
 const BASE = process.env.TEST_BASE || 'http://127.0.0.1:3999';
 const PASSWORD = process.env.TEST_PASSWORD || 'test123';
@@ -159,10 +160,11 @@ async function login() {
     return raw[0].split(';')[0];
 }
 
-// Gọi /api/import/preview với danh sách file [{name, type, buffer}]
+// Gọi /api/import/preview với 1 file Word [{name, type, buffer}]
 async function preview(cookie, files) {
+    const f = files[0];
     const fd = new FormData();
-    files.forEach(f => fd.append('files', blobOf(f.buffer, f.type), f.name));
+    fd.append('file', blobOf(f.buffer, f.type), f.name);
     const res = await fetch(BASE + '/api/import/preview', {
         method: 'POST',
         headers: cookie ? { Cookie: cookie } : {},
@@ -337,7 +339,7 @@ const createdExams = [];
     const wrongExt = await preview(cookie, [{ name: 'de-thi.txt', type: 'text/plain', buffer: Buffer.from('hello') }]);
     check('.txt bị từ chối (400)', wrongExt.status === 400, 'status=' + wrongExt.status);
     check('.txt có thông báo rõ ràng',
-        wrongExt.json && /không hỗ trợ/i.test(wrongExt.json.error || ''), JSON.stringify(wrongExt.json));
+        wrongExt.json && /Word|docx/i.test(wrongExt.json.error || ''), JSON.stringify(wrongExt.json));
 
     const fakeDocx = await preview(cookie, [{
         name: 'gia-danh.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -359,61 +361,23 @@ const createdExams = [];
         badRead.json && /không thể đọc file/i.test(badRead.json.error || ''), JSON.stringify(badRead.json));
 
     // ------------------------------------------------------------------
-    console.log('\n=== 7. Ảnh: tạo câu giữ chỗ, ĐÁNH DẤU cần kiểm tra, giữ ảnh ===');
+    console.log('\n=== 7. Ảnh rời bị từ chối (đã gỡ import ảnh/OCR) ===');
     const imgPreview = await preview(cookie, [{ name: 'hinh-1.png', type: 'image/png', buffer: PNG_1x1 }]);
-    check('ảnh -> preview success', imgPreview.json && imgPreview.json.success === true, JSON.stringify(imgPreview.json).slice(0, 200));
-    check('ảnh -> tạo 1 câu', imgPreview.json && imgPreview.json.count === 1, 'count=' + (imgPreview.json && imgPreview.json.count));
-    const iq = (imgPreview.json && imgPreview.json.questions && imgPreview.json.questions[0]) || {};
-    check('câu từ ảnh được đánh dấu cần kiểm tra', iq.needsReview === true, JSON.stringify(iq));
-    check('câu từ ảnh chứa token ảnh', /\[\[IMG:\d+\]\]/.test(iq.question || ''), JSON.stringify(iq.question));
-    check('có imagePool chứa ảnh gốc',
-        imgPreview.json && imgPreview.json.imagePool && Object.keys(imgPreview.json.imagePool).length === 1);
+    check('ảnh -> bị từ chối (400)', imgPreview.status === 400, 'status=' + imgPreview.status);
+    check('báo chỉ nhận file Word',
+        imgPreview.json && /Word/i.test(imgPreview.json.error || ''), JSON.stringify(imgPreview.json));
 
     // ------------------------------------------------------------------
-    console.log('\n=== 8. Ảnh chưa nhập nội dung -> KHÔNG lưu (không bịa) ===');
-    const c2 = await confirm(cookie, {
-        sessionId: imgPreview.json.sessionId,
-        destination: 'new',
-        examName: 'TEST-IMPORT-IMAGE-EMPTY',
-        questions: [{ include: true, type: 'single', question: iq.question, options: [], correct: null }]
-    });
-    check('chưa nhập đáp án -> không lưu câu nào', c2.json && c2.json.success === false, JSON.stringify(c2.json).slice(0, 200));
-    check('nêu rõ lý do bỏ qua',
-        c2.json && c2.json.skipped && /đáp án/i.test(c2.json.skipped[0].reason || ''),
-        JSON.stringify(c2.json && c2.json.skipped));
+    console.log('\n=== 8. Không còn endpoint OCR ===');
+    const ocrExtract = await fetch(BASE + '/api/ocr/extract', { method: 'POST', headers: { Cookie: cookie } });
+    const ocrAnalyze = await fetch(BASE + '/api/ocr/analyze', { method: 'POST', headers: { Cookie: cookie } });
+    const ocrStatus = await fetch(BASE + '/api/ocr/status', { headers: { Cookie: cookie } });
+    check('/api/ocr/extract -> 404', ocrExtract.status === 404, 'status=' + ocrExtract.status);
+    check('/api/ocr/analyze -> 404', ocrAnalyze.status === 404, 'status=' + ocrAnalyze.status);
+    check('/api/ocr/status -> 404', ocrStatus.status === 404, 'status=' + ocrStatus.status);
 
     // ------------------------------------------------------------------
-    console.log('\n=== 9. Ảnh sau khi giáo viên bổ sung -> lưu và GIỮ ẢNH ===');
-    const c3 = await confirm(cookie, {
-        sessionId: imgPreview.json.sessionId,
-        destination: 'new',
-        examName: 'TEST-IMPORT-IMAGE-OK',
-        questions: [{
-            include: true, type: 'single',
-            question: 'Hình dưới đây minh hoạ gì? [[IMG:0]]',
-            options: ['Hình vuông', 'Hình tròn'],
-            correct: 0
-        }]
-    });
-    check('lưu được câu từ ảnh', c3.json && c3.json.success === true && c3.json.saved === 1, JSON.stringify(c3.json).slice(0, 200));
-    if (c3.json && c3.json.examId) createdExams.push(c3.json.examId);
-
-    let storedQuestion = null;
-    if (c3.json && c3.json.examId) {
-        // Đọc lại bài đã lưu (chỉ đọc, KHÔNG đổi bài đang dùng)
-        const exRes = await fetch(BASE + '/api/exams/' + c3.json.examId, { headers: { Cookie: cookie } });
-        const exJson = await exRes.json();
-        storedQuestion = (exJson && exJson.exam && exJson.exam.questions) ? exJson.exam.questions[0] : null;
-    }
-    check('câu đã lưu có chứa ảnh base64 thật',
-        storedQuestion && /<img[^>]+src="data:image\/png;base64,/i.test(storedQuestion.question || ''),
-        JSON.stringify(storedQuestion && storedQuestion.question).slice(0, 160));
-    check('token ảnh đã được thay hết (không còn [[IMG:)',
-        storedQuestion && !/\[\[IMG:\d+\]\]/.test(storedQuestion.question || ''),
-        JSON.stringify(storedQuestion && storedQuestion.question).slice(0, 160));
-
-    // ------------------------------------------------------------------
-    console.log('\n=== 10. File quá dung lượng -> bị chặn ===');
+    console.log('\n=== 9. File quá dung lượng -> bị chặn ===');
     const big = Buffer.alloc(16 * 1024 * 1024, 0x41); // 16 MB > 15 MB
     const tooBig = await preview(cookie, [{
         name: 'qua-lon.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -424,7 +388,7 @@ const createdExams = [];
         tooBig.json && /quá lớn/i.test(tooBig.json.error || ''), JSON.stringify(tooBig.json));
 
     // ------------------------------------------------------------------
-    console.log('\n=== 11. Bảo vệ: chưa đăng nhập không dùng được ===');
+    console.log('\n=== 10. Bảo vệ: chưa đăng nhập không dùng được ===');
     const anon = await preview(null, [{ name: 'de-thi.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: goodDocx }]);
     check('preview khi chưa đăng nhập -> 403', anon.status === 403, 'status=' + anon.status);
 
@@ -440,22 +404,22 @@ const createdExams = [];
         let body = '';
         if (!guarded) { try { body = await r.text(); } catch (e) { /* ignore */ } }
         check('chưa đăng nhập, "' + p + '" -> bị chặn (không trả trang giáo viên)',
-            guarded && !/gạch chân/.test(body), 'status=' + r.status + ' len=' + body.length);
+            guarded && !/Quản lý Bài kiểm tra/.test(body), 'status=' + r.status + ' len=' + body.length);
     }
     const okTeacher = await fetch(BASE + '/teacher.html', { headers: { Cookie: cookie } });
     const okBody = okTeacher.ok ? await okTeacher.text() : '';
     check('giáo viên ĐÃ đăng nhập vẫn mở được trang giáo viên',
-        okTeacher.status === 200 && /gạch chân/.test(okBody), 'status=' + okTeacher.status + ' len=' + okBody.length);
+        okTeacher.status === 200 && /Quản lý Bài kiểm tra/.test(okBody), 'status=' + okTeacher.status + ' len=' + okBody.length);
 
     // ------------------------------------------------------------------
-    console.log('\n=== 12. Word: đáp án đúng được GẠCH CHÂN (không dùng dấu *) ===');
+    console.log('\n=== 11. Word: đáp án đúng được GẠCH CHÂN (không dùng dấu *) ===');
     const ulDocx = await buildUnderlinedDocx();
     const pu = await preview(cookie, [{
         name: 'de-thi-gach-chan.docx',
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         buffer: ulDocx
     }]);
-    check('preview ảnh/docx gạch chân -> success', pu.json && pu.json.success === true, JSON.stringify(pu.json).slice(0, 200));
+    check('preview docx gạch chân -> success', pu.json && pu.json.success === true, JSON.stringify(pu.json).slice(0, 200));
     check('nhận diện 5 câu hỏi', pu.json && pu.json.count === 5, 'count=' + (pu.json && pu.json.count));
 
     const uq = (pu.json && pu.json.questions) || [];
@@ -502,7 +466,7 @@ const createdExams = [];
     }
 
     // ------------------------------------------------------------------
-    console.log('\n=== 13. Word: đề in 2 cột (nhiều đáp án 1 dòng) + "Câu N." in đậm + Phần II đúng/sai ===');
+    console.log('\n=== 12. Word: đề in 2 cột (nhiều đáp án 1 dòng) + "Câu N." in đậm + Phần II đúng/sai ===');
     // Mo phong dung kieu file giao vien gui: Word trinh bay 2 cot bang khoang
     // trang nen 1 doan co 2 (hoac 4) dap an; "Câu N." bi in dam; dap an dung
     // gach chan o chu cai; Phan II la cau dung/sai voi a) b) c) d).
@@ -584,7 +548,7 @@ const createdExams = [];
     }
 
     // ------------------------------------------------------------------
-    console.log('\n=== 14. Word: câu hỏi nằm trong Heading 1/2 + đánh số 1..120 ===');
+    console.log('\n=== 13. Word: câu hỏi nằm trong Heading 1/2 + đánh số 1..120 ===');
     // File thật "Sử-Trắc nghiệm.docx" đặt nhiều câu trong Heading 1. Parser cũ
     // chỉ đọc <p> nên bỏ qua đúng 33 câu (3, 8-10, 12, ... 119).
     const headingDocx = await buildHeadingDocx(120);
@@ -644,7 +608,7 @@ const createdExams = [];
     }
 
     // ------------------------------------------------------------------
-    console.log('\n=== 15. Word: nhiều đoạn văn, thiếu/trùng số, ảnh, trả lời ngắn ===');
+    console.log('\n=== 14. Word: nhiều đoạn văn, thiếu/trùng số, ảnh, trả lời ngắn ===');
     const edgeDocx = await buildEdgeCaseDocx();
     const pe = await preview(cookie, [{
         name: 'de-bien.docx',
@@ -679,7 +643,7 @@ const createdExams = [];
         JSON.stringify(eq.filter(q => q.type === 'shortanswer').map(q => q.correctAnswer)));
 
     // ------------------------------------------------------------------
-    console.log('\n=== 16. Dọn dẹp: xoá các bài test đã tạo ===');
+    console.log('\n=== 15. Dọn dẹp: xoá các bài test đã tạo ===');
     let cleaned = 0;
     for (const id of createdExams) {
         const r = await fetch(BASE + '/api/exams/' + id, { method: 'DELETE', headers: { Cookie: cookie } });
@@ -693,6 +657,16 @@ const createdExams = [];
     check('bài đang chọn KHÔNG bị thay đổi bởi test',
         after.currentExamId === examsBeforeCurrent,
         'sau=' + after.currentExamId + ' truoc=' + examsBeforeCurrent);
+
+    // ------------------------------------------------------------------
+    console.log('\n=== 16. Giới hạn số phiên nhập đề giữ trong RAM ===');
+    importSessions.clearAll();
+    for (let i = 0; i < 30; i++) importSessions.create({ pool: {} });
+    check('số phiên không vượt trần 20', importSessions.count() <= 20, 'count=' + importSessions.count());
+    check('vẫn dùng được phiên mới nhất',
+        (function () { const id = importSessions.create({ pool: {} }); return !!importSessions.get(id); })(),
+        'phiên mới không đọc lại được');
+    importSessions.clearAll();
 
     console.log('\n----------------------------------------');
     console.log('RESULT: ' + passed + ' passed, ' + failed + ' failed');

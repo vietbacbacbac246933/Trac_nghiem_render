@@ -1,5 +1,9 @@
 # BÁO CÁO CHUYỂN BẢN LAN → ONLINE (Render)
 
+> **Cập nhật:** chức năng nhập đề từ ảnh/OCR (tesseract.js) đã được **gỡ** để
+> giảm RAM trên Render. Các mục nhắc tới OCR bên dưới là lịch sử, không còn
+> đúng với mã nguồn hiện tại. Hiện chỉ hỗ trợ nhập đề từ `.docx`.
+
 Thư mục bản deploy: `C:\Users\vietb\Trac_nghiem_render`
 Bản LAN gốc (không đổi): `C:\Users\vietb\Trac_nghiem_LAN`
 

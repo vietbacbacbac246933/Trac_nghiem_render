@@ -55,7 +55,7 @@ async function login() {
 
 async function preview(cookie, buffer, name) {
     const fd = new FormData();
-    fd.append('files', new Blob([buffer], {
+    fd.append('file', new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     }), name || 'de.docx');
     const res = await fetch(BASE + '/api/import/preview', {
