@@ -200,4 +200,102 @@ var snap = grading.grade([{ type: 'single', question: '<b>q</b>', options: ['A',
 assert.deepStrictEqual(snap.details[0].options, ['A', 'B']);
 assert.strictEqual(snap.details[0].image, '/api/assets/x.png');
 
+// --- Tong hop ket qua cho giao vien ---
+var roster = [
+    { stt: '1', name: 'Nguyễn Văn A', className: '12A1' },
+    { stt: '2', name: 'Trần Văn B', className: '12A1' },
+    { stt: '3', name: 'Lê Văn C', className: '12A2' }
+];
+var teacherAttempts = [
+    // Chen le thoi gian: phai duoc sap xep lai theo thoi diem bat dau.
+    { id: 't3', studentSTT: '1', status: 'submitted', score: 0, maxScore: 10, startedAt: '2026-01-05T00:00:00Z', submittedAt: '2026-01-05T00:10:00Z', timeSpent: '10 phút 0 giây' },
+    { id: 't1', studentSTT: '1', status: 'submitted', score: 6.5, maxScore: 10, startedAt: '2026-01-01T00:00:00Z', submittedAt: '2026-01-01T00:20:30Z', timeSpent: '20 phút 30 giây' },
+    { id: 't2', studentSTT: '1', status: 'submitted', score: 8, maxScore: 10, startedAt: '2026-01-03T00:00:00Z', submittedAt: '2026-01-03T00:05:00Z', timeSpent: '' },
+    { id: 't4', studentSTT: '1', status: 'active', startedAt: '2026-01-06T00:00:00Z' },
+    { id: 't5', studentSTT: '2', status: 'submitted', score: '7', maxScore: '10', startedAt: '2026-01-02T00:00:00Z', submittedAt: '2026-01-02T00:30:00Z', timeSpent: 1800 },
+    // Trung ten voi hoc sinh STT 1 nhung khac STT/lop -> phai la dong rieng.
+    { id: 't6', studentSTT: '4', studentName: 'Nguyễn Văn A', studentClass: '12A3', status: 'submitted', score: 9, maxScore: 10, startedAt: '2026-01-04T00:00:00Z', submittedAt: '2026-01-04T00:09:00Z', timeSpent: '9 phút 0 giây' },
+    // Dang lam do, chua nop.
+    { id: 't7', studentSTT: '5', status: 'active', startedAt: '2026-01-07T00:00:00Z' },
+    // Da nop nhung thieu diem -> khong tu gan 0.
+    { id: 't8', studentSTT: '6', status: 'submitted', startedAt: '2026-01-08T00:00:00Z', submittedAt: '2026-01-08T00:01:00Z' },
+    { id: 'bad', status: 'submitted', score: 10 }
+];
+
+var built = review.buildExamResults(teacherAttempts, roster, '12A1');
+assert.strictEqual(built.students.length, 6);
+var byStt = {};
+built.students.forEach(function (s) { byStt[String(s.stt)] = s; });
+
+assert.deepStrictEqual(byStt['1'].attempts.map(function (a) { return a.id; }), ['t1', 't2', 't3']);
+assert.deepStrictEqual(byStt['1'].attempts.map(function (a) { return a.attemptNo; }), [1, 2, 3]);
+assert.strictEqual(byStt['1'].latestScore, 0); // diem 0 hop le, khac voi chua lam
+assert.strictEqual(byStt['1'].bestScore, 8);
+assert.strictEqual(byStt['1'].attemptCount, 3);
+assert.strictEqual(byStt['1'].hasActive, true);
+assert.strictEqual(byStt['1'].status, 'completed');
+assert.strictEqual(byStt['1'].totalDurationSeconds, 2130);
+assert.strictEqual(byStt['1'].totalDurationText, '35 phút 30 giây');
+
+assert.strictEqual(byStt['2'].latestScore, 7);
+assert.strictEqual(byStt['2'].totalDurationText, '30 phút 0 giây');
+assert.strictEqual(byStt['3'].attemptCount, 0);
+assert.strictEqual(byStt['3'].status, 'none');
+assert.strictEqual(byStt['3'].statusLabel, 'Chưa làm');
+assert.strictEqual(byStt['4'].name, 'Nguyễn Văn A');
+assert.strictEqual(byStt['4'].className, '12A3');
+assert.strictEqual(byStt['5'].status, 'active');
+assert.strictEqual(byStt['5'].statusLabel, 'Đang làm bài');
+assert.strictEqual(byStt['6'].latestScore, null);
+
+assert.deepStrictEqual(built.summary, {
+    totalStudents: 6,
+    submittedStudents: 4,
+    notSubmittedStudents: 2,
+    activeStudents: 1,
+    averageScore: 5.33,
+    highestScore: 9,
+    lowestScore: 0,
+    maxScore: 10
+});
+
+var table = review.resultTable(built.students);
+assert.deepStrictEqual(table.headers, ['STT', 'Họ và tên', 'Lớp', 'Lần 1', 'Lần 2', 'Lần 3', 'Số lần làm', 'Thời gian làm bài', 'Trạng thái']);
+assert.strictEqual(table.maxAttempts, 3);
+var row3 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '3'; })];
+assert.deepStrictEqual(row3, ['3', 'Lê Văn C', '12A2', '—', '—', '—', 0, '—', 'Chưa làm']);
+var row2 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '2'; })];
+assert.deepStrictEqual(row2, ['2', 'Trần Văn B', '12A1', 7, '—', '—', 1, '30 phút 0 giây', 'Đã hoàn thành']);
+var row6 = table.rows[built.students.findIndex(function (s) { return String(s.stt) === '6'; })];
+assert.strictEqual(row6[3], '—'); // thieu diem -> khong tu dien 0
+
+// File Excel: diem phai la so, tieu de giu nguyen, mo lai doc duoc.
+var XLSX = require('xlsx');
+var ws = XLSX.utils.aoa_to_sheet([table.headers].concat(table.rows));
+var wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, 'Ket qua');
+var excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+var reread = XLSX.read(excelBuffer, { type: 'buffer' });
+assert.strictEqual(reread.SheetNames[0], 'Ket qua');
+var excelRows = XLSX.utils.sheet_to_json(reread.Sheets['Ket qua'], { header: 1, defval: '' });
+assert.deepStrictEqual(excelRows[0], table.headers);
+assert.strictEqual(excelRows[0].length, 9);
+var excelRow1 = excelRows[1];
+assert.strictEqual(excelRow1[0], table.rows[0][0]);
+assert.strictEqual(typeof excelRow1[3], 'number'); // diem goc la so
+
+// Thoi luong: uu tien timeSpent, thieu thi tinh tu startedAt/submittedAt, co chan theo timeLimit.
+assert.strictEqual(review.attemptDurationSeconds({ timeSpent: '1 giờ 5 phút 3 giây' }), 3903);
+assert.strictEqual(review.attemptDurationSeconds({ startedAt: '2026-01-01T00:00:00Z', submittedAt: '2026-01-01T00:10:00Z' }), 600);
+assert.strictEqual(review.attemptDurationSeconds({ startedAt: '2026-01-01T00:00:00Z', submittedAt: '2026-01-01T00:10:00Z', timeLimit: 5 }), 300);
+assert.strictEqual(review.attemptDurationSeconds({ startedAt: 'khong-hop-le', submittedAt: '2026-01-01T00:10:00Z' }), null);
+assert.strictEqual(review.attemptDurationSeconds({ timeSpent: 'khong ro' }), null);
+
+// Hai luot cung thoi diem bat dau -> thu tu on dinh theo so luot.
+var tie = review.buildExamResults([
+    { id: 'b', studentSTT: '1', status: 'submitted', score: 2, startedAt: '2026-02-01T00:00:00Z', no: 2 },
+    { id: 'a', studentSTT: '1', status: 'submitted', score: 1, startedAt: '2026-02-01T00:00:00Z', no: 1 }
+], [], '');
+assert.deepStrictEqual(tie.students[0].attempts.map(function (a) { return a.id; }), ['a', 'b']);
+
 console.log('PASS: review tests');

@@ -393,6 +393,93 @@
             color: #dc3545;
             font-weight: bold;
         }
+
+        /* Kết quả ôn tập: tổng quan + bảng nhiều lần làm */
+        .review-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .review-stat {
+            background: #f7f9fc;
+            border: 1px solid #e4e9f2;
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+        }
+        .review-stat-label {
+            display: block;
+            color: #667085;
+            font-size: 0.78em;
+            line-height: 1.3;
+        }
+        .review-stat-value {
+            display: block;
+            color: #24303f;
+            font-size: 1.15em;
+            font-weight: 700;
+            margin-top: 2px;
+            overflow-wrap: anywhere;
+        }
+        .review-exam-meta {
+            color: #667085;
+            font-size: 0.88em;
+            margin: -4px 0 14px;
+            line-height: 1.5;
+        }
+        .review-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid #e4e9f2;
+            border-radius: 10px;
+        }
+        .review-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            min-width: 720px;
+        }
+        .review-summary-table th,
+        .review-summary-table td {
+            padding: 9px 10px;
+            border-bottom: 1px solid #edf0f7;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .review-summary-table th {
+            background: #f1f4fa;
+            color: #3d4959;
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .review-summary-table tbody tr:hover { background: #f8f9fa; }
+        .review-summary-table .col-name { white-space: normal; min-width: 160px; }
+        .review-score-cell { text-align: right; font-variant-numeric: tabular-nums; }
+        .review-score-cell.empty { color: #9aa4b5; text-align: center; }
+        .review-status {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 0.82em;
+            font-weight: 600;
+        }
+        .review-status.completed { background: #e8f5e9; color: #2e7d32; }
+        .review-status.active { background: #fff4e5; color: #a15c00; }
+        .review-status.none { background: #eef1ff; color: #4353b8; }
+        .review-export-btn {
+            background: #2e7d32;
+            color: #fff;
+            border: none;
+            padding: 9px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .review-export-btn:disabled { background: #e3e7ef; color: #98a2b3; cursor: not-allowed; }
         
         /* Cài đặt */
         .settings-card {
@@ -1629,7 +1716,7 @@
 
         <!-- Modal kết quả ôn tập -->
         <div id="reviewResultsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px;box-sizing:border-box;">
-            <div style="background:white;border-radius:14px;max-width:950px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="background:white;border-radius:14px;max-width:1120px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
                 <div style="background:#2e7d32;color:white;padding:16px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
                     <h3 id="reviewResultsTitle" style="margin:0;font-size:1.15em;">Kết quả ôn tập</h3>
                     <button onclick="closeReviewResults()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:1.2em;cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1;">&times;</button>
@@ -4632,6 +4719,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
         }
 
         let reviewResultsData = null;
+        let reviewResultsListId = null;
+        let reviewResultsExamId = '';
 
         async function showReviewResults(listId) {
             const body = document.getElementById('reviewResultsBody');
@@ -4640,6 +4729,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             filters.style.display = 'none';
             filters.innerHTML = '';
             reviewResultsData = null;
+            reviewResultsListId = listId;
             document.getElementById('reviewResultsModal').style.display = 'flex';
             try {
                 const data = await reviewFetch('/api/review-lists/' + encodeURIComponent(listId) + '/results');
@@ -4649,6 +4739,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     return;
                 }
                 reviewResultsData = data;
+                const found = data.exams.find((exam) => String(exam.examId) === String(reviewResultsExamId));
+                reviewResultsExamId = found ? found.examId : data.exams[0].examId;
                 renderReviewResultFilters();
                 renderReviewResults();
             } catch (err) {
@@ -4656,126 +4748,174 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
+        function currentReviewExam() {
+            const data = reviewResultsData;
+            if (!data) return null;
+            return (data.exams || []).find((exam) => String(exam.examId) === String(reviewResultsExamId)) || null;
+        }
+
+        function selectReviewExam(examId) {
+            reviewResultsExamId = examId;
+            renderReviewResults();
+        }
+
         function renderReviewResultFilters() {
             const data = reviewResultsData;
-            const students = new Map();
-            (data.exams || []).forEach((exam) => (exam.attempts || []).forEach((a) => {
-                const key = String(a.studentSTT);
-                if (!students.has(key)) students.set(key, a.studentName || ('STT ' + key));
-            }));
-            const options = (items) => items.map(([value, label]) =>
-                `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
-            const selectStyle = 'padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9em;background:#fff;';
-            const labelStyle = 'display:flex;flex-direction:column;gap:4px;font-size:0.85em;color:#555;';
-
+            const selectStyle = 'padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9em;background:#fff;max-width:100%;';
+            const labelStyle = 'display:flex;flex-direction:column;gap:4px;font-size:0.85em;color:#555;min-width:220px;';
             const filters = document.getElementById('reviewResultsFilters');
             filters.innerHTML = `
-                <label style="${labelStyle}">Học sinh
-                    <select id="reviewFilterStudent" style="${selectStyle}" onchange="renderReviewResults()">
-                        <option value="">Tất cả học sinh</option>
-                        ${options([...students.entries()].sort((a, b) => a[1].localeCompare(b[1], 'vi'))
-                            .map(([stt, name]) => [stt, name + ' (STT ' + stt + ')']))}
+                <label style="${labelStyle}">Bài ôn tập
+                    <select id="reviewFilterExam" style="${selectStyle}" onchange="selectReviewExam(this.value)">
+                        ${data.exams.map((exam) => `<option value="${escapeHtml(exam.examId)}"${String(exam.examId) === String(reviewResultsExamId) ? ' selected' : ''}>${escapeHtml(exam.examName)}</option>`).join('')}
                     </select>
                 </label>
-                <label style="${labelStyle}">Đề đã làm
-                    <select id="reviewFilterExam" style="${selectStyle}" onchange="renderReviewResults()">
-                        <option value="">Tất cả đề</option>
-                        ${options(data.exams.map((exam) => [exam.examId, exam.examName]))}
-                    </select>
-                </label>
-                <label style="${labelStyle}">Lần làm
-                    <select id="reviewFilterAttempt" style="${selectStyle}" onchange="renderReviewResults()">
-                        <option value="">Tất cả các lần</option>
-                    </select>
-                </label>`;
+                <button type="button" class="review-export-btn" onclick="exportReviewResults()">Xuất Excel</button>`;
             filters.style.display = 'flex';
         }
 
-        // Các lượt khớp bộ lọc học sinh + đề; dùng để dựng danh sách "lần làm".
-        function reviewFilteredExams() {
-            const data = reviewResultsData;
-            const student = document.getElementById('reviewFilterStudent').value;
-            const examId = document.getElementById('reviewFilterExam').value;
-            return (data.exams || []).filter((exam) => !examId || String(exam.examId) === examId)
-                .map((exam) => ({
-                    exam: exam,
-                    attempts: (exam.attempts || []).filter((a) => !student || String(a.studentSTT) === student)
-                }))
-                .filter((entry) => entry.attempts.length > 0);
+        // statusLabel do server tính để giao diện và file Excel luôn khớp nhau.
+        function reviewStatusClass(status) {
+            return status === 'completed' ? 'completed' : status === 'active' ? 'active' : 'none';
+        }
+
+        function formatReviewScore(value) {
+            const n = Number(value);
+            if (!isFinite(n)) return '—';
+            return String(Math.round(n * 100) / 100).replace('.', ',');
+        }
+
+        function formatReviewScoreOrDash(value) {
+            return value === null || value === undefined || !isFinite(Number(value))
+                ? '—' : formatReviewScore(value);
+        }
+
+        function scoreCell(attempt) {
+            if (!attempt || attempt.score === null || attempt.score === undefined) {
+                return '<td class="review-score-cell empty">—</td>';
+            }
+            const max = Number(attempt.maxScore);
+            return `<td class="review-score-cell"><strong>${escapeHtml(formatReviewScore(attempt.score))}</strong>` +
+                (max > 0 ? `<span style="color:#8a94a6;">/${escapeHtml(formatReviewScore(max))}</span>` : '') + '</td>';
         }
 
         function renderReviewResults() {
             const resultBody = document.getElementById('reviewResultsBody');
-            const attemptSelect = document.getElementById('reviewFilterAttempt');
-            const filtered = reviewFilteredExams();
-
-            const attemptNos = [...new Set(filtered.flatMap((entry) =>
-                entry.attempts.map((a) => a.attemptNo).filter((n) => n !== null && n !== undefined)))];
-            attemptNos.sort((a, b) => Number(a) - Number(b));
-            const currentAttempt = attemptSelect.value;
-            attemptSelect.innerHTML = '<option value="">Tất cả các lần</option>' +
-                attemptNos.map((n) => `<option value="${escapeHtml(String(n))}">Lần ${escapeHtml(String(n))}</option>`).join('');
-            if (attemptNos.some((n) => String(n) === currentAttempt)) attemptSelect.value = currentAttempt;
-
-            const attempt = attemptSelect.value;
-            const entries = filtered.map((entry) => ({
-                exam: entry.exam,
-                attempts: entry.attempts.filter((a) => !attempt || String(a.attemptNo) === attempt)
-            })).filter((entry) => entry.attempts.length > 0);
-            if (!entries.length) {
-                resultBody.innerHTML = '<p style="color:#888;font-size:0.9em;">Không có lượt nộp phù hợp với bộ lọc.</p>';
+            const exam = currentReviewExam();
+            if (!exam) {
+                resultBody.innerHTML = '<p style="color:#888;font-size:0.9em;">Không tìm thấy đề trong danh sách.</p>';
                 return;
             }
 
-            resultBody.innerHTML = entries.map((entry) => {
-                const exam = entry.exam;
-                const rows = entry.attempts.map((a) => `
-                    <tr>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentSTT)}</td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(a.studentName || '')}</td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(String(a.attemptNo || '--'))}</td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;"><strong>${a.score}${Number(a.maxScore) > 0 ? '/' + a.maxScore : ''}</strong></td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${a.correctCount}/${a.totalQuestions}</td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(displayTimeSpent(a.timeSpent))}</td>
-                        <td style="padding:8px;border-bottom:1px solid #eee;">${formatDate(a.submittedAt)}</td>
-                    </tr>
-                `).join('');
-                return `
-                    <div style="margin-bottom:18px;">
-                        <h4 style="margin:0 0 8px 0;">${escapeHtml(exam.examName)} <span style="color:#888;font-weight:normal;font-size:0.85em;">(tối đa ${exam.settings.maxAttempts || '∞'} lượt, ${exam.settings.timeLimit ? exam.settings.timeLimit + ' phút' : 'không giới hạn thời gian'})</span></h4>
-                        ${rows ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em;">
-                            <thead><tr style="background:#f5f5f5;text-align:left;">
-                                <th style="padding:8px;">STT</th><th style="padding:8px;">Họ tên</th><th style="padding:8px;">Lần</th><th style="padding:8px;">Điểm</th><th style="padding:8px;">Đúng</th><th style="padding:8px;">Thời gian</th><th style="padding:8px;">Nộp lúc</th>
-                            </tr></thead>
-                            <tbody>${rows}</tbody>
-                        </table></div>` : '<p style="color:#888;font-size:0.9em;">Không có lượt nộp phù hợp.</p>'}
-                    </div>
-                `;
+            const summary = exam.summary || {};
+            const students = exam.students || [];
+            const stats = [
+                ['Tổng số học sinh', summary.totalStudents || 0],
+                ['Đã làm bài', summary.submittedStudents || 0],
+                ['Chưa làm bài', summary.notSubmittedStudents || 0],
+                ['Đang làm bài', summary.activeStudents || 0],
+                ['Điểm trung bình', formatReviewScoreOrDash(summary.averageScore)],
+                ['Điểm cao nhất', formatReviewScoreOrDash(summary.highestScore)],
+                ['Điểm thấp nhất', formatReviewScoreOrDash(summary.lowestScore)]
+            ];
+            const overview = `<div class="review-overview">${stats.map(([label, value]) => `
+                <div class="review-stat">
+                    <span class="review-stat-label">${escapeHtml(label)}</span>
+                    <span class="review-stat-value">${escapeHtml(String(value))}</span>
+                </div>`).join('')}</div>`;
+
+            const settings = exam.settings || {};
+            const meta = [
+                exam.questionCount + ' câu',
+                settings.timeLimit ? settings.timeLimit + ' phút' : 'Không giới hạn thời gian',
+                settings.maxAttempts ? 'Tối đa ' + settings.maxAttempts + ' lượt' : 'Không giới hạn số lần'
+            ];
+            if (!exam.available) meta.unshift('Đề đã bị xóa');
+            if (exam.rosterClassName) meta.unshift('Lớp hiện tại: ' + exam.rosterClassName);
+            const metaHtml = `<p class="review-exam-meta">${escapeHtml(meta.join(' • '))}` +
+                ' • Điểm TB/cao nhất/thấp nhất tính theo lần làm gần nhất của mỗi học sinh.' +
+                ' • Thời gian là tổng các lượt đã nộp.</p>';
+
+            if (!students.length) {
+                resultBody.innerHTML = overview + metaHtml +
+                    '<p style="color:#888;font-size:0.9em;">Chưa có học sinh trong phạm vi bài ôn tập.</p>';
+                return;
+            }
+
+            let maxAttempts = 0;
+            students.forEach((s) => {
+                maxAttempts = Math.max(maxAttempts, (s.attempts || []).length);
+            });
+            const attemptHeads = Array.from({ length: maxAttempts }, (_, i) => `<th class="review-score-cell">Lần ${i + 1}</th>`).join('');
+            const rows = students.map((s) => {
+                const cells = Array.from({ length: maxAttempts }, (_, i) => scoreCell((s.attempts || [])[i])).join('');
+                return `<tr>
+                    <td>${escapeHtml(String(s.stt))}</td>
+                    <td class="col-name">${escapeHtml(s.name)}</td>
+                    <td>${escapeHtml(s.className || '—')}</td>
+                    ${cells}
+                    <td class="review-score-cell">${s.attemptCount}</td>
+                    <td>${escapeHtml(s.totalDurationText || '—')}</td>
+                    <td><span class="review-status ${reviewStatusClass(s.status)}">${escapeHtml(s.statusLabel || '—')}</span></td>
+                </tr>`;
             }).join('');
+
+            resultBody.innerHTML = overview + metaHtml + `
+                <div class="review-table-wrap">
+                    <table class="review-summary-table">
+                        <thead><tr>
+                            <th>STT</th><th class="col-name">Họ và tên</th><th>Lớp</th>
+                            ${attemptHeads}
+                            <th class="review-score-cell">Số lần làm</th><th>Thời gian làm bài</th><th>Trạng thái</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+        }
+
+        async function exportReviewResults() {
+            const exam = currentReviewExam();
+            if (!exam) return;
+            if (!(exam.students || []).length) {
+                showNotification('Chưa có học sinh nào để xuất Excel', 'warning');
+                return;
+            }
+            try {
+                const url = '/api/review-lists/' + encodeURIComponent(reviewResultsListId) +
+                    '/results/export?examId=' + encodeURIComponent(exam.examId);
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }
+                const blob = await res.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = responseFileName(res) || ('Ket_qua_on_tap_' + exam.examId + '.xlsx');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(objectUrl);
+                showNotification('Đã xuất file Excel');
+            } catch (err) {
+                showNotification('Lỗi xuất Excel: ' + err.message, 'error');
+            }
+        }
+
+        // Ưu tiên filename* để tên file giữ được tiếng Việt.
+        function responseFileName(res) {
+            const header = res.headers.get('Content-Disposition') || '';
+            const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
+            if (encoded) {
+                try { return decodeURIComponent(encoded[1]); } catch (err) { /* dùng tên ASCII */ }
+            }
+            const plain = /filename="?([^";]+)"?/i.exec(header);
+            return plain ? plain[1] : '';
         }
 
         function closeReviewResults() {
             document.getElementById('reviewResultsModal').style.display = 'none';
-        }
-
-        // Máy chủ đã trả chuỗi "x phút y giây"; số giây chỉ dùng cho dữ liệu cũ.
-        function displayTimeSpent(value) {
-            if (typeof value === 'number') return formatDuration(value);
-            return value ? String(value) : '--';
-        }
-
-        function formatDuration(seconds) {
-            const total = Math.max(0, Math.floor(Number(seconds) || 0));
-            return Math.floor(total / 60) + ' phút ' + (total % 60) + ' giây';
-        }
-
-        function formatDate(iso) {
-            if (!iso) return '--';
-            try {
-                return new Date(iso).toLocaleString('vi-VN');
-            } catch (err) {
-                return iso;
-            }
         }
 
         // Initialize

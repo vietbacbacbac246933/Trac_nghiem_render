@@ -480,6 +480,17 @@ function studentFullName(s) {
     return ((s.ho || '') + ' ' + (s.ten || '')).trim();
 }
 
+// Danh sách lớp hiện tại để đối chiếu "đã làm / chưa làm" khi xem kết quả.
+function reviewRoster() {
+    return students.map(function (s) {
+        return {
+            stt: s.stt,
+            name: studentFullName(s),
+            className: currentSession.className || ''
+        };
+    });
+}
+
 function publicReviewExam(examId, settings) {
     var exam = loadExam(examId);
     if (!exam) {
@@ -588,6 +599,7 @@ function filterHistoryDetails(settings, details) {
             index: typeof d.index === 'number' ? d.index : position,
             question: d.question,
             type: d.type,
+            studentAnswer: d.studentAnswer,
             studentAnswerText: d.studentAnswerText,
             hasAnswer: hasAnswer,
             options: Array.isArray(d.options) ? d.options : null,
@@ -2699,10 +2711,85 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
             };
         });
         info.attempts = attempts;
+        // Bảng tổng hợp theo từng học sinh: giữ đủ lịch sử, học sinh chưa làm
+        // vẫn có mặt nếu thuộc lớp hiện tại hoặc đã từng làm bài.
+        var built = review.buildExamResults(rawAttempts, reviewRoster(), currentSession.className || '');
+        info.students = built.students;
+        info.summary = built.summary;
+        info.rosterClassName = currentSession.className || '';
         return info;
     });
     res.json({ success: true, list: { id: list.id, name: list.name }, exams: exams });
 });
+
+// Xuất kết quả ôn tập của một đề ra Excel (.xlsx).
+app.get('/api/review-lists/:listId/results/export', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền xuất kết quả' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var item = findReviewItem(list, req.query.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+
+    var examInfo = publicReviewExam(item.examId, item.settings);
+    var built = review.buildExamResults(
+        loadReviewAttempts(list.id, item.examId),
+        reviewRoster(),
+        currentSession.className || ''
+    );
+    if (!built.students.length) {
+        return res.status(409).json({ error: 'Chưa có học sinh nào trong phạm vi bài ôn tập để xuất.' });
+    }
+
+    var table = review.resultTable(built.students);
+    var ws = XLSX.utils.aoa_to_sheet([table.headers].concat(table.rows));
+    var cols = [{ wch: 5 }, { wch: 28 }, { wch: 12 }];
+    for (var i = 0; i < table.maxAttempts; i++) cols.push({ wch: 10 });
+    cols.push({ wch: 12 }, { wch: 20 }, { wch: 18 });
+    ws['!cols'] = cols;
+    ws['!autofilter'] = {
+        ref: XLSX.utils.encode_range({
+            s: { r: 0, c: 0 },
+            e: { r: table.rows.length, c: table.headers.length - 1 }
+        })
+    };
+
+    var wb = XLSX.utils.book_new();
+    wb.Props = {
+        Title: 'Kết quả ôn tập - ' + examInfo.examName,
+        Author: 'Trac nghiem'
+    };
+    XLSX.utils.book_append_sheet(wb, ws, 'Ket qua');
+
+    var now = new Date();
+    var dateParts = [
+        String(now.getDate()).padStart(2, '0'),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getFullYear())
+    ];
+    var dateStr = dateParts.join('-');
+    var asciiName = 'Ket_qua_on_tap_' + slugFileName(examInfo.examName) + '_' + dateStr + '.xlsx';
+    var utf8Name = 'Ket_qua_on_tap_' +
+        String(examInfo.examName || 'bai_on_tap').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80) +
+        '_' + dateStr + '.xlsx';
+
+    var buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition',
+        'attachment; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodeURIComponent(utf8Name));
+    res.send(buffer);
+});
+
+// Ten file ASCII: bo dau tieng Viet, chi giu chu/so va gach duoi.
+function slugFileName(name) {
+    return String(name || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60) || 'bai_on_tap';
+}
 
 // --- Học sinh: xem danh sách và tự chọn đề ---
 app.get('/api/review/students', function (req, res) {
