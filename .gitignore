@@ -50,6 +50,8 @@ data/progress/
 # Danh sach on tap va lich su lam bai (du lieu chay, co ten hoc sinh)
 data/review-lists.json
 data/review-attempts/
+# Bai lam dang do (luu tam theo tung luot, du lieu chay)
+data/review-progress/
 # Danh sach hoc sinh (chua ho ten -> thong tin ca nhan)
 data/default-students.json
 data/class-students/

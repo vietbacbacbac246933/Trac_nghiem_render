@@ -709,6 +709,33 @@
         return parts.join(' • ');
     }
 
+    // Hủy lượt đang làm bị treo (đổi máy, trình duyệt lỗi...). Lượt bị hủy
+    // không tính vào số lần làm, nên học sinh làm lại được ngay.
+    function cancelReviewAttempt(examId, attemptId) {
+        if (!currentStudent || !currentList) return;
+        if (!attemptId) return;
+        if (!confirm('Hủy lượt đang làm?\n\nBài làm dở của lượt này sẽ bị xóa và lượt này KHÔNG bị tính vào số lần làm.')) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/review/attempt/cancel', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4) return;
+            if (xhr.status === 200) {
+                loadListDetail();
+                return;
+            }
+            var msg = 'Không thể hủy lượt.';
+            try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+            alert(msg);
+        };
+        xhr.send(JSON.stringify({
+            listId: currentList.id,
+            examId: examId,
+            stt: currentStudent.stt,
+            attemptId: attemptId
+        }));
+    }
+
     function renderExams() {
         if (!currentList) return;
         var search = (document.getElementById('examSearch').value || '').trim().toLowerCase();
@@ -743,7 +770,10 @@
                 var resumeUrl = '/?reviewList=' + encodeURIComponent(currentList.id) +
                     '&reviewExam=' + encodeURIComponent(item.examId) +
                     '&reviewStt=' + encodeURIComponent(currentStudent.stt);
-                startHtml = '<a class="btn btn-primary" href="' + resumeUrl + '">Tiếp tục lượt đang làm</a>';
+                startHtml = '<a class="btn btn-primary" href="' + resumeUrl + '">Tiếp tục lượt đang làm</a>' +
+                    '<button class="btn btn-secondary" onclick="cancelReviewAttempt(\'' +
+                    esc(item.examId).replace(/'/g, "\\'") + '\',\'' +
+                    esc(h.activeAttemptId || '').replace(/'/g, "\\'") + '\')">Hủy lượt</button>';
             } else if (!h.canAttempt) {
                 startHtml = '<button class="btn" disabled>Đã hết lượt</button>';
             } else {

@@ -445,6 +445,53 @@ function saveReviewAttempts(listId, examId, attempts) {
     DATA.writeJson(getReviewAttemptsPath(listId, examId), attempts);
 }
 
+// ---------------------------------------------------------------------------
+// Tiến độ làm bài ôn tập: mỗi lượt một file nhỏ, KHÔNG ghi lại cả mảng
+// attempts (tránh phải serialize toàn bộ lịch sử mỗi 20 giây của 40 học sinh).
+// ---------------------------------------------------------------------------
+var REVIEW_PROGRESS_DIR = path.join(__dirname, 'data', 'review-progress');
+
+function reviewProgressPath(attemptId) {
+    return path.join(REVIEW_PROGRESS_DIR, String(attemptId) + '.json');
+}
+
+function loadReviewProgress(attemptId) {
+    if (!isSafeId(attemptId)) return null;
+    var data = DATA.readJson(reviewProgressPath(attemptId), null);
+    return data && typeof data === 'object' ? data : null;
+}
+
+function saveReviewProgress(attemptId, value) {
+    if (!isSafeId(attemptId)) return;
+    DATA.writeJson(reviewProgressPath(attemptId), value);
+}
+
+function deleteReviewProgress(attemptId) {
+    if (!isSafeId(attemptId)) return;
+    DATA.del(reviewProgressPath(attemptId));
+}
+
+// Đóng các lượt "đang làm" đã quá hạn hoặc bị bỏ quên quá lâu. Chạy khi đọc
+// danh sách/lịch sử/kết quả để trạng thái "Đang làm bài" không bị treo mãi.
+function closeStaleReviewAttempts(list, item, attempts) {
+    var now = Date.now();
+    var changed = false;
+    for (var i = 0; i < attempts.length; i++) {
+        var a = attempts[i];
+        if (!a || a.status !== 'active') continue;
+        var progress = loadReviewProgress(a.id);
+        var lastAt = progress && progress.updatedAt ? new Date(progress.updatedAt).getTime() : 0;
+        if (!review.isStaleAttempt(item.settings, a, lastAt, now)) continue;
+        var exam = loadExam(item.examId);
+        settleReviewAttempt(a, exam && Array.isArray(exam.questions) ? exam.questions : [], {}, item.settings, true);
+        a.details = null; // lượt bỏ dở không cần giữ nội dung từng câu
+        deleteReviewProgress(a.id);
+        changed = true;
+    }
+    if (changed) saveReviewAttempts(list.id, item.examId, attempts);
+    return changed;
+}
+
 function findReviewItem(list, examId) {
     if (!list || !Array.isArray(list.items)) return null;
     for (var i = 0; i < list.items.length; i++) {
@@ -501,7 +548,11 @@ function buildReviewListPayload(list, stt) {
     var items = (list.items || []).map(function (item) {
         var info = publicReviewExam(item.examId, item.settings);
         var attempts = loadReviewAttempts(list.id, item.examId);
+        closeStaleReviewAttempts(list, item, attempts);
         info.history = review.statusOf(attempts, item.settings.maxAttempts, stt);
+        // Chỉ để nút "Hủy lượt" gửi đúng lượt của mình, không hủy nhầm lượt khác.
+        var activeAttempt = review.findActiveAttempt(attempts, stt);
+        info.history.activeAttemptId = activeAttempt ? activeAttempt.id : null;
         return info;
     });
     return {
@@ -2708,6 +2759,7 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
     var exams = (list.items || []).map(function (item) {
         var info = publicReviewExam(item.examId, item.settings);
         var rawAttempts = loadReviewAttempts(list.id, item.examId);
+        closeStaleReviewAttempts(list, item, rawAttempts);
         // Dữ liệu cũ có thể thiếu trường no: đánh số theo thứ tự bắt đầu.
         var noById = {};
         var byStudent = {};
@@ -2874,6 +2926,7 @@ app.get('/api/review/history', function (req, res) {
     if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
 
     var attempts = loadReviewAttempts(list.id, item.examId);
+    closeStaleReviewAttempts(list, item, attempts);
     var summary = review.summarize(attempts, student.stt);
     var settings = item.settings;
     var canViewDetails = settings.showResult || settings.showAnswers;
@@ -2939,13 +2992,16 @@ app.get('/api/review/play', function (req, res) {
     if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
 
     var attempts = loadReviewAttempts(list.id, item.examId);
+    closeStaleReviewAttempts(list, item, attempts);
     var now = Date.now();
     var plan = review.planAttempt(attempts, item.settings, student.stt, now);
 
-    // Lượt dở đã quá hạn: đóng và chấm với 0 câu trả lời (server không giữ
-    // tiến độ), để lượt đó vẫn được tính vào giới hạn.
+    // Lượt dở đã quá hạn: đóng và chấm với 0 câu trả lời (giữ nguyên cách
+    // chấm cũ), để lượt đó vẫn được tính vào giới hạn.
     if (plan.action === 'close') {
         settleReviewAttempt(plan.attempt, exam.questions, {}, item.settings, true);
+        plan.attempt.details = null;
+        deleteReviewProgress(plan.attempt.id);
         saveReviewAttempts(list.id, item.examId, attempts);
         plan = review.planAttempt(attempts, item.settings, student.stt, Date.now());
     }
@@ -2975,6 +3031,12 @@ app.get('/api/review/play', function (req, res) {
     var playSettings = reviewSettingsPayload(item.settings);
     // Dùng đúng thời gian đã chốt cho lượt này (kể cả khi giáo viên vừa sửa đề).
     playSettings.timeLimit = review.attemptTimeLimit(active, item.settings);
+    // Tiến độ đã lưu trên server (máy khác / tải lại trang vẫn còn bài làm).
+    var savedProgress = loadReviewProgress(active.id);
+    var progressPayload = savedProgress && savedProgress.answers &&
+        Object.keys(savedProgress.answers).length
+        ? { answers: savedProgress.answers, updatedAt: savedProgress.updatedAt || null }
+        : null;
     res.json({
         success: true,
         list: { id: list.id, name: list.name, description: list.description || '', subject: list.subject || '' },
@@ -2991,10 +3053,74 @@ app.get('/api/review/play', function (req, res) {
         },
         settings: playSettings,
         attempt: { id: active.id, startedAt: active.startedAt },
+        progress: progressPayload,
         serverNow: now,
         attemptsUsed: attemptsUsed,
         remainingAttempts: item.settings.maxAttempts > 0
             ? Math.max(0, item.settings.maxAttempts - attemptsUsed)
+            : null
+    });
+});
+
+// Lưu tạm bài làm ôn tập (hàng đợi phía client gọi mỗi ~20 giây).
+// Mỗi lượt ghi một file riêng nên không phải ghi lại toàn bộ lịch sử.
+app.post('/api/review/progress', function (req, res) {
+    var body = req.body || {};
+    var list = getReviewList(body.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var item = findReviewItem(list, body.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var student = findStudentByStt(body.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var target = review.findSubmitTarget(attempts, body.attemptId, student.stt);
+    if (!target.attempt) {
+        return res.status(409).json({ error: 'Lượt làm bài không còn hiệu lực' });
+    }
+
+    var answers = body.answers;
+    if (!answers || typeof answers !== 'object') answers = {};
+    if (JSON.stringify(answers).length > 256 * 1024) {
+        return res.status(413).json({ error: 'Bài làm quá lớn để lưu tạm' });
+    }
+    saveReviewProgress(target.attempt.id, {
+        listId: list.id,
+        examId: item.examId,
+        stt: String(student.stt),
+        answers: answers,
+        updatedAt: new Date().toISOString()
+    });
+    res.json({ success: true });
+});
+
+// Hủy lượt đang làm bị treo. Lượt bị hủy không tính vào giới hạn và không
+// giữ bài làm, nên học sinh bắt đầu lại được mà không bị phạt oan.
+app.post('/api/review/attempt/cancel', function (req, res) {
+    var body = req.body || {};
+    var list = getReviewList(body.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var item = findReviewItem(list, body.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var student = findStudentByStt(body.stt);
+    if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var target = review.findSubmitTarget(attempts, body.attemptId, student.stt);
+    var active = target.attempt;
+    if (!active) return res.status(409).json({ error: 'Không có lượt nào đang làm' });
+
+    active.status = 'cancelled';
+    active.cancelledAt = new Date().toISOString();
+    saveReviewAttempts(list.id, item.examId, attempts);
+    deleteReviewProgress(active.id);
+
+    var used = review.countAttempts(attempts, student.stt);
+    res.json({
+        success: true,
+        attemptsUsed: used,
+        remainingAttempts: item.settings.maxAttempts > 0
+            ? Math.max(0, item.settings.maxAttempts - used)
             : null
     });
 });
@@ -3026,6 +3152,7 @@ app.post('/api/review/submit', function (req, res) {
         // Lượt đã được chấm (bấm nộp 2 lần, hoặc phản hồi bị mất rồi bấm
         // "Thử nộp lại"): trả lại đúng kết quả đã lưu thay vì báo lỗi.
         if (target.submitted) {
+            deleteReviewProgress(target.submitted.id);
             var replay = reviewSubmitPayload(item, target.submitted, attempts, student);
             replay.alreadySubmitted = true;
             return res.json(replay);
@@ -3041,8 +3168,10 @@ app.post('/api/review/submit', function (req, res) {
     // thay vì để lượt treo, nhưng không chấp nhận đáp án gửi muộn.
     if (late) {
         settleReviewAttempt(attempt, exam.questions, {}, item.settings, true);
+        attempt.details = null; // nộp trễ: không giữ snapshot nội dung câu hỏi
         attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
         attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
+        deleteReviewProgress(attempt.id);
         saveReviewAttempts(list.id, item.examId, attempts);
         return res.json(reviewSubmitPayload(item, attempt, attempts, student));
     }
@@ -3050,6 +3179,7 @@ app.post('/api/review/submit', function (req, res) {
     settleReviewAttempt(attempt, exam.questions, body.answers, item.settings, false);
     attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
     attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
+    deleteReviewProgress(attempt.id);
     saveReviewAttempts(list.id, item.examId, attempts);
 
     res.json(reviewSubmitPayload(item, attempt, attempts, student));

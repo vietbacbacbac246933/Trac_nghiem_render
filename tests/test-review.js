@@ -76,6 +76,16 @@ assert.strictEqual(review.countAttempts(attempts, 1), 4);
 assert.strictEqual(review.countAttempts(attempts, 2), 1);
 assert.strictEqual(review.countAttempts(attempts, 3), 0);
 
+// Luot bi huy (bam "Huy luot" khi bi treo) khong tinh vao gioi han.
+var withCancelled = attempts.concat([
+    { id: 'a6', studentSTT: 1, status: 'cancelled', score: 0, submittedAt: null, timeSpent: 0 }
+]);
+assert.strictEqual(review.countAttempts(withCancelled, 1), 4);
+assert.strictEqual(review.summarize(withCancelled, 1).attemptCount, 3);
+var onlyCancelled = [{ id: 'a6', studentSTT: 1, status: 'cancelled' }];
+assert.strictEqual(review.findActiveAttempt(onlyCancelled, 1), null);
+assert.strictEqual(review.statusOf(onlyCancelled, 0, 1).hasActive, false);
+
 var sum = review.summarize(attempts, 1);
 assert.strictEqual(sum.attemptCount, 3);
 assert.strictEqual(sum.bestScore, 9);
@@ -116,6 +126,19 @@ assert.strictEqual(review.isOverDeadline(tfSettings, { startedAt: startedAt }, s
 assert.strictEqual(review.isOverDeadline(tfSettings, { startedAt: startedAt }, startMs + 12 * 60000 + 1), true);
 assert.strictEqual(review.isOverDeadline({ timeLimit: 0 }, { startedAt: startedAt }, startMs + 999 * 60000), false);
 assert.strictEqual(review.isOverDeadline(tfSettings, null, startMs), false);
+
+// Luot bi bo quen: co gioi han thi qua han la dong; khong gioi han thi dong
+// sau 12 gio khong luu tien do (neu khong, giao vien thay "Dang lam bai" mai).
+var activeAttempt = { status: 'active', startedAt: startedAt };
+assert.strictEqual(review.isStaleAttempt(tfSettings, activeAttempt, 0, startMs + 11 * 60000), false);
+assert.strictEqual(review.isStaleAttempt(tfSettings, activeAttempt, 0, startMs + 12 * 60000 + 1), true);
+assert.strictEqual(review.isStaleAttempt({ timeLimit: 0 }, activeAttempt, 0, startMs + 11 * 3600000), false);
+assert.strictEqual(review.isStaleAttempt({ timeLimit: 0 }, activeAttempt, 0, startMs + 13 * 3600000), true);
+// Vua luu tien do -> duoc gia han 12 gio tinh tu lan luu cuoi.
+assert.strictEqual(review.isStaleAttempt({ timeLimit: 0 }, activeAttempt,
+    startMs + 13 * 3600000, startMs + 13 * 3600000 + 1000), false);
+assert.strictEqual(review.isStaleAttempt({ timeLimit: 0 }, { status: 'submitted', startedAt: startedAt },
+    0, startMs + 99 * 3600000), false);
 
 // Thoi gian chot luc bat dau: sua cau hinh sau do khong doi dong ho cua luot.
 assert.strictEqual(review.attemptTimeLimit({ timeLimit: 5 }, { timeLimit: 60 }), 5);

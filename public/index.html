@@ -2275,7 +2275,10 @@
         var socketConnected = false;
         
         try {
-            if (typeof io !== 'undefined') {
+            // Ôn tập không dùng Socket.IO: tránh mở thêm kết nối và bắn sự kiện
+            // rời tab/toàn màn hình cho 40 máy cùng lúc.
+            var isReviewPage = window.location.search.indexOf('reviewList=') !== -1;
+            if (typeof io !== 'undefined' && !isReviewPage) {
                 socket = io({
                     transports: ['websocket', 'polling'],
                     reconnection: true,
@@ -3129,6 +3132,14 @@
             }
 
             var hasProgress = restoreExamProgress();
+            // Không có tiến độ trên máy này (đổi máy / xóa cache) -> dùng bản
+            // đã lưu trên server của đúng lượt đang làm.
+            if (!hasProgress && data.progress && data.progress.answers &&
+                Object.keys(data.progress.answers).length) {
+                answers = data.progress.answers;
+                hasProgress = true;
+                saveExamProgress();
+            }
             renderNavigation();
             renderQuestions(function() {
                 if (hasProgress && Object.keys(answers).length > 0) {
@@ -4123,7 +4134,81 @@
                     localStorage.setItem(EXAM_PROGRESS_KEY, JSON.stringify(fresh));
                 } catch(e2) {}
             }
+
+            if (reviewContext) queueReviewSave();
         }
+
+        // ==================== HÀNG ĐỢI LƯU BÀI ÔN TẬP ====================
+        // Chỉ 1 request đang bay; các lần lưu mới gộp lại thành lần kế tiếp.
+        // Lỗi mạng thì tự thử lại với khoảng chờ tăng dần, không làm treo máy.
+        var reviewSaveQueue = { timer: null, inFlight: false, pending: false, failures: 0 };
+        var lastReviewSaveBody = null;
+
+        function queueReviewSave(delayMs) {
+            if (!reviewContext || !reviewAttemptId) return;
+            reviewSaveQueue.pending = true;
+            if (reviewSaveQueue.timer) clearTimeout(reviewSaveQueue.timer);
+            reviewSaveQueue.timer = setTimeout(flushReviewSave, delayMs === undefined ? 4000 : delayMs);
+        }
+
+        function reviewSavePayload() {
+            return JSON.stringify({
+                listId: reviewContext.listId,
+                examId: reviewContext.examId,
+                stt: studentInfo.stt,
+                attemptId: reviewAttemptId,
+                answers: answers
+            });
+        }
+
+        function flushReviewSave() {
+            reviewSaveQueue.timer = null;
+            if (!reviewSaveQueue.pending) return;
+            // Đang có request bay: để nó xong rồi gửi tiếp bản mới nhất.
+            if (reviewSaveQueue.inFlight) return;
+            if (!reviewAttemptId || !studentInfo.stt) return;
+
+            // Không có gì mới thì không ghi lại (40 máy ngồi im cũng không tạo tải).
+            var body = reviewSavePayload();
+            if (body === lastReviewSaveBody) {
+                reviewSaveQueue.pending = false;
+                return;
+            }
+
+            reviewSaveQueue.pending = false;
+            reviewSaveQueue.inFlight = true;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/review/progress', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
+                reviewSaveQueue.inFlight = false;
+                if (xhr.status === 200) {
+                    reviewSaveQueue.failures = 0;
+                    lastReviewSaveBody = body;
+                    if (reviewSaveQueue.pending) queueReviewSave(0);
+                    return;
+                }
+                // Lượt đã nộp/hủy -> không thử lại nữa.
+                if (xhr.status >= 400 && xhr.status < 500) {
+                    reviewSaveQueue.pending = false;
+                    return;
+                }
+                reviewSaveQueue.failures++;
+                reviewSaveQueue.pending = true;
+                queueReviewSave(Math.min(30000, 2000 * Math.pow(2, reviewSaveQueue.failures)));
+            };
+            xhr.send(body);
+        }
+
+        // Đóng tab / chuyển app: gửi nốt bản mới nhất, không chờ phản hồi.
+        window.addEventListener('pagehide', function() {
+            if (!reviewContext || !reviewAttemptId || !studentInfo.stt) return;
+            try {
+                var blob = new Blob([reviewSavePayload()], { type: 'application/json' });
+                navigator.sendBeacon('/api/review/progress', blob);
+            } catch (e) {}
+        });
         
         function getExamProgress(stt, examId) {
             try {
@@ -4153,7 +4238,14 @@
 
         function startProgressSync() {
             stopProgressSync();
-            if (reviewContext) return; // ôn tập chỉ lưu tiến độ trên máy, không ghi đè phiên thi
+            // Ôn tập: lưu qua hàng đợi vào file riêng của lượt (không ghi đè
+            // phiên thi chính thức và không ghi lại cả mảng lịch sử).
+            if (reviewContext) {
+                progressSyncInterval = setInterval(function() {
+                    queueReviewSave(0);
+                }, 20000);
+                return;
+            }
             progressSyncInterval = setInterval(function() {
                 syncProgressToServer();
             }, 30000); // mỗi 30 giây
@@ -4164,6 +4256,11 @@
                 clearInterval(progressSyncInterval);
                 progressSyncInterval = null;
             }
+            if (reviewSaveQueue.timer) {
+                clearTimeout(reviewSaveQueue.timer);
+                reviewSaveQueue.timer = null;
+            }
+            reviewSaveQueue.pending = false;
         }
 
         function syncProgressToServer() {
@@ -4802,37 +4899,7 @@
             // Lưu timeSpent vào biến global để dùng trong callback
             window._submitTimeSpent = timeSpent;
             
-            var xhr = new XMLHttpRequest();
-            var submitUrl = reviewContext ? '/api/review/submit' : '/api/submit';
-            xhr.open('POST', submitUrl, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    submitInFlight = false;
-                    if (xhr.status === 200) {
-                        try {
-                            var result = JSON.parse(xhr.responseText);
-                            if (result.success) {
-                                clearExamProgress(studentInfo.stt, currentExamId);
-                                showResult(result, window._submitTimeSpent);
-                            } else {
-                                showSubmitErrorModal(result.error || 'Có lỗi khi nộp bài.', false);
-                            }
-                        } catch(e) {
-                            showSubmitErrorModal('Lỗi dữ liệu phản hồi.');
-                        }
-                    } else {
-                        var errorMessage = 'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và thử lại.';
-                        try {
-                            var err = JSON.parse(xhr.responseText);
-                            if (err && err.error) errorMessage = err.error;
-                        } catch (e2) {}
-                        // Chỉ lỗi mạng/5xx mới chắc chắn "thử lại được".
-                        showSubmitErrorModal(errorMessage, xhr.status === 0 || xhr.status >= 500);
-                    }
-                }
-            };
-            xhr.send(JSON.stringify(reviewContext ? {
+            var submitPayload = JSON.stringify(reviewContext ? {
                 listId: reviewContext.listId,
                 examId: reviewContext.examId,
                 stt: studentInfo.stt,
@@ -4848,7 +4915,49 @@
                 studentClass: studentInfo.class,
                 answers: answersArray,
                 timeSpent: timeSpent
-            }));
+            });
+            sendSubmitRequest(submitPayload, 0);
+        }
+
+        // Nộp bài theo hàng đợi: lỗi mạng/5xx thì tự thử lại (server chống nộp
+        // trùng nên thử lại an toàn), chỉ hiện modal khi đã thử hết.
+        function sendSubmitRequest(payload, attemptNo) {
+            var xhr = new XMLHttpRequest();
+            var submitUrl = reviewContext ? '/api/review/submit' : '/api/submit';
+            xhr.open('POST', submitUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status === 200) {
+                    submitInFlight = false;
+                    try {
+                        var result = JSON.parse(xhr.responseText);
+                        if (result.success) {
+                            clearExamProgress(studentInfo.stt, currentExamId);
+                            showResult(result, window._submitTimeSpent);
+                        } else {
+                            showSubmitErrorModal(result.error || 'Có lỗi khi nộp bài.', false);
+                        }
+                    } catch (e) {
+                        showSubmitErrorModal('Lỗi dữ liệu phản hồi.');
+                    }
+                    return;
+                }
+                var retryable = xhr.status === 0 || xhr.status >= 500;
+                if (retryable && attemptNo < 3) {
+                    showMessage('error', 'Mất kết nối. Đang tự động thử nộp lại (' + (attemptNo + 1) + '/3)...');
+                    setTimeout(function() { sendSubmitRequest(payload, attemptNo + 1); }, 2000 * (attemptNo + 1));
+                    return;
+                }
+                submitInFlight = false;
+                var errorMessage = 'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và thử lại.';
+                try {
+                    var err = JSON.parse(xhr.responseText);
+                    if (err && err.error) errorMessage = err.error;
+                } catch (e2) {}
+                showSubmitErrorModal(errorMessage, retryable);
+            };
+            xhr.send(payload);
         }
         
         // Hiển thị modal lỗi khi nộp bài thất bại
