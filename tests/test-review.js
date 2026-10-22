@@ -300,4 +300,21 @@ var tie = review.buildExamResults([
 ], [], '');
 assert.deepStrictEqual(tie.students[0].attempts.map(function (a) { return a.id; }), ['a', 'b']);
 
+// Nop lai: luot dang lam duoc chon; luot da nop cung id tra ve de tra ket qua cu;
+// id la / cua hoc sinh khac thi khong dung.
+var submitPool = [
+    { id: 'x1', studentSTT: '10', status: 'submitted', score: 7 },
+    { id: 'x2', studentSTT: '10', status: 'active' },
+    { id: 'x3', studentSTT: '11', status: 'active' }
+];
+var hit = review.findSubmitTarget(submitPool, 'x2', '10');
+assert.strictEqual(hit.attempt.id, 'x2');
+assert.strictEqual(hit.submitted, null);
+var again = review.findSubmitTarget(submitPool, 'x1', '10');
+assert.strictEqual(again.attempt, null);
+assert.strictEqual(again.submitted.id, 'x1');
+assert.deepStrictEqual(review.findSubmitTarget(submitPool, 'x3', '10'), { attempt: null, submitted: null });
+assert.deepStrictEqual(review.findSubmitTarget(submitPool, 'khong-co', '10'), { attempt: null, submitted: null });
+assert.deepStrictEqual(review.findSubmitTarget(submitPool, null, '10'), { attempt: null, submitted: null });
+
 console.log('PASS: review tests');

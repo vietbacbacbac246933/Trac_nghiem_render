@@ -555,6 +555,29 @@ function settleReviewAttempt(attempt, questions, answers, settings, expired) {
     return graded;
 }
 
+// Payload trả về cho học sinh sau khi nộp (dùng chung cho nộp thật, nộp trễ
+// và nộp lại lượt đã nộp). Chỉ đọc dữ liệu đã chốt trên lượt, không chấm lại.
+function reviewSubmitPayload(item, attempt, attempts, student) {
+    var used = review.countAttempts(attempts, student.stt);
+    return {
+        success: true,
+        expired: !!attempt.expired,
+        score: attempt.score,
+        maxScore: attempt.maxScore,
+        correctCount: attempt.correctCount,
+        partialCount: attempt.partialCount,
+        wrongCount: attempt.wrongCount,
+        unansweredCount: attempt.unansweredCount,
+        totalQuestions: attempt.totalQuestions,
+        showScore: true,
+        showAnswers: item.settings.showAnswers,
+        attemptsUsed: used,
+        remainingAttempts: item.settings.maxAttempts > 0
+            ? Math.max(0, item.settings.maxAttempts - used)
+            : null
+    };
+}
+
 // Ẩn đáp án trước khi học sinh nộp bài.
 function sanitizeExamForStudent(questionList) {
     return (questionList || []).map(function (q, index) {
@@ -2971,16 +2994,16 @@ app.post('/api/review/submit', function (req, res) {
     if (!student) return res.status(404).json({ error: 'Không tìm thấy học sinh' });
 
     var attempts = loadReviewAttempts(list.id, item.examId);
-    var attempt = null;
-    for (var i = 0; i < attempts.length; i++) {
-        if (attempts[i] && attempts[i].id === body.attemptId &&
-            attempts[i].status === 'active' &&
-            String(attempts[i].studentSTT) === String(student.stt)) {
-            attempt = attempts[i];
-            break;
-        }
-    }
+    var target = review.findSubmitTarget(attempts, body.attemptId, student.stt);
+    var attempt = target.attempt;
     if (!attempt) {
+        // Lượt đã được chấm (bấm nộp 2 lần, hoặc phản hồi bị mất rồi bấm
+        // "Thử nộp lại"): trả lại đúng kết quả đã lưu thay vì báo lỗi.
+        if (target.submitted) {
+            var replay = reviewSubmitPayload(item, target.submitted, attempts, student);
+            replay.alreadySubmitted = true;
+            return res.json(replay);
+        }
         return res.status(409).json({ error: 'Lượt làm bài không hợp lệ hoặc đã được nộp' });
     }
 
@@ -2991,52 +3014,19 @@ app.post('/api/review/submit', function (req, res) {
     // Quá hạn + 2 phút ân hạn: vẫn đóng lượt và lưu kết quả (0 câu trả lời)
     // thay vì để lượt treo, nhưng không chấp nhận đáp án gửi muộn.
     if (late) {
-        var expiredGraded = settleReviewAttempt(attempt, exam.questions, {}, item.settings, true);
+        settleReviewAttempt(attempt, exam.questions, {}, item.settings, true);
         attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
         attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
         saveReviewAttempts(list.id, item.examId, attempts);
-        var expiredUsed = review.countAttempts(attempts, student.stt);
-        return res.json({
-            success: true,
-            expired: true,
-            score: expiredGraded.score,
-            maxScore: expiredGraded.maxScore,
-            correctCount: expiredGraded.correctCount,
-            partialCount: expiredGraded.partialCount,
-            wrongCount: expiredGraded.wrongCount,
-            unansweredCount: expiredGraded.unansweredCount,
-            totalQuestions: expiredGraded.totalQuestions,
-            showScore: true,
-            showAnswers: item.settings.showAnswers,
-            attemptsUsed: expiredUsed,
-            remainingAttempts: item.settings.maxAttempts > 0
-                ? Math.max(0, item.settings.maxAttempts - expiredUsed)
-                : null
-        });
+        return res.json(reviewSubmitPayload(item, attempt, attempts, student));
     }
 
-    var graded = settleReviewAttempt(attempt, exam.questions, body.answers, item.settings, false);
+    settleReviewAttempt(attempt, exam.questions, body.answers, item.settings, false);
     attempt.fsExitCount = toViolationCount(body.violations && body.violations.fsExitCount);
     attempt.tabSwitchCount = toViolationCount(body.violations && body.violations.tabSwitchCount);
     saveReviewAttempts(list.id, item.examId, attempts);
 
-    var usedCount = review.countAttempts(attempts, student.stt);
-    res.json({
-        success: true,
-        score: graded.score,
-        maxScore: graded.maxScore,
-        correctCount: graded.correctCount,
-        partialCount: graded.partialCount,
-        wrongCount: graded.wrongCount,
-        unansweredCount: graded.unansweredCount,
-        totalQuestions: graded.totalQuestions,
-        showScore: true,
-        showAnswers: item.settings.showAnswers,
-        attemptsUsed: usedCount,
-        remainingAttempts: item.settings.maxAttempts > 0
-            ? Math.max(0, item.settings.maxAttempts - usedCount)
-            : null
-    });
+    res.json(reviewSubmitPayload(item, attempt, attempts, student));
 });
 
 app.post('/api/review/check-answer', function (req, res) {
@@ -3094,6 +3084,22 @@ app.post('/api/submit', (req, res) => {
     
     // Kiểm tra học sinh đã nộp bài chưa (không cho nộp lại trừ khi được phép)
     if (studentSTT && studentStatus[studentSTT] && studentStatus[studentSTT].completed && !studentStatus[studentSTT].canRetry) {
+        // Nộp lặp do mất phản hồi/bấm 2 lần: trả lại kết quả đã lưu, không chấm lại.
+        var savedResult = results.find(r => r && r.studentSTT == studentSTT);
+        if (savedResult) {
+            return res.json({
+                success: true,
+                alreadySubmitted: true,
+                score: savedResult.score,
+                maxScore: savedResult.maxScore,
+                correctCount: savedResult.correctCount,
+                partialCount: savedResult.partialCount,
+                wrongCount: savedResult.wrongCount,
+                unansweredCount: savedResult.unansweredCount,
+                totalQuestions: savedResult.totalQuestions,
+                showScore: examSettings.showScore
+            });
+        }
         return res.json({ 
             success: false, 
             error: 'Bạn đã nộp bài rồi. Không thể nộp lại!' 

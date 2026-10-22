@@ -2388,6 +2388,7 @@
             return { listId: listId, examId: examId, stt: stt, settings: null };
         })();
         var reviewAttemptId = null;
+        var submitInFlight = false; // chặn nộp trùng khi bấm 2 lần / timer trùng
         var reviewInitStarted = false;
         var studentInfo = { name: '', class: '', stt: '' };
         var selectedStudent = null;
@@ -4738,6 +4739,9 @@
         // Submit exam
         function submitExam(autoSubmit) {
             if (autoSubmit === undefined) autoSubmit = false;
+            // Đang gửi thì bỏ qua lần bấm thứ 2 (nộp trùng -> server báo 409 oan).
+            if (submitInFlight) return;
+            submitInFlight = true;
 
             closeConfirmModal();
             clearInterval(timerInterval);
@@ -4804,6 +4808,7 @@
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
+                    submitInFlight = false;
                     if (xhr.status === 200) {
                         try {
                             var result = JSON.parse(xhr.responseText);
@@ -4811,7 +4816,7 @@
                                 clearExamProgress(studentInfo.stt, currentExamId);
                                 showResult(result, window._submitTimeSpent);
                             } else {
-                                showSubmitErrorModal(result.error || 'Có lỗi khi nộp bài.');
+                                showSubmitErrorModal(result.error || 'Có lỗi khi nộp bài.', false);
                             }
                         } catch(e) {
                             showSubmitErrorModal('Lỗi dữ liệu phản hồi.');
@@ -4822,7 +4827,8 @@
                             var err = JSON.parse(xhr.responseText);
                             if (err && err.error) errorMessage = err.error;
                         } catch (e2) {}
-                        showSubmitErrorModal(errorMessage);
+                        // Chỉ lỗi mạng/5xx mới chắc chắn "thử lại được".
+                        showSubmitErrorModal(errorMessage, xhr.status === 0 || xhr.status >= 500);
                     }
                 }
             };
@@ -4846,7 +4852,8 @@
         }
         
         // Hiển thị modal lỗi khi nộp bài thất bại
-        function showSubmitErrorModal(errorMessage) {
+        function showSubmitErrorModal(errorMessage, canRetry) {
+            if (canRetry === undefined) canRetry = true;
             // Tạo modal nếu chưa có
             var modal = document.getElementById('submitErrorModal');
             if (!modal) {
@@ -4863,10 +4870,7 @@
                             '<p id="submitErrorMessage" style="margin: 0; color: #856404;"></p>' +
                         '</div>' +
                         '<div style="background: #e8f5e9; border: 1px solid #4caf50; padding: 15px; border-radius: 12px; margin-bottom: 20px;">' +
-                            '<p style="margin: 0; color: #2e7d32; font-size: 0.9em;">' +
-                                '<strong>Câu trả lời của bạn vẫn được lưu!</strong><br>' +
-                                'Khi kết nối được khôi phục, hãy bấm "Thử nộp lại".' +
-                            '</p>' +
+                            '<p id="submitErrorHint" style="margin: 0; color: #2e7d32; font-size: 0.9em;"></p>' +
                         '</div>' +
                         '<div class="btn-group" style="flex-direction: column; gap: 10px;">' +
                             '<button class="btn btn-success" onclick="retrySubmitExam()" style="font-size: 1.1em; padding: 15px;">Thử nộp lại</button>' +
@@ -4878,6 +4882,11 @@
             
             // Cập nhật message
             document.getElementById('submitErrorMessage').textContent = errorMessage;
+            document.getElementById('submitErrorHint').innerHTML = canRetry
+                ? '<strong>Câu trả lời của bạn vẫn được lưu trên máy này!</strong><br>' +
+                  'Khi kết nối được khôi phục, hãy bấm "Thử nộp lại".'
+                : '<strong>Bài làm vẫn được lưu trên máy này.</strong><br>' +
+                  'Nếu trước đó đã nộp thành công, kết quả đã được lưu trên máy chủ.';
             modal.classList.add('show');
         }
         
