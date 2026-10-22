@@ -296,6 +296,10 @@ var studentStatus = {}; // Trạng thái học sinh: { stt: { selected: false, s
 var socketToStt = {}; // Map socketId -> stt để O(1) lookup trong disconnect
 var reports = []; // Báo cáo chọn nhầm
 var serverProgress = {}; // Progress backup: { stt: { startTime, examId, answers, questionOrder, optionOrders, timeLimit, savedAt } }
+// Cache payload /api/exam: 40 hoc sinh tai de cung luc chi ton 1 buffer thay vi
+// 40 ban sao (de co anh nhung co the vai MB). Tang version moi khi sua cau hoi.
+var questionsVersion = 0;
+var examPayloadCache = { key: '', body: null };
 
 // ========== HỆ THỐNG QUẢN LÝ LỚP & BÀI KIỂM TRA ==========
 // Mỗi lớp có thể làm nhiều bài kiểm tra
@@ -1142,6 +1146,7 @@ function makeDebouncedSaver(fn, delay) {
 
 // Lưu câu hỏi vào file
 function saveQuestions() {
+    questionsVersion++; // đổi đề -> bỏ cache payload /api/exam
     DATA.writeJson(path.join(__dirname, 'data', 'questions.json'), questions);
     // Nếu đang có exam, cập nhật exam đó
     if (currentSession.examId && currentSession.examName) {
@@ -1569,29 +1574,50 @@ app.get('/api/exam', (req, res) => {
     if (!examSettings.isOpen) {
         return res.json({ error: 'Bài thi chưa được mở' });
     }
-    var examQuestions = questions.map((q, index) => {
-        var mq = migrateQuestion(q);
-        return {
-            id: index,
-            type: mq.type || 'single',
-            question: mq.question,
-            options: mq.options,
-            image: mq.image || null
-        };
-    });
-    res.json({
-        title: examSettings.title,
-        timeLimit: examSettings.timeLimit,
-        questions: examQuestions,
-        className: currentSession.className || 'Chưa chọn lớp',
-        examId: currentSession.examId || 'default',
-        examName: currentSession.examName || examSettings.title,
-        practiceMode: examSettings.practiceMode || false,
-        practiceMaxAttempts: examSettings.practiceMaxAttempts === undefined ? null : examSettings.practiceMaxAttempts,
-        practiceTimeLimitMinutes: examSettings.practiceTimeLimitMinutes === undefined ? null : examSettings.practiceTimeLimitMinutes,
-        practiceReviewMode: examSettings.practiceReviewMode || 'answer',
-        shuffleExam: examSettings.shuffleExam !== false
-    });
+    // Dung lai payload da serialize: nhieu hoc sinh vao cung luc khong phai
+    // dung lai JSON (va khong giu N ban sao anh base64 trong RAM).
+    var cacheKey = [
+        questionsVersion,
+        examSettings.title, examSettings.timeLimit,
+        examSettings.practiceMode ? 1 : 0,
+        examSettings.practiceMaxAttempts,
+        examSettings.practiceTimeLimitMinutes,
+        examSettings.practiceReviewMode,
+        examSettings.shuffleExam !== false ? 1 : 0,
+        currentSession.className || '',
+        currentSession.examId || 'default',
+        currentSession.examName || ''
+    ].join('|');
+    if (examPayloadCache.key !== cacheKey) {
+        var examQuestions = questions.map((q, index) => {
+            var mq = migrateQuestion(q);
+            return {
+                id: index,
+                type: mq.type || 'single',
+                question: mq.question,
+                options: mq.options,
+                image: mq.image || null
+            };
+        });
+        examPayloadCache.body = Buffer.from(JSON.stringify({
+            title: examSettings.title,
+            timeLimit: examSettings.timeLimit,
+            questions: examQuestions,
+            className: currentSession.className || 'Chưa chọn lớp',
+            examId: currentSession.examId || 'default',
+            examName: currentSession.examName || examSettings.title,
+            practiceMode: examSettings.practiceMode || false,
+            practiceMaxAttempts: examSettings.practiceMaxAttempts === undefined ? null : examSettings.practiceMaxAttempts,
+            practiceTimeLimitMinutes: examSettings.practiceTimeLimitMinutes === undefined ? null : examSettings.practiceTimeLimitMinutes,
+            practiceReviewMode: examSettings.practiceReviewMode || 'answer',
+            shuffleExam: examSettings.shuffleExam !== false
+        }), 'utf8');
+        examPayloadCache.key = cacheKey;
+    }
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Length', String(examPayloadCache.body.length));
+    res.end(examPayloadCache.body);
 });
 
 // API kiểm tra đáp án trong chế độ ôn tập.
@@ -3124,13 +3150,21 @@ app.post('/api/submit', (req, res) => {
     };
     
     // Tìm và cập nhật kết quả cũ nếu có, hoặc thêm mới
+    // Chi phat thong tin ngan: ban cu phat ca "details" (co the vai MB neu de
+    // co anh) cho MOI socket, gom ca 40 hoc sinh -> ton RAM va lo du lieu.
+    var notify = {
+        studentSTT: studentSTT,
+        studentName: studentName,
+        score: graded.score,
+        maxScore: graded.maxScore
+    };
     var existingIndex = results.findIndex(r => r.studentSTT == studentSTT);
     if (existingIndex >= 0) {
         results[existingIndex] = result;
-        io.emit('resultUpdated', result);
+        io.emit('resultUpdated', notify);
     } else {
         results.push(result);
-        io.emit('newResult', result);
+        io.emit('newResult', notify);
     }
     saveResults();
     
@@ -5231,6 +5265,13 @@ function startListening() {
 DATA.init().then(function() {
     auth.init();
     loadAllData();
+    // Chan doan OOM: cho biet file JSON nao dang chiem nhieu RAM nhat.
+    DATA.sizeReport(10).then(function(rows) {
+        safeLog('[MEM] Du lieu lon nhat dang giu trong RAM:');
+        rows.forEach(function(r) {
+            safeLog('[MEM]   ' + (r.bytes / 1024 / 1024).toFixed(2) + ' MB  ' + r.key);
+        });
+    }).catch(function() {});
     printStartupInfo();
     safeLog('Dang khoi dong server...');
     startListening();

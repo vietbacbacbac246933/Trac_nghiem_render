@@ -52,4 +52,19 @@ var rep = memStats.report(parsed, 0);
 assert.ok(/512 MB - RSS trung vị/.test(rep), rep);
 assert.ok(/85\.0 MB/.test(rep), rep); // trung vi cua 80 va 90
 
-console.log('PASS: mem-monitor tests');
+// 7) sizeReport() liet ke duoc file JSON lon nhat (chan doan OOM).
+var DATA = require('../lib/datastore');
+DATA.init().then(function () {
+    return DATA.sizeReport(3);
+}).then(function (rows) {
+    assert.ok(Array.isArray(rows));
+    assert.ok(rows.length <= 3);
+    rows.forEach(function (r) {
+        assert.strictEqual(typeof r.key, 'string');
+        assert.ok(r.bytes >= 0);
+    });
+    console.log('PASS: mem-monitor tests');
+}).catch(function (err) {
+    console.error(err);
+    process.exit(1);
+});
