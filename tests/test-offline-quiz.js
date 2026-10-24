@@ -151,6 +151,12 @@ check('bang dap an mau + bam o de nhay toi cau', () => {
 check('nop bai xong tu ve dau trang', () => {
     assert.ok(html.includes('window.scrollTo(0, 0)'));
 });
+check('xac nhan nop bai bang hop thoai trong trang (khong dung confirm)', () => {
+    assert.ok(html.includes('id="ask"'), 'thieu hop thoai xac nhan nop bai');
+    assert.ok(html.includes('id="askOk"') && html.includes('id="askCancel"'), 'thieu nut trong hop thoai');
+    assert.ok(html.includes('function doSubmit'), 'thieu ham nop bai tach rieng');
+    assert.ok(!html.includes('confirm('), 'van dung confirm() cua trinh duyet — bi chan tren Safari iOS');
+});
 check('nut len dau / xuong cuoi trang', () => {
     assert.ok(html.includes('class="jumpnav"'), 'thieu cum nut nhay');
     assert.ok(html.includes('data-scroll="top"'));

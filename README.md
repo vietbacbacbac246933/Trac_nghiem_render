@@ -178,6 +178,9 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
 - **Báo đúng/sai ngay:** bật khi xuất để học sinh chọn xong mỗi câu là biết ngay
   đúng/sai (kèm đáp án đúng nếu giáo viên cho xem đáp án). Mặc định tắt.
 - **Nộp bài xong tự về đầu trang** để thấy ngay điểm và bảng đáp án.
+- **Hộp thoại xác nhận nộp bài nằm trong trang** (không dùng `confirm` của trình
+  duyệt), nên bấm "Nộp bài" hoạt động cả trên Safari iOS và khi file được mở trong
+  app/khung xem khác (Zalo, Drive…) — nơi hộp thoại của trình duyệt bị chặn.
 - **Nút ▲ / ▼** ở góc phải gần cuối màn hình để lên đầu hoặc xuống cuối trang khi xem lại.
 - **Chống gian lận** (mặc định bật, tắt được khi xuất): tự bật toàn màn hình khi
   bấm vào file, không chọn/copy được nội dung, chặn chuột phải và các phím tắt
