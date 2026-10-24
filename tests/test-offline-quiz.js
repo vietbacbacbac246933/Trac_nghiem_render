@@ -17,16 +17,37 @@ function check(name, fn) {
 console.log('normalizeSettings');
 check('on tap: giu so luot, bo thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'practice', attempts: 5, minutes: 90, showAnswers: false }),
-        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false });
+        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false, shuffle: true });
 });
 check('thi: chi 1 luot, giu thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'exam', attempts: 5, minutes: 90 }),
-        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true });
+        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true, shuffle: true });
+});
+check('tat tron cau hoi', () => {
+    assert.strictEqual(offline.normalizeSettings({ mode: 'practice', shuffle: false }).shuffle, false);
 });
 check('gia tri rac duoc kep trong khoang', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'exam', minutes: 'abc' }).minutes, 0);
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', attempts: 999 }).attempts, 99);
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', attempts: -3 }).attempts, 0);
+});
+
+console.log('buildOrder');
+check('khong tron -> giu nguyen thu tu', () => {
+    assert.deepStrictEqual(offline.buildOrder(4, false), [0, 1, 2, 3]);
+});
+check('tron -> du va khac thu tu goc', () => {
+    const order = offline.buildOrder(20, true, () => 0.01);
+    assert.deepStrictEqual(order.slice().sort((a, b) => a - b), Array.from({ length: 20 }, (_, i) => i));
+    assert.notDeepStrictEqual(order, Array.from({ length: 20 }, (_, i) => i));
+});
+check('tron voi rng co dinh -> ket qua lap lai duoc', () => {
+    let seed = 0;
+    const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const a = offline.buildOrder(10, true, rng);
+    seed = 0;
+    const b = offline.buildOrder(10, true, rng);
+    assert.deepStrictEqual(a, b);
 });
 
 console.log('renderMathInHtml');
@@ -105,12 +126,21 @@ check('khong co cau hoi van render duoc', () => {
 });
 check('lich su lam bai thu gon tung luot', () => {
     assert.ok(html.includes('Lịch sử làm bài'));
-    assert.ok(html.includes('<details class="run">'), 'moi luot phai la <details> thu gon');
+    assert.ok(html.includes('<details class="run"'), 'moi luot phai la <details> thu gon');
 });
-check('lich su luu so cau dung/sai, khong luu bai lam', () => {
+check('moi luot xem lai duoc bai lam + bo loc', () => {
+    assert.ok(html.includes('data-rev-filter'), 'thieu bo loc trong bai lam');
+    assert.ok(html.includes('Xem lại bài làm'), 'thieu phan xem lai');
+    assert.ok(html.includes('data-rev="'), 'thieu cho gan bai lam cua tung luot');
+});
+check('lich su luu so cau dung/sai va dap an tung luot', () => {
     assert.ok(html.includes('correct: res.correct'));
     assert.ok(html.includes('wrong: res.wrong'));
-    assert.ok(!/runs\.push\(\{[^}]*answers/.test(html), 'khong nen luu dap an tung luot vao localStorage');
+    assert.ok(/runs\.push\(\{[\s\S]*?answers: answers/.test(html), 'moi luot phai luu dap an de xem lai');
+});
+check('tron cau hoi theo tung luot', () => {
+    assert.ok(html.includes('function buildOrder'), 'thieu ham tron');
+    assert.ok(html.includes('buildOrder(QS.length, CFG.shuffle)'), 'chua tao thu tu khi bat dau luot');
 });
 
 console.log('');

@@ -4188,7 +4188,8 @@ app.post('/api/export/offline', function (req, res) {
         mode: body.mode,
         attempts: body.attempts,
         minutes: body.minutes,
-        showAnswers: body.showAnswers
+        showAnswers: body.showAnswers,
+        shuffle: body.shuffle
     };
 
     inlineAssetImages(prepared.saved).then(function (list) {

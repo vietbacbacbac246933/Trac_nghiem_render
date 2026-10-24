@@ -163,7 +163,11 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
 - **Thi:** **1 lượt**, có thể đặt **thời gian** (phút); hết giờ tự nộp. Giáo viên
   chọn có hiện đáp án sau khi nộp hay không.
 - **Lịch sử làm bài:** mỗi lượt là một dòng thu gọn (điểm + thời điểm); bấm vào
-  đúng lượt cần xem mới hiện số câu đúng / sai / đúng một phần / chưa trả lời.
+  đúng lượt cần xem mới hiện chi tiết bài làm của lượt đó (câu đúng / sai, đáp án
+  đúng, đáp án đã chọn) kèm bộ lọc **Tất cả / Đúng / Đúng một phần / Sai / Chưa trả lời**.
+  30 lượt gần nhất còn xem lại được chi tiết; lượt cũ hơn chỉ còn điểm.
+- **Trộn thứ tự câu hỏi:** mỗi lượt làm xáo lại thứ tự câu (mặc định bật, tắt được
+  khi xuất). Đáp án và điểm vẫn tính theo câu gốc.
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
   từng câu, ảnh nhúng và công thức toán (render sẵn MathML).
 - Tiến trình và số lượt lưu bằng `localStorage` của trình duyệt; tải lại trang vẫn
