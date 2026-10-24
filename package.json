@@ -8,6 +8,7 @@
     "test:import": "node tests/test-import-docx.js",
     "test:shortanswer": "node tests/test-shortanswer.js",
     "test:import-shortanswer": "node tests/test-import-shortanswer.js",
+    "test:offline": "node tests/test-offline-quiz.js",
     "test:answer-tables": "node tests/test-answer-tables.js",
     "test:question-editor": "node tests/test-question-editor.js",
     "test:review": "node tests/test-review.js",

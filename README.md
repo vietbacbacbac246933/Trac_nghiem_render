@@ -148,6 +148,24 @@ Số trên nút được cập nhật ngay khi giáo viên sửa (chọn đáp �
 có thể lọc “Cần kiểm tra” rồi sửa lần lượt cho đến khi về 0. Đổi bộ lọc **không**
 làm mất nội dung đã sửa và **không** tự lưu gì.
 
+### Xuất bài kiểm tra offline (1 file HTML)
+
+Trong bản xem trước sau khi nhập Word, khối **“Xuất bài kiểm tra offline”** tạo ra
+**một file `.html` tự chạy**, không cần server hay mạng:
+
+- **Ôn tập:** làm lại theo **số lượt** giáo viên đặt (`0` = không giới hạn); sau khi
+  nộp xem được điểm, đáp án đúng và bài làm.
+- **Thi:** **1 lượt**, có thể đặt **thời gian** (phút); hết giờ tự nộp. Giáo viên
+  chọn có hiện đáp án sau khi nộp hay không.
+- Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
+  từng câu, ảnh nhúng và công thức toán (render sẵn MathML).
+- Tiến trình và số lượt lưu bằng `localStorage` của trình duyệt; tải lại trang vẫn
+  tiếp tục bài đang làm.
+- Câu chưa hợp lệ bị chặn trước khi xuất (không tự bỏ câu, không tự gán đáp án).
+
+**Giới hạn:** đáp án nằm trong file nên chỉ phù hợp để giao học sinh tự ôn/tự làm;
+không chống được học sinh đọc mã nguồn. Xoá dữ liệu trình duyệt sẽ xoá lượt đã làm.
+
 ### Nhập đề từ ẢNH bằng OCR (đã gỡ)
 
 Chức năng này đã được gỡ cùng `tesseract.js`, `pngjs`, `jpeg-js` và các route
@@ -167,6 +185,7 @@ API mới (đều yêu cầu đăng nhập giáo viên):
 |---|---|
 | `POST /api/import/preview` | Nhận 1 file `.docx`, kiểm tra, phân tích, trả bản xem trước + `sessionId` |
 | `POST /api/import/confirm` | Lưu câu hỏi sau khi giáo viên xác nhận |
+| `POST /api/export/offline` | Xuất câu hỏi đã xác nhận thành 1 file HTML offline |
 | `GET /api/exams/:examId` | Đọc nội dung 1 bài đã lưu (chỉ đọc) |
 
 ## 6. Giới hạn đã biết

@@ -49,6 +49,8 @@ var normalizePoints = grading.normalizePoints;
 var scoreQuestion = grading.scoreQuestion;
 // Logic che do On tap (gioi han luot, thoi gian, loc du lieu tra ve client)
 var practice = require('./lib/practice');
+// Tao file bai kiem tra offline (HTML tu chay) tu cau hoi da xac nhan
+var offlineQuiz = require('./lib/offline-quiz');
 
 // ========== HELPER FUNCTIONS CHO ES5 ==========
 // Merge objects (thay thế spread operator)
@@ -3994,22 +3996,10 @@ app.post('/api/import/preview', docxUpload.single('file'), function (req, res) {
     });
 });
 
-// ---- Bước 2: lưu SAU KHI giáo viên xác nhận (không lưu trước đó) ----
-app.post('/api/import/confirm', function (req, res) {
-    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
-
-    var body = req.body || {};
-    var session = importSessions.get(body.sessionId);
-    if (!session) {
-        return res.json({ success: false, error: 'Phiên nhập đề đã hết hạn hoặc không tồn tại. Vui lòng chọn lại file.' });
-    }
+// Chuan hoa danh sach cau hoi client gui ve (dung chung cho luu va xuat offline):
+// thay token anh, sanitize HTML, validate tung cau. Cau chua hop le vao `skipped`.
+function prepareIncomingQuestions(session, incoming) {
     var pool = session.pool || {};
-
-    var incoming = Array.isArray(body.questions) ? body.questions : [];
-    if (incoming.length === 0) {
-        return res.json({ success: false, error: 'Không có câu hỏi nào để lưu.' });
-    }
-
     var saved = [];
     var skipped = [];
     var excluded = 0;
@@ -4044,6 +4034,29 @@ app.post('/api/import/confirm', function (req, res) {
         if (!normalized) { skipped.push({ index: i, reason: errs.join('; ') }); return; }
         saved.push(normalized);
     });
+
+    return { saved: saved, skipped: skipped, excluded: excluded };
+}
+
+// ---- Bước 2: lưu SAU KHI giáo viên xác nhận (không lưu trước đó) ----
+app.post('/api/import/confirm', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+    var body = req.body || {};
+    var session = importSessions.get(body.sessionId);
+    if (!session) {
+        return res.json({ success: false, error: 'Phiên nhập đề đã hết hạn hoặc không tồn tại. Vui lòng chọn lại file.' });
+    }
+
+    var incoming = Array.isArray(body.questions) ? body.questions : [];
+    if (incoming.length === 0) {
+        return res.json({ success: false, error: 'Không có câu hỏi nào để lưu.' });
+    }
+
+    var prepared = prepareIncomingQuestions(session, incoming);
+    var saved = prepared.saved;
+    var skipped = prepared.skipped;
+    var excluded = prepared.excluded;
 
     if (saved.length === 0) {
         return res.json({
@@ -4101,6 +4114,93 @@ app.post('/api/import/confirm', function (req, res) {
         examId: newExamId, examName: examData.name,
         saved: saved.length, skipped: skipped, total: saved.length
     }, saveCounts));
+});
+
+// ========== XUAT BAI KIEM TRA OFFLINE (1 FILE HTML TU CHAY) ==========
+// Anh tai len duoc luu dang /api/assets/<id>; file offline khong co server nen
+// phai doi sang data URI de anh van hien khi mo file.
+function inlineAssetImages(questions) {
+    var re = /\/api\/assets\/([a-f0-9]{32}\.(?:png|jpe?g|gif|bmp|webp))/g;
+    var found = {};
+
+    function scan(html) {
+        if (typeof html !== 'string') return;
+        var m;
+        re.lastIndex = 0;
+        while ((m = re.exec(html)) !== null) found[m[1]] = true;
+    }
+
+    questions.forEach(function (q) {
+        scan(q.question);
+        (q.options || []).forEach(scan);
+    });
+
+    var ids = Object.keys(found);
+    if (!ids.length) return Promise.resolve(questions);
+
+    return Promise.all(ids.map(function (id) {
+        return DATA.readAsset(id).then(function (buffer) {
+            return { id: id, uri: (buffer && buffer.length) ? 'data:' + assets.mimeForId(id) + ';base64,' + buffer.toString('base64') : null };
+        });
+    })).then(function (rows) {
+        var map = {};
+        rows.forEach(function (r) { if (r.uri) map['/api/assets/' + r.id] = r.uri; });
+        function replace(html) {
+            if (typeof html !== 'string') return html;
+            Object.keys(map).forEach(function (url) { html = html.split(url).join(map[url]); });
+            return html;
+        }
+        return questions.map(function (q) {
+            return Object.assign({}, q, {
+                question: replace(q.question),
+                options: (q.options || []).map(replace)
+            });
+        });
+    });
+}
+
+app.post('/api/export/offline', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
+
+    var body = req.body || {};
+    var session = importSessions.get(body.sessionId);
+    if (!session) {
+        return res.status(400).json({ error: 'Phiên nhập đề đã hết hạn. Vui lòng chọn lại file Word.' });
+    }
+
+    var incoming = Array.isArray(body.questions) ? body.questions : [];
+    if (!incoming.length) {
+        return res.status(400).json({ error: 'Chưa chọn câu hỏi nào để xuất file.' });
+    }
+
+    var prepared = prepareIncomingQuestions(session, incoming);
+    if (prepared.skipped.length) {
+        return res.status(400).json({
+            error: 'Có ' + prepared.skipped.length + ' câu chưa hợp lệ, chưa thể xuất file.',
+            skipped: prepared.skipped
+        });
+    }
+
+    var title = String(body.title == null ? '' : body.title).replace(/[<>]/g, '').trim().slice(0, 100) || 'Bài kiểm tra';
+    var settings = {
+        mode: body.mode,
+        attempts: body.attempts,
+        minutes: body.minutes,
+        showAnswers: body.showAnswers
+    };
+
+    inlineAssetImages(prepared.saved).then(function (list) {
+        var html = offlineQuiz.renderQuiz({ title: title, questions: list, settings: settings });
+        var asciiName = slugFileName(title) + '.html';
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition',
+            'attachment; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodeURIComponent(title.slice(0, 80) + '.html'));
+        res.setHeader('X-Quiz-Filename', asciiName);
+        res.send(html);
+    }).catch(function (err) {
+        console.error('Lỗi xuất file offline:', err);
+        res.status(500).json({ error: 'Không tạo được file offline. Vui lòng thử lại.' });
+    });
 });
 
 // ========== HTML SANITIZER ==========
