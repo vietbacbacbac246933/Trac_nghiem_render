@@ -197,6 +197,17 @@ check('tron lua chon A/B/C/D trong tung cau', () => {
     assert.ok(html.includes('optionOrderOf(qi, state.current)'), 'man hinh lam bai khong dung thu tu da tron');
     assert.ok(!/letter\(oi\)/.test(html), 'chu cai dang lay theo chi so goc thay vi vi tri hien thi');
 });
+check('cau dung/sai: nut chon to, thay ro y da chon', () => {
+    assert.ok(html.includes('class="tf-choice"'), 'thieu nhom nut Đúng/Sai');
+    assert.ok(html.includes('input:checked + span'), 'trang thai chon phu thuoc :has()');
+    assert.ok(html.includes('aria-label="Ý \' + y + \': Đúng"'), 'nut chon thieu nhan cho trinh doc man hinh');
+    assert.ok(html.includes('min-height:44px'), 'nut chon qua nho de bam tren dien thoai');
+});
+check('tra loi ngan: o nhap ro rang tren dien thoai', () => {
+    assert.ok(html.includes('enterkeyhint="done"'), 'o nhap thieu enterkeyhint');
+    assert.ok(html.includes('class="short-hint"'), 'thieu goi y dinh dang dap an');
+    assert.ok(html.includes('aria-label="Trả lời ngắn cho câu \' + (pos + 1) + \'"'), 'o nhap thieu nhan cho trinh doc man hinh');
+});
 
 console.log('');
 console.log(passed + ' passed, ' + failed + ' failed');

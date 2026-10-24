@@ -191,7 +191,9 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
   theo vị trí đã trộn, nhưng điểm và đáp án vẫn tính theo câu gốc; xem lại bài làm
   hiện đúng thứ tự lựa chọn của chính lượt đó. Câu Đúng–Sai giữ nguyên ý a) b) c) d).
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
-  từng câu, ảnh nhúng và công thức toán (render sẵn MathML).
+  từng câu, ảnh nhúng và công thức toán (render sẵn MathML). Câu Đúng–Sai có nút
+  **Đúng/Sai** to, rõ cho từng ý a)–d); câu trả lời ngắn có ô nhập số kèm gợi ý định
+  dạng. Khi xem lại, mỗi ý Đúng–Sai hiện đáp án và lựa chọn của học sinh (✔/✘).
 - Tiến trình và số lượt lưu bằng `localStorage` của trình duyệt; tải lại trang vẫn
   tiếp tục bài đang làm.
 - Câu chưa hợp lệ bị chặn trước khi xuất (không tự bỏ câu, không tự gán đáp án).
