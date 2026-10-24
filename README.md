@@ -171,6 +171,11 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
 - **Báo đúng/sai ngay:** bật khi xuất để học sinh chọn xong mỗi câu là biết ngay
   đúng/sai (kèm đáp án đúng nếu giáo viên cho xem đáp án). Mặc định tắt.
 - **Nộp bài xong tự về đầu trang** để thấy ngay điểm và bảng đáp án.
+- **Nút ▲ / ▼** ở góc phải gần cuối màn hình để lên đầu hoặc xuống cuối trang khi xem lại.
+- **Chống gian lận** (mặc định bật, tắt được khi xuất): tự bật toàn màn hình khi
+  bấm vào file, không chọn/copy được nội dung, chặn chuột phải và các phím tắt
+  (Ctrl+C/X/A/S/P/U/F, Ctrl+Shift+I/J/C, F12). Đây chỉ là rào cản, không chống được
+  học sinh đọc mã nguồn hay dùng máy khác.
 - **Trộn thứ tự câu hỏi:** mỗi lượt làm xáo lại thứ tự câu (mặc định bật, tắt được
   khi xuất). Đáp án và điểm vẫn tính theo câu gốc.
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm

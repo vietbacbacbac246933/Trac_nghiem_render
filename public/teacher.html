@@ -1413,6 +1413,9 @@
                                 <input id="offlineInstant" type="checkbox"> Báo đúng/sai ngay sau khi chọn đáp án
                             </label>
                             <label style="flex:1 1 100%; display:flex; align-items:center; gap:8px; font-size:0.86em; color:#555; cursor:pointer;">
+                                <input id="offlineLockdown" type="checkbox" checked> Chống gian lận: toàn màn hình, chặn copy và phím tắt
+                            </label>
+                            <label style="flex:1 1 100%; display:flex; align-items:center; gap:8px; font-size:0.86em; color:#555; cursor:pointer;">
                                 <input id="offlineShowAnswers" type="checkbox" checked> Hiện đáp án đúng sau khi nộp
                             </label>
                         </div>
@@ -1479,6 +1482,9 @@
                     </label>
                     <label style="flex: 1 1 100%; display: flex; align-items: center; gap: 8px; font-size: 0.86em; color: #555; cursor: pointer;">
                         <input id="bankOfflineInstant" type="checkbox"> Báo đúng/sai ngay sau khi chọn đáp án
+                    </label>
+                    <label style="flex: 1 1 100%; display: flex; align-items: center; gap: 8px; font-size: 0.86em; color: #555; cursor: pointer;">
+                        <input id="bankOfflineLockdown" type="checkbox" checked> Chống gian lận: toàn màn hình, chặn copy và phím tắt
                     </label>
                     <label style="flex: 1 1 100%; display: flex; align-items: center; gap: 8px; font-size: 0.86em; color: #555; cursor: pointer;">
                         <input id="bankOfflineShowAnswers" type="checkbox" checked> Hiện đáp án đúng sau khi nộp
@@ -6052,6 +6058,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     showAnswers: document.getElementById('bankOfflineShowAnswers').checked,
                     shuffle: document.getElementById('bankOfflineShuffle').checked,
                     instant: document.getElementById('bankOfflineInstant').checked,
+                    lockdown: document.getElementById('bankOfflineLockdown').checked,
                     questions: list.map(q => ({
                         include: true,
                         type: q.type || 'single',
@@ -6094,6 +6101,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
             const showAnswers = document.getElementById('offlineShowAnswers').checked;
             const shuffle = document.getElementById('offlineShuffle').checked;
             const instant = document.getElementById('offlineInstant').checked;
+            const lockdown = document.getElementById('offlineLockdown').checked;
             const title = (document.getElementById('importNewExamName').value || '').trim() || 'Bài kiểm tra';
 
             const btn = document.getElementById('offlineExportBtn');
@@ -6112,6 +6120,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                     showAnswers: showAnswers,
                     shuffle: shuffle,
                     instant: instant,
+                    lockdown: lockdown,
                     questions: included.map(q => ({
                         include: true,
                         type: q.type,

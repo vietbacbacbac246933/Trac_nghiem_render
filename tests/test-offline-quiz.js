@@ -17,11 +17,11 @@ function check(name, fn) {
 console.log('normalizeSettings');
 check('on tap: giu so luot, bo thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'practice', attempts: 5, minutes: 90, showAnswers: false }),
-        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false, shuffle: true, instant: false });
+        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false, shuffle: true, instant: false, lockdown: true });
 });
 check('thi: chi 1 luot, giu thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'exam', attempts: 5, minutes: 90 }),
-        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true, shuffle: true, instant: false });
+        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true, shuffle: true, instant: false, lockdown: true });
 });
 check('tat tron cau hoi', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', shuffle: false }).shuffle, false);
@@ -29,6 +29,10 @@ check('tat tron cau hoi', () => {
 check('bat bao dung/sai ngay', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', instant: true }).instant, true);
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', instant: 'yes' }).instant, false);
+});
+check('chong gian lan: mac dinh bat, tat duoc', () => {
+    assert.strictEqual(offline.normalizeSettings({ mode: 'practice' }).lockdown, true);
+    assert.strictEqual(offline.normalizeSettings({ mode: 'practice', lockdown: false }).lockdown, false);
 });
 check('gia tri rac duoc kep trong khoang', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'exam', minutes: 'abc' }).minutes, 0);
@@ -146,6 +150,19 @@ check('bang dap an mau + bam o de nhay toi cau', () => {
 });
 check('nop bai xong tu ve dau trang', () => {
     assert.ok(html.includes('window.scrollTo(0, 0)'));
+});
+check('nut len dau / xuong cuoi trang', () => {
+    assert.ok(html.includes('class="jumpnav"'), 'thieu cum nut nhay');
+    assert.ok(html.includes('data-scroll="top"'));
+    assert.ok(html.includes('data-scroll="bottom"'));
+    assert.ok(html.includes('document.documentElement.scrollHeight'), 'khong cuon xuong cuoi');
+});
+check('chong gian lan: toan man hinh, chan copy, chan phim tat', () => {
+    assert.ok(html.includes('requestFullscreen'), 'thieu toan man hinh');
+    assert.ok(html.includes("'copy'") && html.includes("'contextmenu'"), 'thieu chan copy');
+    assert.ok(html.includes('function enterFullscreen'), 'thieu ham toan man hinh');
+    assert.ok(html.includes("'keydown'"), 'thieu chan phim tat');
+    assert.ok(html.includes('body.classList.add(\'locked\')'), 'thieu khoa boi den');
 });
 check('bao dung/sai ngay sau khi chon (khi bat)', () => {
     assert.ok(html.includes('function updateFeedback'), 'thieu ham bao dung/sai');
