@@ -189,6 +189,14 @@ check('tron cau hoi theo tung luot', () => {
     assert.ok(html.includes('function buildOrder'), 'thieu ham tron');
     assert.ok(html.includes('buildOrder(QS.length, CFG.shuffle)'), 'chua tao thu tu khi bat dau luot');
 });
+check('tron lua chon A/B/C/D trong tung cau', () => {
+    assert.ok(html.includes('function optionOrderOf'), 'thieu ham thu tu lua chon cua luot');
+    assert.ok(html.includes('optOrder: newOptionOrder()'), 'luot lam khong luu thu tu lua chon');
+    assert.ok(html.includes('optOrder: state.current.optOrder'), 'luot trong lich su khong luu thu tu lua chon');
+    assert.ok(html.includes('run.optOrder'), 'xem lai khong dung thu tu lua chon cua luot');
+    assert.ok(html.includes('optionOrderOf(qi, state.current)'), 'man hinh lam bai khong dung thu tu da tron');
+    assert.ok(!/letter\(oi\)/.test(html), 'chu cai dang lay theo chi so goc thay vi vi tri hien thi');
+});
 
 console.log('');
 console.log(passed + ' passed, ' + failed + ' failed');

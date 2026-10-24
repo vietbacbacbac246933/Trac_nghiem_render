@@ -186,8 +186,10 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
   bấm vào file, không chọn/copy được nội dung, chặn chuột phải và các phím tắt
   (Ctrl+C/X/A/S/P/U/F, Ctrl+Shift+I/J/C, F12). Đây chỉ là rào cản, không chống được
   học sinh đọc mã nguồn hay dùng máy khác.
-- **Trộn thứ tự câu hỏi:** mỗi lượt làm xáo lại thứ tự câu (mặc định bật, tắt được
-  khi xuất). Đáp án và điểm vẫn tính theo câu gốc.
+- **Trộn câu hỏi và lựa chọn:** mỗi lượt làm xáo lại thứ tự câu **và** thứ tự các
+  lựa chọn A/B/C/D trong từng câu (mặc định bật, tắt được khi xuất). Chữ cái hiển thị
+  theo vị trí đã trộn, nhưng điểm và đáp án vẫn tính theo câu gốc; xem lại bài làm
+  hiện đúng thứ tự lựa chọn của chính lượt đó. Câu Đúng–Sai giữ nguyên ý a) b) c) d).
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
   từng câu, ảnh nhúng và công thức toán (render sẵn MathML).
 - Tiến trình và số lượt lưu bằng `localStorage` của trình duyệt; tải lại trang vẫn
