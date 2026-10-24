@@ -130,6 +130,13 @@ Các kiểu trình bày “khó” đã được xử lý riêng (rút ra từ �
   **Đúng/Sai** với đáp án từng phát biểu a) b) c) d); **gạch chân dưới một phát biểu
   = phát biểu ĐÚNG** (cùng quy ước với gạch chân ở phần I). Không có dấu hiệu nào thì
   các phát biểu được để trống và câu bị đánh dấu *cần kiểm tra*.
+- **Tiêu đề phần ghi “học sinh chọn đúng hoặc sai”** (đề 2025: `PHẦN II. (4,0 điểm) …
+  chọn đúng hoặc sai.`) cũng được nhận là phần **Đúng/Sai**, nên bảng
+  `ĐÁP ÁN TRẮC NGHIỆM ĐÚNG SAI` ở cuối file ghép được đáp án từng ý a) b) c) d).
+- **Phần không câu nào có phương án A/B/C/D** (ví dụ `PHẦN III. (1,5 điểm) Học sinh
+  trả lời từ câu 1 đến câu 6.` — tiêu đề không ghi loại) được nhận là **trả lời
+  ngắn**, ghép đáp án từ bảng `ĐÁP ÁN TRẮC NGHIỆM TRẢ LỜI NGẮN`. Nếu chỉ *một vài*
+  câu mất phương án thì giữ nguyên trắc nghiệm và đánh dấu *cần kiểm tra*.
 - **Định dạng trang trí** (in đậm / nghiêng / gạch chân / màu chữ) bị **bỏ khỏi nội
   dung lưu** để bản xem trước đọc được như văn bản bình thường (trước đây ô sửa hiện
   ra cả thẻ `<strong>`). Ảnh nhúng, khối code và công thức toán vẫn được giữ nguyên.

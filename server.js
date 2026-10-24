@@ -4681,6 +4681,42 @@ function buildQuestionObj(type, question, options, correctAnswer, correctList, c
     return obj;
 }
 
+// Doi 1 cau "single khong co phuong an" thanh tra loi ngan (giu co needsReview
+// neu chua co dap an). Dung lai dung logic danh gia cua pushCurrent().
+function toShortAnswer(q) {
+    q.type = 'shortanswer';
+    q.options = [];
+    q.correct = -1;
+    q.correctList = null;
+    q.correctTF = null;
+    if (q.correctAnswer == null) q.correctAnswer = '';
+    q.answerDetected = !!q.correctAnswer;
+    if (Array.isArray(q.reviewReasons)) {
+        q.reviewReasons = q.reviewReasons.filter(function (r) {
+            return r.indexOf('cần ít nhất 2') < 0 && r.indexOf('Chưa xác định được đáp án đúng') < 0;
+        });
+        if (!q.answerDetected) q.reviewReasons.push('Chưa có đáp án trả lời ngắn — giáo viên cần nhập.');
+        q.needsReview = q.reviewReasons.length > 0;
+    }
+}
+
+// Chi doi khi TOAN BO cau cua phan khong co phuong an nao: tranh bien mot cau
+// trac nghiem bi loi doc dap an thanh cau tra loi ngan.
+function promoteOptionlessSections(questions) {
+    var groups = {};
+    questions.forEach(function (q) {
+        var key = (q.importMeta && q.importMeta.sectionIndex != null) ? q.importMeta.sectionIndex : -1;
+        (groups[key] = groups[key] || []).push(q);
+    });
+    Object.keys(groups).forEach(function (key) {
+        var group = groups[key];
+        var optionless = group.length > 0 && group.every(function (q) {
+            return (q.type || 'single') === 'single' && !(q.options && q.options.length);
+        });
+        if (optionless) group.forEach(toShortAnswer);
+    });
+}
+
 function parseQuestionsFromHtml(html, opts) {
     opts = opts || {};
     var parsedQuestions = [];
@@ -4803,6 +4839,8 @@ function parseQuestionsFromHtml(html, opts) {
         if (/trả\s+lời\s+ngắn/i.test(text)) return 'shortanswer';
         if (/trắc nghiệm\s+đúng\s*[-\/–—]?\s*sai/i.test(text)) return 'truefalse';
         if (/^\s*PHẦN\s+[IVXLC0-9]+\s*[\.:\-–—]?\s*(?:CÂU\s+)?(?:HỎI\s+)?ĐÚNG\s*[-\/–—]?\s*SAI/i.test(text)) return 'truefalse';
+        // "Trong mỗi ý a) b) c) d) ... học sinh chọn đúng hoặc sai" (đề 2025).
+        if (/chọn\s+đúng\s+(?:hoặc|hay)\s+sai|đúng\s+(?:hoặc|hay)\s+sai/i.test(text)) return 'truefalse';
         if (/trắc nghiệm\s+nhiều phương án/i.test(text)) return 'single';
         return null;
     }
@@ -4998,6 +5036,11 @@ function parseQuestionsFromHtml(html, opts) {
     }
 
     pushCurrent();
+
+    // Co de khong ghi loai cau o tieu de phan (vd "PHẦN III. (1,5 điểm) Học sinh
+    // trả lời từ câu 1 đến câu 6."). Phan ma KHONG cau nao co phuong an A/B/C/D
+    // chac chan la tra loi ngan, khong phai cau trac nghiem bi thieu dap an.
+    promoteOptionlessSections(parsedQuestions);
 
     // Ghep dap an tu bang cuoi file vao cau hoi da phan tich.
     var tableReport = answerTables.apply(parsedQuestions, tableResult.tables);

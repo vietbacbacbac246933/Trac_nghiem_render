@@ -10,6 +10,7 @@
     "test:import-shortanswer": "node tests/test-import-shortanswer.js",
     "test:offline": "node tests/test-offline-quiz.js",
     "test:answer-tables": "node tests/test-answer-tables.js",
+    "test:import-sections": "node tests/test-import-sections.js",
     "test:question-editor": "node tests/test-question-editor.js",
     "test:review": "node tests/test-review.js",
     "test:mem": "node tests/test-mem-monitor.js",
