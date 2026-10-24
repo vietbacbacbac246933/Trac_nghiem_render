@@ -17,14 +17,18 @@ function check(name, fn) {
 console.log('normalizeSettings');
 check('on tap: giu so luot, bo thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'practice', attempts: 5, minutes: 90, showAnswers: false }),
-        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false, shuffle: true });
+        { mode: 'practice', attempts: 5, minutes: 0, showAnswers: false, shuffle: true, instant: false });
 });
 check('thi: chi 1 luot, giu thoi gian', () => {
     assert.deepStrictEqual(offline.normalizeSettings({ mode: 'exam', attempts: 5, minutes: 90 }),
-        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true, shuffle: true });
+        { mode: 'exam', attempts: 1, minutes: 90, showAnswers: true, shuffle: true, instant: false });
 });
 check('tat tron cau hoi', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'practice', shuffle: false }).shuffle, false);
+});
+check('bat bao dung/sai ngay', () => {
+    assert.strictEqual(offline.normalizeSettings({ mode: 'practice', instant: true }).instant, true);
+    assert.strictEqual(offline.normalizeSettings({ mode: 'practice', instant: 'yes' }).instant, false);
 });
 check('gia tri rac duoc kep trong khoang', () => {
     assert.strictEqual(offline.normalizeSettings({ mode: 'exam', minutes: 'abc' }).minutes, 0);
@@ -132,6 +136,26 @@ check('moi luot xem lai duoc bai lam + bo loc', () => {
     assert.ok(html.includes('data-rev-filter'), 'thieu bo loc trong bai lam');
     assert.ok(html.includes('Xem lại bài làm'), 'thieu phan xem lai');
     assert.ok(html.includes('data-rev="'), 'thieu cho gan bai lam cua tung luot');
+});
+check('bang dap an mau + bam o de nhay toi cau', () => {
+    assert.ok(html.includes('class="rev-grid"'), 'thieu bang dap an');
+    assert.ok(html.includes('data-jump='), 'o trong bang chua bam duoc');
+    assert.ok(html.includes('cell \' + info.cls'), 'o trong bang chua to mau theo ket qua');
+    assert.ok(html.includes('function jumpTo'), 'thieu ham nhay toi cau');
+    assert.ok(html.includes('scrollIntoView'), 'bam o khong cuon toi cau');
+});
+check('nop bai xong tu ve dau trang', () => {
+    assert.ok(html.includes('window.scrollTo(0, 0)'));
+});
+check('bao dung/sai ngay sau khi chon (khi bat)', () => {
+    assert.ok(html.includes('function updateFeedback'), 'thieu ham bao dung/sai');
+    assert.ok(html.includes('CFG.instant'), 'khong doc cai dat instant');
+    assert.ok(html.includes('id="fb'), 'thieu o hien dung/sai trong cau');
+    const instant = offline.renderQuiz({
+        title: 'X', questions: questions,
+        settings: { mode: 'practice', instant: true }
+    });
+    assert.ok(instant.includes('"instant":true'), 'cai dat instant khong vao file');
 });
 check('lich su luu so cau dung/sai va dap an tung luot', () => {
     assert.ok(html.includes('correct: res.correct'));

@@ -163,9 +163,14 @@ File `.html` tạo ra tự chạy, không cần server hay mạng:
 - **Thi:** **1 lượt**, có thể đặt **thời gian** (phút); hết giờ tự nộp. Giáo viên
   chọn có hiện đáp án sau khi nộp hay không.
 - **Lịch sử làm bài:** mỗi lượt là một dòng thu gọn (điểm + thời điểm); bấm vào
-  đúng lượt cần xem mới hiện chi tiết bài làm của lượt đó (câu đúng / sai, đáp án
-  đúng, đáp án đã chọn) kèm bộ lọc **Tất cả / Đúng / Đúng một phần / Sai / Chưa trả lời**.
-  30 lượt gần nhất còn xem lại được chi tiết; lượt cũ hơn chỉ còn điểm.
+  đúng lượt cần xem mới hiện chi tiết bài làm của lượt đó: **bảng đáp án** tô màu
+  (xanh = đúng, vàng = đúng một phần, đỏ = sai, xám = chưa trả lời) và danh sách câu
+  kèm đáp án đúng / đáp án đã chọn. Bấm một ô trong bảng để nhảy ngay tới câu đó.
+  Có bộ lọc **Tất cả / Đúng / Đúng một phần / Sai / Chưa trả lời**. 30 lượt gần nhất
+  còn xem lại được chi tiết; lượt cũ hơn chỉ còn điểm.
+- **Báo đúng/sai ngay:** bật khi xuất để học sinh chọn xong mỗi câu là biết ngay
+  đúng/sai (kèm đáp án đúng nếu giáo viên cho xem đáp án). Mặc định tắt.
+- **Nộp bài xong tự về đầu trang** để thấy ngay điểm và bảng đáp án.
 - **Trộn thứ tự câu hỏi:** mỗi lượt làm xáo lại thứ tự câu (mặc định bật, tắt được
   khi xuất). Đáp án và điểm vẫn tính theo câu gốc.
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
