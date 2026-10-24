@@ -1438,6 +1438,45 @@
                 <p style="margin: 0; color: #666; font-size: 0.88em;">Các câu hỏi bên dưới sẽ được thêm vào bài kiểm tra đang chọn</p>
             </div>
 
+            <!-- Nhập Word + xuất file offline ngay tại phần câu hỏi -->
+            <details style="border: 1px solid #c7d2fe; border-radius: 10px; background: #f5f7ff; padding: 14px 18px; margin-bottom: 20px;">
+                <summary style="cursor: pointer; font-weight: 600; color: #3730a3; font-size: 0.95em;">📄 Nhập đề từ Word / Xuất file offline</summary>
+
+                <div style="margin-top: 14px;">
+                    <div style="font-weight: 600; color: #333; font-size: 0.9em; margin-bottom: 4px;">Nhập đề từ Word</div>
+                    <div style="font-size: 0.82em; color: #666; margin-bottom: 8px;">Chọn file .docx để xem trước, sửa rồi lưu vào bài đang soạn hoặc tạo bài mới.</div>
+                    <label class="btn btn-primary" style="display: inline-block; cursor: pointer; padding: 9px 16px;">
+                        Chọn file Word
+                        <input type="file" accept=".docx" style="display: none;" onchange="startImportPreview(this)">
+                    </label>
+                </div>
+
+                <div style="border-top: 1px solid #dbe2ee; margin: 16px 0 12px;"></div>
+
+                <div style="font-weight: 600; color: #333; font-size: 0.9em; margin-bottom: 4px;">Xuất file offline</div>
+                <div style="font-size: 0.82em; color: #666; margin-bottom: 10px;">Tải 1 file HTML tự chạy để gửi học sinh — dùng đúng câu hỏi và điểm đang có, không cần nhập lại.</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+                    <label style="flex: 1 1 220px; font-size: 0.84em; color: #555;">Chế độ
+                        <select id="bankOfflineMode" onchange="updateBankOfflineUI()" style="width: 100%; margin-top: 5px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.95em; background: #fff;">
+                            <option value="practice">Ôn tập — làm lại nhiều lần</option>
+                            <option value="exam">Thi — một lần, có tính giờ</option>
+                        </select>
+                    </label>
+                    <label id="bankOfflineAttemptsWrap" style="flex: 1 1 170px; font-size: 0.84em; color: #555;">Số lượt làm (0 = không giới hạn)
+                        <input id="bankOfflineAttempts" type="number" min="0" max="99" value="0" style="width: 100%; margin-top: 5px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.95em; box-sizing: border-box;">
+                    </label>
+                    <label id="bankOfflineMinutesWrap" style="flex: 1 1 170px; font-size: 0.84em; color: #555; display: none;">Thời gian (phút, 0 = không giới hạn)
+                        <input id="bankOfflineMinutes" type="number" min="0" max="600" value="0" style="width: 100%; margin-top: 5px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.95em; box-sizing: border-box;">
+                    </label>
+                    <label style="flex: 1 1 100%; display: flex; align-items: center; gap: 8px; font-size: 0.86em; color: #555; cursor: pointer;">
+                        <input id="bankOfflineShowAnswers" type="checkbox" checked> Hiện đáp án đúng sau khi nộp
+                    </label>
+                </div>
+                <button id="bankOfflineExportBtn" onclick="exportBankOffline()" style="margin-top: 12px; background: #0f766e; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95em;">
+                    ⬇ Tải file offline (<span id="bankOfflineCount">0</span> câu)
+                </button>
+            </details>
+
             <h2>Thêm câu hỏi mới</h2>
 
             <form id="questionForm">
@@ -2311,6 +2350,8 @@ C. Công thức nước là H₂O. (Đ)</pre>
             const container = document.getElementById('questionsList');
             renderTypeFilters();
             updatePointsSummary();
+            const bankCount = document.getElementById('bankOfflineCount');
+            if (bankCount) bankCount.textContent = questions.length;
 
             if (questions.length === 0) {
                 container.innerHTML = '<p style="color: #666; text-align: center;">Chưa có câu hỏi nào. Hãy thêm câu hỏi mới!</p>';
@@ -5939,6 +5980,85 @@ C. Công thức nước là H₂O. (Đ)</pre>
             }
         }
 
+        // Tải file HTML offline từ server — dùng chung cho xuất từ bản xem trước
+        // và xuất thẳng từ ngân hàng câu hỏi.
+        async function fetchOfflineFile(payload) {
+            const res = await fetch('/api/export/offline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                let msg = 'Không tạo được file offline.';
+                try {
+                    const data = await res.json();
+                    if (data.error) msg = data.error;
+                    if (data.skipped && data.skipped.length) {
+                        msg += '\n\n' + data.skipped.slice(0, 5).map(s => '• ' + s.reason).join('\n');
+                    }
+                } catch (e) {}
+                throw new Error(msg);
+            }
+
+            const blob = await res.blob();
+            const fileName = res.headers.get('X-Quiz-Filename') || 'bai-kiem-tra.html';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            return fileName;
+        }
+
+        function updateBankOfflineUI() {
+            const mode = document.getElementById('bankOfflineMode').value;
+            document.getElementById('bankOfflineAttemptsWrap').style.display = (mode === 'practice') ? '' : 'none';
+            document.getElementById('bankOfflineMinutesWrap').style.display = (mode === 'exam') ? '' : 'none';
+        }
+
+        // Xuất thẳng từ ngân hàng câu hỏi đang mở: không cần nhập lại file.
+        async function exportBankOffline() {
+            const list = questions.filter(q => q && q.question);
+            if (!list.length) { alert('Chưa có câu hỏi nào để xuất file.'); return; }
+
+            const examTitle = (currentSession && currentSession.examName) ? currentSession.examName : '';
+            const btn = document.getElementById('bankOfflineExportBtn');
+            const oldLabel = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = 'Đang tạo file...';
+
+            try {
+                const fileName = await fetchOfflineFile({
+                    title: examTitle || 'Bài kiểm tra',
+                    mode: document.getElementById('bankOfflineMode').value,
+                    attempts: Math.max(0, Math.min(99, parseInt(document.getElementById('bankOfflineAttempts').value, 10) || 0)),
+                    minutes: Math.max(0, Math.min(600, parseInt(document.getElementById('bankOfflineMinutes').value, 10) || 0)),
+                    showAnswers: document.getElementById('bankOfflineShowAnswers').checked,
+                    questions: list.map(q => ({
+                        include: true,
+                        type: q.type || 'single',
+                        question: q.question,
+                        options: q.options || [],
+                        correct: q.correct,
+                        correctList: q.correctList,
+                        correctTF: q.correctTF,
+                        correctAnswer: q.correctAnswer,
+                        points: (Number(q.points) > 0) ? Number(q.points) : 1
+                    }))
+                });
+                showNotification('✔ Đã tải ' + fileName + ' (' + list.length + ' câu).', 'success');
+            } catch (err) {
+                alert('✘ ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldLabel;
+            }
+        }
+
         // Xuất file HTML tự chạy để giáo viên gửi học sinh (không cần server).
         async function exportOfflineQuiz() {
             if (!_importPreview) return;
@@ -5967,58 +6087,29 @@ C. Công thức nước là H₂O. (Đ)</pre>
             setImportStatus('Đang tạo file offline...');
 
             try {
-                const res = await fetch('/api/export/offline', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sessionId: _importPreview.sessionId,
-                        title: title,
-                        mode: mode,
-                        attempts: attempts,
-                        minutes: minutes,
-                        showAnswers: showAnswers,
-                        questions: included.map(q => ({
-                            include: true,
-                            type: q.type,
-                            question: q.question,
-                            options: q.options,
-                            correct: q.correct,
-                            correctList: q.correctList,
-                            correctTF: q.correctTF,
-                            correctAnswer: q.correctAnswer,
-                            points: (Number(q.points) > 0) ? Number(q.points) : 1
-                        }))
-                    })
+                const fileName = await fetchOfflineFile({
+                    sessionId: _importPreview.sessionId,
+                    title: title,
+                    mode: mode,
+                    attempts: attempts,
+                    minutes: minutes,
+                    showAnswers: showAnswers,
+                    questions: included.map(q => ({
+                        include: true,
+                        type: q.type,
+                        question: q.question,
+                        options: q.options,
+                        correct: q.correct,
+                        correctList: q.correctList,
+                        correctTF: q.correctTF,
+                        correctAnswer: q.correctAnswer,
+                        points: (Number(q.points) > 0) ? Number(q.points) : 1
+                    }))
                 });
-
-                if (!res.ok) {
-                    let msg = 'Không tạo được file offline.';
-                    try {
-                        const data = await res.json();
-                        if (data.error) msg = data.error;
-                        if (data.skipped && data.skipped.length) {
-                            msg += '\n\n' + data.skipped.slice(0, 5).map(s => '• ' + s.reason).join('\n');
-                        }
-                    } catch (e) {}
-                    setImportStatus('');
-                    alert('✘ ' + msg);
-                    return;
-                }
-
-                const blob = await res.blob();
-                const fileName = res.headers.get('X-Quiz-Filename') || 'bai-kiem-tra.html';
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
                 setImportStatus('✔ Đã tạo file <b>' + escapeHtml(fileName) + '</b> (' + included.length + ' câu). Gửi file này cho học sinh.');
             } catch (err) {
                 setImportStatus('');
-                alert('Lỗi: ' + err.message);
+                alert('✘ ' + err.message);
             } finally {
                 btn.disabled = false;
                 btn.textContent = oldLabel;

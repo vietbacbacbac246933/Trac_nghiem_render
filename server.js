@@ -4163,7 +4163,9 @@ app.post('/api/export/offline', function (req, res) {
     if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền' });
 
     var body = req.body || {};
-    var session = importSessions.get(body.sessionId);
+    // Có sessionId: xuất từ bản xem trước vừa nhập (cần pool ảnh của phiên).
+    // Không có sessionId: xuất thẳng từ ngân hàng câu hỏi đang mở.
+    var session = body.sessionId ? importSessions.get(body.sessionId) : { pool: {} };
     if (!session) {
         return res.status(400).json({ error: 'Phiên nhập đề đã hết hạn. Vui lòng chọn lại file Word.' });
     }

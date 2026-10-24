@@ -103,6 +103,15 @@ check('khong co cau hoi van render duoc', () => {
     const empty = offline.renderQuiz({ title: 'Trống', questions: [], settings: {} });
     assert.ok(empty.includes('"questions":[]'));
 });
+check('lich su lam bai thu gon tung luot', () => {
+    assert.ok(html.includes('Lịch sử làm bài'));
+    assert.ok(html.includes('<details class="run">'), 'moi luot phai la <details> thu gon');
+});
+check('lich su luu so cau dung/sai, khong luu bai lam', () => {
+    assert.ok(html.includes('correct: res.correct'));
+    assert.ok(html.includes('wrong: res.wrong'));
+    assert.ok(!/runs\.push\(\{[^}]*answers/.test(html), 'khong nen luu dap an tung luot vao localStorage');
+});
 
 console.log('');
 console.log(passed + ' passed, ' + failed + ' failed');

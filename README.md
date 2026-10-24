@@ -150,13 +150,20 @@ làm mất nội dung đã sửa và **không** tự lưu gì.
 
 ### Xuất bài kiểm tra offline (1 file HTML)
 
-Trong bản xem trước sau khi nhập Word, khối **“Xuất bài kiểm tra offline”** tạo ra
-**một file `.html` tự chạy**, không cần server hay mạng:
+Xuất được ở **hai chỗ**, cùng một cấu hình:
+
+- **Tab Câu hỏi → 📄 Nhập đề từ Word / Xuất file offline:** xuất thẳng ngân hàng câu
+  hỏi đang mở (đúng câu hỏi và điểm đang có) — không phải nhập lại file Word.
+- **Bản xem trước sau khi nhập Word:** xuất ngay bản đang xem, chưa cần lưu.
+
+File `.html` tạo ra tự chạy, không cần server hay mạng:
 
 - **Ôn tập:** làm lại theo **số lượt** giáo viên đặt (`0` = không giới hạn); sau khi
   nộp xem được điểm, đáp án đúng và bài làm.
 - **Thi:** **1 lượt**, có thể đặt **thời gian** (phút); hết giờ tự nộp. Giáo viên
   chọn có hiện đáp án sau khi nộp hay không.
+- **Lịch sử làm bài:** mỗi lượt là một dòng thu gọn (điểm + thời điểm); bấm vào
+  đúng lượt cần xem mới hiện số câu đúng / sai / đúng một phần / chưa trả lời.
 - Hỗ trợ đủ 4 loại câu (một đáp án / nhiều đáp án / Đúng–Sai / trả lời ngắn), điểm
   từng câu, ảnh nhúng và công thức toán (render sẵn MathML).
 - Tiến trình và số lượt lưu bằng `localStorage` của trình duyệt; tải lại trang vẫn
@@ -185,7 +192,7 @@ API mới (đều yêu cầu đăng nhập giáo viên):
 |---|---|
 | `POST /api/import/preview` | Nhận 1 file `.docx`, kiểm tra, phân tích, trả bản xem trước + `sessionId` |
 | `POST /api/import/confirm` | Lưu câu hỏi sau khi giáo viên xác nhận |
-| `POST /api/export/offline` | Xuất câu hỏi đã xác nhận thành 1 file HTML offline |
+| `POST /api/export/offline` | Xuất câu hỏi thành 1 file HTML offline (có `sessionId` = từ bản xem trước, không có = từ ngân hàng đang mở) |
 | `GET /api/exams/:examId` | Đọc nội dung 1 bài đã lưu (chỉ đọc) |
 
 ## 6. Giới hạn đã biết
