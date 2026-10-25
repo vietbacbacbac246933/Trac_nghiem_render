@@ -138,6 +138,7 @@ var PORT = parseInt(process.env.PORT, 10) || 3456;
 app.set('trust proxy', 1);
 
 // Middleware
+app.use('/api/export/offline', express.json({ limit: '50mb' }));
 app.use(express.json({ limit: '2mb' }));
 
 // Chuan hoa duong dan truoc khi so sanh: phai giai ma %xx, gop dau "/" thua,
