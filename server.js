@@ -2809,6 +2809,33 @@ app.get('/api/review-lists/:listId/results', function (req, res) {
     res.json({ success: true, list: { id: list.id, name: list.name }, exams: exams });
 });
 
+// Giáo viên sửa điểm một lượt ôn tập đã nộp (phúc khảo).
+app.put('/api/review-lists/:listId/results/score', function (req, res) {
+    if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền sửa điểm' });
+    var list = getReviewList(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'Không tìm thấy danh sách ôn tập' });
+    var body = req.body || {};
+    var item = findReviewItem(list, body.examId);
+    if (!item) return res.status(404).json({ error: 'Đề không thuộc danh sách này' });
+    var score = Number(body.score);
+    if (!isFinite(score) || score < 0) return res.status(400).json({ error: 'Điểm không hợp lệ' });
+
+    var attempts = loadReviewAttempts(list.id, item.examId);
+    var attempt = attempts.find(function (a) {
+        return a && a.status === 'submitted' && String(a.id) === String(body.attemptId);
+    });
+    if (!attempt) return res.status(404).json({ error: 'Không tìm thấy lượt đã nộp' });
+    var maxScore = Number(attempt.maxScore) || 0;
+    if (maxScore > 0 && score > maxScore) {
+        return res.status(400).json({ error: 'Điểm không được lớn hơn ' + maxScore });
+    }
+
+    attempt.score = score;
+    attempt.scoreEditedAt = new Date().toISOString();
+    saveReviewAttempts(list.id, item.examId, attempts);
+    res.json({ success: true, attemptId: attempt.id, score: attempt.score, maxScore: attempt.maxScore });
+});
+
 // Xuất kết quả ôn tập của một đề ra Excel (.xlsx).
 app.get('/api/review-lists/:listId/results/export', function (req, res) {
     if (!isTeacher(req)) return res.status(403).json({ error: 'Không có quyền xuất kết quả' });

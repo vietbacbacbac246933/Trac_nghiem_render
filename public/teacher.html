@@ -459,6 +459,8 @@
         .review-summary-table .col-name { white-space: normal; min-width: 160px; }
         .review-score-cell { text-align: right; font-variant-numeric: tabular-nums; }
         .review-score-cell.empty { color: #9aa4b5; text-align: center; }
+        .review-score-cell.editable-score { cursor: pointer; }
+        .review-score-cell.editable-score:hover { background: #eef2ff; }
         .review-status {
             display: inline-block;
             padding: 2px 9px;
@@ -4893,13 +4895,40 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 ? '—' : formatReviewScore(value);
         }
 
-        function scoreCell(attempt) {
+        function scoreCell(attempt, stt, index) {
             if (!attempt || attempt.score === null || attempt.score === undefined) {
                 return '<td class="review-score-cell empty">—</td>';
             }
             const max = Number(attempt.maxScore);
-            return `<td class="review-score-cell"><strong>${escapeHtml(formatReviewScore(attempt.score))}</strong>` +
-                (max > 0 ? `<span style="color:#8a94a6;">/${escapeHtml(formatReviewScore(max))}</span>` : '') + '</td>';
+            return `<td class="review-score-cell editable-score" title="Bấm để sửa điểm" data-stt="${escapeHtml(String(stt))}" data-index="${Number(index)}"><strong>${escapeHtml(formatReviewScore(attempt.score))}</strong>` +
+                (max > 0 ? `<span style="color:#8a94a6;">/${escapeHtml(formatReviewScore(max))}</span>` : '') + ' ✎</td>';
+        }
+
+        // Bấm vào ô điểm để phúc khảo (chỉ giáo viên).
+        async function editReviewScore(stt, index) {
+            const exam = currentReviewExam();
+            const student = exam && (exam.students || []).find((s) => String(s.stt) === String(stt));
+            const attempt = student && (student.attempts || [])[index];
+            if (!attempt) return;
+            const input = prompt('Điểm mới cho ' + student.name + ' (0 - ' + formatReviewScore(attempt.maxScore) + '):',
+                formatReviewScore(attempt.score));
+            if (input === null) return;
+            const score = Number(String(input).trim().replace(',', '.'));
+            if (!isFinite(score) || score < 0) {
+                showNotification('Điểm không hợp lệ', 'error');
+                return;
+            }
+            try {
+                await reviewFetch('/api/review-lists/' + encodeURIComponent(reviewResultsListId) + '/results/score', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ examId: exam.examId, attemptId: attempt.id, score: score })
+                });
+                showNotification('Đã cập nhật điểm');
+                await showReviewResults(reviewResultsListId);
+            } catch (err) {
+                showNotification('Lỗi sửa điểm: ' + err.message, 'error');
+            }
         }
 
         // "6 & 8" = số lần thoát toàn màn hình & số lần đổi tab.
@@ -4976,7 +5005,7 @@ C. Công thức nước là H₂O. (Đ)</pre>
                 : Array.from({ length: maxAttempts }, (_, i) => i);
             const attemptHeads = columns.map((i) => `<th class="review-score-cell">Lần ${i + 1}</th>`).join('');
             const rows = students.map((s) => {
-                const cells = columns.map((i) => scoreCell((s.attempts || [])[i])).join('');
+                const cells = columns.map((i) => scoreCell((s.attempts || [])[i], s.stt, i)).join('');
                 const violations = escapeHtml(reviewViolationCell(s.attempts, attemptIndex));
                 return `<tr>
                     <td>${escapeHtml(String(s.stt))}</td>
@@ -5023,6 +5052,9 @@ C. Công thức nước là H₂O. (Đ)</pre>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
+            resultBody.querySelectorAll('.editable-score').forEach((td) => {
+                td.onclick = () => editReviewScore(td.dataset.stt, Number(td.dataset.index));
+            });
         }
 
         async function exportReviewResults() {
